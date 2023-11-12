@@ -1,0 +1,98 @@
+
+\documentclass[]{amsart}
+
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[serbian]{babel}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{float}
+\usepackage{fancyvrb}
+\usepackage{fancyhdr}
+
+% Let us first define a custom Verbatim environment, that saves us a lot of writing
+  \DefineVerbatimEnvironment{CodeListing}{Verbatim}%
+    {showtabs,commandchars=\\\{\}}% showspaces and showtabs only for visualizing
+
+
+\pagestyle{fancy}
+\addtolength{\headheight}{\baselineskip}
+
+\floatstyle{ruled}
+\newfloat{program}{p}{}
+\floatname{program}{Kod}
+\fancyhf{}
+\setlength{\headheight}{48pt}
+\fancyhead[L]{Stefan Nožinić, II godina master studija računarskih nauka \\
+Departman za matematiku i informatiku, Prirodno-matematički fakultet \\
+Univerzitet u Novom Sadu. \\
+}
+
+
+\begin{document}
+
+\title{VertexVoyage: Distribuirani sistem za potapanje ;vorova u realnim mrežama}
+\author{Stefan Nožinić \\
+student II godine master studija računarskih nauka \\
+Departman za matematiku i informatiku \\
+Prirodno-matematički fakultet \\
+Univerzitet u Novom Sadu. \\
+Tip rada: master rad \\
+Mentor: \MakeLowercase{prof. dr} Miloš Savić
+}
+
+\begin{abstract}
+    Ovaj dokument sadrži predlog istraživačkog projekta kao završnog rada na master studijama.
+    Istraživanje bi imalo za cilj implementaciju distribuiranog algoritma za potapanje čvorova u realnim mrežama gde je broj čvorova moguće skalirati na ogromne skale.     
+\end{abstract}
+
+
+\maketitle
+\newpage
+
+
+\section{Uvod}
+\label{sec:introduction}
+
+\cite{grover2016node2vec}
+
+
+\subsection{Prethodna istraživanja}
+\label{sec:prev_work}
+
+\section{Metode}
+\label{sec:methods}
+\subsection{Ulazni podaci}
+\label{sec:input_data}
+
+
+\subsection{Izlazni podaci}
+\label{sec:output_data}
+
+
+
+\subsection{Implementacija}
+\label{sec:implementation}
+
+\section{Prikupljanje rezultata}
+\label{sec:results}
+
+
+
+
+\section{Zaključak}
+\label{sec:conclusion}
+
+\bibliographystyle{unsrt}
+\bibliography{./refs.bib}
+
+
+\end{document}
+\endinput
