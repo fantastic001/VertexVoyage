@@ -38,7 +38,7 @@ Univerzitet u Novom Sadu. \\
 
 \begin{document}
 
-\title{VertexVoyage: Distribuirani sistem za potapanje čvorova u realnim mrežama}
+\title{VertexVoyage: Distribuirani sistem za embedovanje čvorova u realnim mrežama}
 \author{Stefan Nožinić \\
 student II godine master studija računarskih nauka \\
 Departman za matematiku i informatiku \\
@@ -50,7 +50,7 @@ Mentor: \MakeLowercase{prof. dr} Miloš Savić
 
 \begin{abstract}
     Ovaj dokument sadrži predlog istraživačkog projekta kao završnog rada na master studijama.
-    Istraživanje bi imalo za cilj implementaciju distribuiranog algoritma za potapanje čvorova u realnim mrežama gde je broj čvorova moguće skalirati na ogromne skale.
+    Istraživanje bi imalo za cilj implementaciju distribuiranog algoritma za embedovanje čvorova u realnim mrežama gde je broj čvorova moguće skalirati na ogromne skale.
 \end{abstract}
 
 
@@ -61,12 +61,12 @@ Mentor: \MakeLowercase{prof. dr} Miloš Savić
 \section{Uvod i opis problema}
 \label{sec:introduction}
 
-Dosta istraživanja je urađeno na temu potapanja čvorova u realnim mrežama 
+Dosta istraživanja je urađeno na temu embedovanja čvorova u realnim mrežama 
 sa ciljem dalje upotrebe u algoritmima mašinskog učenja i klasterisanja. \cite{grover2016node2vec}.
 
 Realne mreže su grafovi koji imaju specifična svojstva takva da oblikuju ponašanje mreža koje se mogu naći u prurodi. Ta svojstva se ogledaju pre svega u tome da takvi grafovi imaju jednu gigantsku komponentu, postojanje habova (čvorova sa visokim stepenom) i postojanjem fenomena malog sveta odnosno svojstva da je prosečna distanca između bilo koja dva čvora mala (često manja od 10). Takođe, izuzetno bitno svojstvo je i postojanje zajednica - delova grafa gde su čvorovi jako povezani međusobno, a slabo povezani van zajednice. 
 
-Jedan od najkorišćenijih algoritama za potapanje čvorova u realnim mrežama jeste node2vec \cite{grover2016node2vec}. Postoji dosta verzija paralelne implementacije ovog algoritma kao npr \cite{lombardo2019actornode2vec}, \cite{fang2023distributed}. Node2vec algoritam je baziran na principu po kom funkcioniše word2vec \cite{church2017word2vec}. Algoritam generiše sekvence čvorova pokretanjem nasumične šetnje po grafu, a zatim u drugoj fazi uz pomoć izgenerisanih sekvenci obučava neuronsku mrežu čija je arhitektura jedan skriveni sloj i softmax sloj na izlaznom delu. Cilj obučavanja mreže je maksimizacija verovatnoće predviđanja susednog čvora tokom nasumične šetnje za dati ulazni čvor. 
+Jedan od najkorišćenijih algoritama za embedovanje čvorova u realnim mrežama jeste node2vec \cite{grover2016node2vec}. Postoji dosta verzija paralelne implementacije ovog algoritma kao npr \cite{lombardo2019actornode2vec}, \cite{fang2023distributed}. Node2vec algoritam je baziran na principu po kom funkcioniše word2vec \cite{church2017word2vec}. Algoritam generiše sekvence čvorova pokretanjem nasumične šetnje po grafu, a zatim u drugoj fazi uz pomoć izgenerisanih sekvenci obučava neuronsku mrežu čija je arhitektura jedan skriveni sloj i softmax sloj na izlaznom delu. Cilj obučavanja mreže je maksimizacija verovatnoće predviđanja susednog čvora tokom nasumične šetnje za dati ulazni čvor. 
 
 Kako bi se ceo proces paralelizovao potrebno je uraditi paralelizaciju obe faze. Za paralelizaciju nasumične šetnje potrebno je uraditi particionisanje grafa. Neki od pokušaja particionisanja su opisani u \cite{lombardo2019actornode2vec}. Paralelizacija obučavanja neuronske mreže je rađena u \cite{gupta2018distributed} i \cite{anil2018large}. 
 
@@ -85,11 +85,11 @@ Metodologija koja će biti sprovedena je eksperimentalno istraživanje. Varijabl
 Za potrebe istraživanja, biće izmereni sledeći parametri:
 
 \begin{itemize}
-  \item Skaliranje - odnos vremena potrebnog za potapanje na jednom i na p procesora
+  \item Skaliranje - odnos vremena potrebnog za embedovanje na jednom i na p procesora
   \item Količina utrošenog vremena na komunikaciju između procesora 
 \end{itemize}
 
-Kako bi se verifikovala implementacija, izračunaće se korelacija između klastera dobijenih sa K-means klasterisanjem na potapanju dobijenom upotrebom standardnog node2vec algoritma i potapanju dobijenom paralelne implementacije. Ovde je očekivanje da postoji pozitivna korelacije između klastera. 
+Kako bi se verifikovala implementacija, izračunaće se korelacija između klastera dobijenih sa K-means klasterisanjem na embedovanju dobijenom upotrebom standardnog node2vec algoritma i embedovanju dobijenom paralelne implementacije. Ovde je očekivanje da postoji pozitivna korelacije između klastera. 
 
 
 
