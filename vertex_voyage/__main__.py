@@ -5,6 +5,7 @@ import cdlib.algorithms
 import cdlib.utils
 import numpy as np
 import vertex_voyage.node2vec as nv 
+import sklearn
 
 # get Zachary's Karate Club graph
 G = nx.karate_club_graph()
@@ -43,19 +44,26 @@ def get_embedding(G):
     Get the embedding of a graph
     """
     # create a Node2Vec object
-    node2vec = nv.Node2Vec(dim=128, walk_size=10, n_walks=100, window_size=5)
+    node2vec = nv.Node2Vec(dim=4, walk_size=10, n_walks=100, window_size=5)
 
     # fit the Node2Vec object to the graph
-    model = node2vec.fit(G)
+    node2vec.fit(G)
 
-    return model
+    return node2vec
     
 
 def kmeans(nodes):
     """
     Perform k-means clustering on a set of nodes
     """
-    return np.random.randint(0, 3, len(nodes))
+    # create a k-means object
+    kmeans = sklearn.cluster.KMeans(n_clusters=2)
+
+    # fit the k-means object to the nodes
+    km = kmeans.fit(nodes)
+
+    return km.labels_
+    
 
 def cluster_similarity(km1, km2):
     """
@@ -73,9 +81,15 @@ print("Embedding of G:")
 model = get_embedding(G)
 print("Weights: " + str(model))
 
+v = []
+for node in G.nodes():
+    v.append(model.embed_node(node))
+v = np.array(v)
+print("Embedding of G with vertices : " + str(v))
+    
 
 print("K-means clustering of G:")
-print(kmeans(G.nodes()))
+print(kmeans(v))
 
 print("Cluster similarity:")
-print(cluster_similarity(kmeans(G.nodes()), kmeans(G.nodes())))
+print(cluster_similarity(kmeans(v), kmeans(v)))

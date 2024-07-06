@@ -25,8 +25,11 @@ class Node2Vec:
         return result
 
     def embed_node(self, node):
-        return self.model[self.nodes[node]]
+        return self.model[list(self.G.nodes()).index(node)]
     
+    def embed_nodes(self, nodes):
+        return [self.embed_node(node) for node in nodes]
+
     def _random_walks(self):
         walks = []
         for i in range(self.n_walks):
