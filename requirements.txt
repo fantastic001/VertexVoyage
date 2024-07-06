@@ -1,0 +1,5 @@
+cdlib
+networkx
+numpy
+scikit-learn 
+tensorflow
