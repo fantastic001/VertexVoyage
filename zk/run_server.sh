@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-SERVER_NUM=3
+SERVER_NUM=${SERVER_NUM:-3}
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
