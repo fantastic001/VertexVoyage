@@ -2,15 +2,49 @@
 import networkx as nx 
 import numpy as np 
 import tensorflow as tf
-
+import random 
 class Node2Vec:
 
-    def __init__(self, dim, walk_size, n_walks, window_size, epochs=10) -> None:
+    def __init__(self, 
+                 dim, 
+                 walk_size, 
+                 n_walks, 
+                 window_size, 
+                 epochs=10, 
+                 p = .5, 
+                 q = .5,
+                 seed = None 
+            ) -> None:
         self.dim = dim
         self.walk_size = walk_size 
         self.n_walks = n_walks  
         self.window_size = window_size
         self.epochs = epochs
+        self.p = p
+        self.q = q
+        if seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
+        else:
+            np.random.seed()
+            random.seed()
+    
+    def _get_next(self, prev, current):
+        neighbors = list(self.G.neighbors(current))
+        weights = []
+        for neighbor in neighbors:
+            weight = self.G[current][neighbor].get('weight', 1)
+            if neighbor == prev:
+                weights.append(1/self.p)
+            elif prev is not None and neighbor in self.G.neighbors(prev):
+                weights.append(1)
+            else:
+                weights.append(1/self.q)
+            weights[-1] *= weight
+        weights = np.array(weights, dtype=np.float64)
+        weights /= weights.sum()
+        return np.random.choice(neighbors, p=weights)
+
     def fit(self, G):
         self.G = G
         self.nodes = {node: self._encode(node) for node in self.G.nodes()}
@@ -39,11 +73,13 @@ class Node2Vec:
     
     def _random_walk(self, node):
         walk = [self.nodes[node]]
-        for _ in range(self.walk_size):
-            neighbors = list(self.G.neighbors(node))
-            if neighbors:
-                node = np.random.choice(neighbors)
-                walk.append(self.nodes[node])
+        current = node
+        prev = None
+        for _ in range(self.walk_size - 1):
+            next_node = self._get_next(prev, current)
+            walk.append(self.nodes[next_node])
+            prev = current
+            current = next_node
         return walk
     
 
