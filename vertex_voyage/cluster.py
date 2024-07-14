@@ -12,7 +12,8 @@ ENV_NODE_NAME = os.getenv('NODE_NAME', random.randbytes(4).hex())
 def get_zk_client():
     global zk 
     if zk is None:
-        zk = KazooClient(hosts='localhost:2181')
+        hosts = os.getenv('ZK_HOSTS', 'localhost:2181')
+        zk = KazooClient(hosts=hosts)
         zk.start()
     else:
         if not zk.connected:
