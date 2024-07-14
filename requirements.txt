@@ -3,3 +3,5 @@ networkx
 numpy
 scikit-learn 
 tensorflow
+zookeeper
+kazoo

@@ -6,6 +6,7 @@ import cdlib.utils
 import numpy as np
 import vertex_voyage.node2vec as nv 
 import sklearn
+from vertex_voyage.cluster import *
 
 # get Zachary's Karate Club graph
 G = nx.karate_club_graph()
@@ -115,5 +116,23 @@ class Executor:
         return None
     def train_model(self, graph_name: str):
         return None
+        
+
+    def zk(self):
+        client = get_zk_client()
+        register_node()
+        nodes = get_nodes()
+        node_data = get_node_data(nodes[0])
+        node_index = get_node_index(nodes[0])
+        node_by_index = get_node_by_index(1)
+        leader = get_leader()
+        current_node = get_current_node()
+        return {
+            "node_data": node_data,
+            "node_index": node_index,
+            "node_by_index": node_by_index,
+            "leader": leader,
+            "current_node": current_node
+        }
 
 COMMAND_CLASSES = ["Executor"]
