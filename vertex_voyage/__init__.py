@@ -8,8 +8,6 @@ import vertex_voyage.node2vec as nv
 import sklearn
 from vertex_voyage.cluster import *
 
-# get Zachary's Karate Club graph
-G = nx.karate_club_graph()
 
 def calculate_graph_similarity(g1, g2):
     """
@@ -72,28 +70,33 @@ def cluster_similarity(km1, km2):
     """
     return np.mean(km1 == km2)
 
-print(calculate_graph_similarity(G, G))
 
-print("Partitions of G:")
-for community in partition_graph(G):
-    print(community)
+def run_poc():
+    # get Zachary's Karate Club graph
+    G = nx.karate_club_graph()
+    print(calculate_graph_similarity(G, G))
 
-print("Embedding of G:")
-model = get_embedding(G)
-print("Weights: " + str(model))
+    print("Partitions of G:")
+    for community in partition_graph(G):
+        print(community)
 
-v = []
-for node in G.nodes():
-    v.append(model.embed_node(node))
-v = np.array(v)
-print("Embedding of G with vertices : " + str(v))
-    
+    print("Embedding of G:")
+    model = get_embedding(G)
+    print("Weights: " + str(model))
 
-print("K-means clustering of G:")
-print(kmeans(v))
+    v = []
+    for node in G.nodes():
+        v.append(model.embed_node(node))
+    v = np.array(v)
+    print("Embedding of G with vertices : " + str(v))
+        
 
-print("Cluster similarity:")
-print(cluster_similarity(kmeans(v), kmeans(v)))
+    print("K-means clustering of G:")
+    print(kmeans(v))
+
+    print("Cluster similarity:")
+    print(cluster_similarity(kmeans(v), kmeans(v)))
+
 
 class Executor:
     def create_graph(self, name: str):
