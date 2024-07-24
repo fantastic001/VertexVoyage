@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  zoo1:
+    image: zookeeper
+    hostname: zoo1
+    container_name: zoo1
+    environment:
+      ZOO_MY_ID: 1
+      # ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+    volumes:
+      - ./zoo.cfg:/conf/zoo.cfg
+    ports:
+      - "2181:2181"
+      - "2888:2888"
+      - "3888:3888"
+    networks:
+      - zoo_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  zoo2:
+    image: zookeeper
+    hostname: zoo2
+    container_name: zoo2
+    environment:
+      ZOO_MY_ID: 2
+      # ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+    volumes:
+      - ./zoo.cfg:/conf/zoo.cfg
+    ports:
+      - "2182:2181"
+      - "2889:2888"
+      - "3889:3888"
+    networks:
+      - zoo_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  zoo3:
+    image: zookeeper
+    hostname: zoo3
+    container_name: zoo3
+    environment:
+      ZOO_MY_ID: 3
+      # ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+    volumes:
+      - ./zoo.cfg:/conf/zoo.cfg
+    ports:
+      - "2183:2181"
+      - "2890:2888"
+      - "3890:3888"
+    networks:
+      - zoo_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  vertex_voyage1:
+    image: vertexvoyage:latest
+    hostname: vv1
+    container_name: vertex_voyage1
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+    networks:
+      - zoo_net
+    environment:
+      - ZK_HOSTS=zoo1:2181,zoo2:2181,zoo3:2181
+    healthcheck:
+      test: ["CMD", "nc", "-z", "zoo1", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  vertex_voyage2:
+    image: vertexvoyage:latest
+    hostname: vv2
+    container_name: vertex_voyage2
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+    networks:
+      - zoo_net
+    environment:
+      - ZK_HOSTS=zoo1:2181,zoo2:2181,zoo3:2181
+    healthcheck:
+      test: ["CMD", "nc", "-z", "zoo1", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  vertex_voyage3:
+    image: vertexvoyage:latest
+    hostname: vv3
+    container_name: vertex_voyage3
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+    networks:
+      - zoo_net
+    environment:
+      - ZK_HOSTS=zoo1:2181,zoo2:2181,zoo3:2181
+    healthcheck:
+      test: ["CMD", "nc", "-z", "zoo1", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+networks:
+  zoo_net:
+    driver: bridge
