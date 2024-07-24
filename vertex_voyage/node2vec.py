@@ -31,6 +31,8 @@ class Node2Vec:
     
     def _get_next(self, prev, current):
         neighbors = list(self.G.neighbors(current))
+        if neighbors == []:
+            return current
         weights = []
         for neighbor in neighbors:
             weight = self.G[current][neighbor].get('weight', 1)
