@@ -2,6 +2,7 @@
 import networkx as nx 
 import numpy as np 
 import tensorflow as tf
+from tensorflow.keras.losses import CategoricalCrossentropy
 import random 
 class Node2Vec:
 
@@ -13,6 +14,7 @@ class Node2Vec:
                  epochs=10, 
                  p = .5, 
                  q = .5,
+                 batch_size = None,
                  seed = None 
             ) -> None:
         self.dim = dim
@@ -22,6 +24,7 @@ class Node2Vec:
         self.epochs = epochs
         self.p = p
         self.q = q
+        self.batch_size = batch_size
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
@@ -30,7 +33,8 @@ class Node2Vec:
             random.seed()
     
     def _get_next(self, prev, current):
-        neighbors = list(self.G.neighbors(current))
+        neighbors = list(self.G.neighbors(current)) 
+        neighbors = list(set(neighbors))
         if neighbors == []:
             return current
         weights = []
@@ -51,7 +55,7 @@ class Node2Vec:
         self.G = G
         self.nodes = {node: self._encode(node) for node in self.G.nodes()}
         self.walks = self._random_walks()
-        self.model = self._train()
+        self.W = self._train()
         return self.model
 
     def _encode(self, node):
@@ -61,7 +65,7 @@ class Node2Vec:
         return result
 
     def embed_node(self, node):
-        return self.model[list(self.G.nodes()).index(node)]
+        return self.W[list(self.G.nodes()).index(node)]
     
     def embed_nodes(self, nodes):
         return [self.embed_node(node) for node in nodes]
@@ -94,17 +98,27 @@ class Node2Vec:
                 for nb in walk[max(i - self.window_size, 0): i + self.window_size]:
                     if (nb != node).any():
                         x.append(node)
-                        y.append(nb)  
+                        y.append(nb)
         # use tensorflow and implement word2vec 
         x = np.array(x)
         y = np.array(y)
-        print("x and y shape:")
-        print(x.shape, y.shape)
         model = tf.keras.Sequential()
-        model.add(tf.keras.layers.Embedding(input_dim=len(self.G.nodes()), output_dim=self.dim))
-        model.add(tf.keras.layers.Dense(len(self.G.nodes()), activation='softmax'))
-        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        model.fit(x, y, epochs=self.epochs)
+        model.add(tf.keras.layers.Dense(
+            input_dim=len(self.G.nodes()), 
+            units=self.dim,
+            use_bias = False
+        ))
+        model.add(tf.keras.layers.Dense(
+            units=len(self.G.nodes()), 
+            activation='softmax')
+        )
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate = 0.01), 
+            loss=CategoricalCrossentropy(), 
+            metrics=['accuracy']
+        )
+        model.fit(x, y, epochs=self.epochs, batch_size=self.batch_size)
         # return weights of embedding layer 
         W, *_ = model.layers[0].get_weights()
+        self.model = model 
         return W
