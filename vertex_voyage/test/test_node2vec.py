@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 from vertex_voyage.node2vec import Node2Vec
 from sklearn.cluster import KMeans
+from vertex_voyage.reconstruction import reconstruct
 
 class TestNode2Vec(unittest.TestCase):
 
@@ -17,7 +18,7 @@ class TestNode2Vec(unittest.TestCase):
         self.node2vec = Node2Vec(dim=2, walk_size=10, n_walks=10, window_size=2, epochs=1, seed=42)
 
     def test_fit(self):
-        model = self.node2vec.fit(self.G)
+        model = self.node2vec.fit(self.G).layers[0].get_weights()[0]
         self.assertEqual(model.shape[0], len(self.G.nodes()))
         self.assertEqual(model.shape[1], self.node2vec.dim)
 
@@ -28,6 +29,30 @@ class TestNode2Vec(unittest.TestCase):
         self.assertEqual(len(walks), self.node2vec.n_walks)
         for walk in walks:
             self.assertEqual(len(walk), self.node2vec.walk_size)
+        
+        G = nx.Graph()
+        G.add_edge(1, 2, weight=1.0)
+        G.add_edge(4, 3, weight=1.0)
+        node2vec = Node2Vec(dim=2, walk_size=10, n_walks=10, window_size=2, epochs=1, seed=42)
+        node2vec.G = G
+        node2vec.nodes = {node: node2vec._encode(node) for node in G.nodes()}
+        walks = node2vec._random_walks()
+        self.assertEqual(len(walks), node2vec.n_walks)
+        for walk in walks:
+            self.assertEqual(len(walk), node2vec.walk_size)
+            decoded_walk = [] 
+            for w in walk:
+                decoded = [k for k, v in node2vec.nodes.items() if (v == w).all()][0]
+                decoded_walk.append(decoded)
+            if 1 in decoded_walk:
+                self.assertTrue(2 in decoded_walk)
+                self.assertFalse(3 in decoded_walk)
+                self.assertFalse(4 in decoded_walk)
+            if 4 in decoded_walk:
+                self.assertTrue(3 in decoded_walk)
+                self.assertFalse(1 in decoded_walk)
+                self.assertFalse(2 in decoded_walk)
+
 
     def test_embed_node(self):
         self.node2vec.fit(self.G)
@@ -43,7 +68,7 @@ class TestNode2Vec(unittest.TestCase):
         for embedding in embeddings:
             self.assertEqual(len(embedding), self.node2vec.dim)
 
-    def test_embedding_node_distance(self):
+    def test_reconstruct(self):
         # create graph with 3 nodes, where 2 nodes are connected and one is isolated 
         G = nx.Graph()
         G.add_edge(1, 2, weight=1.0)
@@ -53,25 +78,56 @@ class TestNode2Vec(unittest.TestCase):
         node2vec.fit(G)
         # calculate embeddings
         embeddings = node2vec.embed_nodes(G.nodes())
-        # calculate distance between embeddings
-        distance = np.linalg.norm(embeddings[0] - embeddings[1])
-        self.assertGreater(distance, 0)
-        # calculate distance between isolated node and connected node
-        distance2 = np.linalg.norm(embeddings[0] - embeddings[2])
-        self.assertGreater(distance2, 0)
-        self.assertGreater(distance2, distance)
+        # reconstruct graph
+        reconstructed_graph = reconstruct(1, embeddings)
+        self.assertEqual(reconstructed_graph.number_of_edges(), 1)
 
-        # now create graph with 4 nodes where 2 nodes are connected and 2 other nodes are connected 
+        # create graph with 4 nodes where 2 nodes are connected and 2 other nodes are connected 
         G = nx.Graph()
-        G.add_edge(1, 2, weight=1.0)
-        G.add_edge(3, 4, weight=1.0)
+        nodes = [1, 2, 3, 4]
+        G.add_edge(nodes[0], nodes[1], weight=1.0)
+        G.add_edge(nodes[2], nodes[3], weight=1.0)
         # fit node2vec model
-        node2vec = Node2Vec(dim=2, walk_size=10, n_walks=10, window_size=50, epochs=1, seed=42)
+        node2vec = Node2Vec(dim=4, walk_size=10, n_walks=100, window_size=5, seed=42, epochs=10, p=.25, q=4, batch_size=32)
+        node2vec.fit(G)
+        # calculate embeddings
+        embeddings = node2vec.embed_nodes(nodes)
+        # reconstruct graph
+        reconstructed_graph = reconstruct(2, embeddings, nodes)
+        print(reconstructed_graph.edges())
+        self.assertEqual(reconstructed_graph.number_of_edges(), 2)
+
+        # test model prediction of context neighbor 
+        for n in nodes:
+            x = node2vec.nodes[n]
+            pred = node2vec.model.predict(np.array([x]))
+            predicted_node = pred.argmax()
+            self.assertTrue(nodes[predicted_node] in G.neighbors(n))
+
+        precision = len(set(G.edges()).intersection(reconstructed_graph.edges())) / len(reconstructed_graph.edges())
+        self.assertEqual(precision, 1.0)
+        
+
+    def test_zachary_recall_reconstructed_graph(self):
+        # load karate club graph
+        G = nx.karate_club_graph()
+        nodes = list(G.nodes())
+        # fit node2vec model
+        node2vec = Node2Vec(
+            dim=10, 
+            walk_size=80, 
+            n_walks=100, 
+            window_size=10, 
+            epochs=10, 
+            p = 1,
+            q = 1,
+            seed=None
+        )
         node2vec.fit(G)
         # calculate embeddings
         embeddings = node2vec.embed_nodes(G.nodes())
-        # now lets do k-means on embeddings and see if clsters are assigned properly
-        kmeans = KMeans(n_clusters=2, random_state=0).fit(embeddings)
-        self.assertEqual(kmeans.labels_[0], kmeans.labels_[1])
-        self.assertEqual(kmeans.labels_[2], kmeans.labels_[3])
-        self.assertNotEqual(kmeans.labels_[0], kmeans.labels_[2])
+        # reconstruct graph
+        k = len(G.edges())
+        reconstructed_graph = reconstruct(k, embeddings, nodes)
+        recall = len(set(G.edges()).intersection(reconstructed_graph.edges())) / len(G.edges())
+        self.assertGreaterEqual(recall, 0.7)
