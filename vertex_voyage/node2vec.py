@@ -25,6 +25,7 @@ class Node2Vec:
         self.p = p
         self.q = q
         self.batch_size = batch_size
+        self.seed = seed
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
@@ -106,16 +107,19 @@ class Node2Vec:
         model.add(tf.keras.layers.Dense(
             input_dim=len(self.G.nodes()), 
             units=self.dim,
-            use_bias = False
+            use_bias = False,
+            kernel_initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=10, seed=self.seed)
         ))
         model.add(tf.keras.layers.Dense(
             units=len(self.G.nodes()), 
-            activation='softmax')
-        )
+            activation='softmax',
+            use_bias = False,
+            kernel_initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=10, seed=self.seed)
+        ))
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate = 0.01), 
             loss=CategoricalCrossentropy(), 
-            metrics=['accuracy']
+            metrics=['accuracy'],
         )
         model.fit(x, y, epochs=self.epochs, batch_size=self.batch_size)
         # return weights of embedding layer 
