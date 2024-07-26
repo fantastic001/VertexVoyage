@@ -114,18 +114,20 @@ class TestNode2Vec(unittest.TestCase):
         nodes = list(G.nodes())
         # fit node2vec model
         node2vec = Node2Vec(
-            dim=10, 
+            dim=100, 
             walk_size=80, 
             n_walks=100, 
-            window_size=10, 
+            window_size=4,
             epochs=10, 
             p = 1,
             q = 1,
-            seed=None
+            batch_size=None,
+            seed=42,
+            learning_rate=0.8
         )
         node2vec.fit(G)
         # calculate embeddings
-        embeddings = node2vec.embed_nodes(G.nodes())
+        embeddings = node2vec.embed_nodes(nodes)
         # reconstruct graph
         k = len(G.edges())
         reconstructed_graph = reconstruct(k, embeddings, nodes)
