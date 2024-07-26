@@ -15,6 +15,7 @@ class Node2Vec:
                  p = .5, 
                  q = .5,
                  batch_size = None,
+                 learning_rate = 0.01,
                  seed = None 
             ) -> None:
         self.dim = dim
@@ -22,6 +23,7 @@ class Node2Vec:
         self.n_walks = n_walks  
         self.window_size = window_size
         self.epochs = epochs
+        self.learning_rate = learning_rate
         self.p = p
         self.q = q
         self.batch_size = batch_size
@@ -117,7 +119,7 @@ class Node2Vec:
             kernel_initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=10, seed=self.seed)
         ))
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate = 0.01), 
+            optimizer=tf.keras.optimizers.Adam(learning_rate = self.learning_rate), 
             loss=CategoricalCrossentropy(), 
             metrics=['accuracy'],
         )
