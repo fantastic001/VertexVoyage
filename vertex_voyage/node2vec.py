@@ -2,8 +2,8 @@
 import networkx as nx 
 import numpy as np 
 import tensorflow as tf
-from tensorflow.keras.losses import CategoricalCrossentropy
 import random 
+from vertex_voyage.word2vec import word2vec
 class Node2Vec:
 
     def __init__(self, 
@@ -59,7 +59,7 @@ class Node2Vec:
         self.nodes = {node: self._encode(node) for node in self.G.nodes()}
         self.walks = self._random_walks()
         self.W = self._train()
-        return self.model
+        return self.W
 
     def _encode(self, node):
         result = np.zeros(len(self.G.nodes()))
@@ -94,37 +94,20 @@ class Node2Vec:
 
     
     def _train(self):
-        x = []
-        y = []
+        training_data = [] 
+        node_indices = [node.argmax() for node in self.nodes.values()]
         for walk in self.walks:
             for i, node in enumerate(walk):
-                for nb in walk[max(i - self.window_size, 0): i + self.window_size]:
-                    if (nb != node).any():
-                        x.append(node)
-                        y.append(nb)
-        # use tensorflow and implement word2vec 
-        x = np.array(x)
-        y = np.array(y)
-        model = tf.keras.Sequential()
-        model.add(tf.keras.layers.Dense(
-            input_dim=len(self.G.nodes()), 
-            units=self.dim,
-            use_bias = False,
-            kernel_initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=10, seed=self.seed)
-        ))
-        model.add(tf.keras.layers.Dense(
-            units=len(self.G.nodes()), 
-            activation='softmax',
-            use_bias = False,
-            kernel_initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=10, seed=self.seed)
-        ))
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate = self.learning_rate), 
-            loss=CategoricalCrossentropy(), 
-            metrics=['accuracy'],
-        )
-        model.fit(x, y, epochs=self.epochs, batch_size=self.batch_size)
-        # return weights of embedding layer 
-        W, *_ = model.layers[0].get_weights()
-        self.model = model 
-        return W
+                node_index = node.argmax()
+                for context in walk[max(0, i - self.window_size): min(len(walk), i + self.window_size)]:
+                    if (node != context).any():
+                        context_index = context.argmax()
+                        training_data.append((node_index, context_index, 1))
+                # choose window_size samples on random which are not in context range 
+                non_context = list(set(node_indices) - set([node.argmax() for node in walk[max(0, i - self.window_size): min(len(walk), i + self.window_size)] ]))
+                if len(non_context) > 0:
+                    for _ in range(100*self.window_size):
+                        sample = random.choice(non_context)
+                        if sample != node_index:
+                            training_data.append((node_index, sample, 0))
+        return word2vec(training_data, len(self.G.nodes()), self.dim, self.learning_rate, self.epochs)
