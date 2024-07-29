@@ -94,20 +94,16 @@ class Node2Vec:
 
     
     def _train(self):
-        training_data = [] 
-        node_indices = [node.argmax() for node in self.nodes.values()]
-        for walk in self.walks:
-            for i, node in enumerate(walk):
-                node_index = node.argmax()
-                for context in walk[max(0, i - self.window_size): min(len(walk), i + self.window_size)]:
-                    if (node != context).any():
-                        context_index = context.argmax()
-                        training_data.append((node_index, context_index, 1))
-                # choose window_size samples on random which are not in context range 
-                non_context = list(set(node_indices) - set([node.argmax() for node in walk[max(0, i - self.window_size): min(len(walk), i + self.window_size)] ]))
-                if len(non_context) > 0:
-                    for _ in range(self.negative_sample_num*self.window_size):
-                        sample = random.choice(non_context)
-                        if sample != node_index:
-                            training_data.append((node_index, sample, 0))
-        return word2vec(training_data, len(self.G.nodes()), self.dim, self.learning_rate, self.epochs)
+        walks = [
+            [n.argmax() for n in walk] for walk in self.walks
+        ]
+        return word2vec(
+            training_data=walks,
+            vocab_size=len(self.G.nodes()),
+            embedding_dim=self.dim,
+            learning_rate=self.learning_rate,
+            epochs=self.epochs,
+            window_size=self.window_size,
+            num_ns=self.negative_sample_num,
+            seed=self.seed
+        )
