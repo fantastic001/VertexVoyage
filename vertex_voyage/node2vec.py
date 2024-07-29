@@ -14,7 +14,7 @@ class Node2Vec:
                  epochs=10, 
                  p = .5, 
                  q = .5,
-                 batch_size = None,
+                 negative_sample_num = 50,
                  learning_rate = 0.01,
                  seed = None 
             ) -> None:
@@ -26,7 +26,7 @@ class Node2Vec:
         self.learning_rate = learning_rate
         self.p = p
         self.q = q
-        self.batch_size = batch_size
+        self.negative_sample_num = negative_sample_num
         self.seed = seed
         if seed is not None:
             np.random.seed(seed)
@@ -106,7 +106,7 @@ class Node2Vec:
                 # choose window_size samples on random which are not in context range 
                 non_context = list(set(node_indices) - set([node.argmax() for node in walk[max(0, i - self.window_size): min(len(walk), i + self.window_size)] ]))
                 if len(non_context) > 0:
-                    for _ in range(100*self.window_size):
+                    for _ in range(self.negative_sample_num*self.window_size):
                         sample = random.choice(non_context)
                         if sample != node_index:
                             training_data.append((node_index, sample, 0))
