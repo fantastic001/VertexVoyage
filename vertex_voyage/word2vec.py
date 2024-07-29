@@ -25,11 +25,12 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs):
 
     # Training loop
     for epoch in range(epochs):
+        prev_loss = 0
         print(f"Epoch {epoch + 1}/{epochs}")
         progress = 0
+        total_loss = 0
         for center_word, context_word, label in training_data:
             progress += 1
-            print("Progress: " + "=" * int(progress / len(training_data) * 40), end="\r")
             # Forward pass
             h = W_input[center_word]  # Input word vector
             u = np.dot(W_output[context_word], h)  # Output layer input
@@ -39,15 +40,20 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs):
 
             # Loss calculation
             loss = -label * np.log(y_pred) - (1 - label) * np.log(1 - y_pred)
+            total_loss += loss if not np.isnan(loss) and not np.isinf(loss) else 0
+            avg_loss = total_loss / progress
+            p = int(progress / len(training_data) * 40)
+            print("Progress: " + "=" * p + " " * (40 - p) + " Loss: %f" % avg_loss, end="\r")
 
             # Backpropagation
-            grad_u = y_pred - label
+            grad_u = y_pred - label 
             grad_W_output = np.outer(grad_u, h)
-            grad_h = np.dot(W_output[context_word].T, grad_u)
+            grad_h = np.dot(W_output[context_word].T, grad_u) 
 
             # Update weights using gradient descent
             W_output[context_word] -= learning_rate * grad_u * h
             W_input[center_word] -= learning_rate * grad_h
+            prev_loss = loss
         print()
 
     # Extract word vectors from W_input
