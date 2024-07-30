@@ -13,6 +13,7 @@ class TestPartitioning(unittest.TestCase):
         self.assertEqual(len(communities), partition_num)
         # approximately small differences between partitions )less than 10%_
         self.assertLessEqual(len(communities[0]), len(zachary.nodes) * 0.60)
+        self.assertLessEqual(len(communities[1]), len(zachary.nodes) * 0.60)
     
     def test_partitioning_on_sbm(self):
         n = 100
