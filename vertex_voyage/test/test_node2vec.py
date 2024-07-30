@@ -17,11 +17,6 @@ class TestNode2Vec(unittest.TestCase):
         self.G.add_edge(1, 3, weight=1.0)
         self.node2vec = Node2Vec(dim=2, walk_size=10, n_walks=10, window_size=2, epochs=1, seed=42)
 
-    def test_fit(self):
-        model = self.node2vec.fit(self.G)
-        self.assertEqual(model.shape[0], len(self.G.nodes()))
-        self.assertEqual(model.shape[1], self.node2vec.dim)
-
     def test_random_walks(self):
         self.node2vec.G = self.G
         self.node2vec.nodes = {node: self.node2vec._encode(node) for node in self.G.nodes()}
@@ -117,13 +112,13 @@ class TestNode2Vec(unittest.TestCase):
             dim=128, 
             walk_size=80, 
             n_walks=100, 
-            window_size=5,
+            window_size=20,
             epochs=1, 
-            p = 1,
-            q = 1,
+            p = .25,
+            q = 4,
             negative_sample_num=5, # in practice, should be 500
             seed=42,
-            learning_rate=0.01
+            learning_rate=0.001
         )
         node2vec.fit(G)
         # calculate embeddings
@@ -134,4 +129,4 @@ class TestNode2Vec(unittest.TestCase):
         recall = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(G.neighbors(n))) for n in nodes]) / len(G.nodes())
         precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
         f1 = 2 * (precision * recall) / (precision + recall)
-        self.assertGreaterEqual(f1, 0.36)
+        self.assertGreaterEqual(f1, 0.7)

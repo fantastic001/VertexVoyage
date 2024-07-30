@@ -2,8 +2,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-
-
+import gensim 
 class Word2Vec(tf.keras.Model):
   def __init__(self, vocab_size, embedding_dim):
     super(Word2Vec, self).__init__()
@@ -90,35 +89,5 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
     """
-    walk_size = len(training_data[0])
-    vectorize_layer = layers.TextVectorization(
-        max_tokens=vocab_size,
-        output_mode='int',
-        output_sequence_length=walk_size
-    )
-    training_data = [[str(word) for word in walk] for walk in training_data]
-    # flatten training data 
-    training_data = [word for walk in training_data for word in walk]
-    vectorize_layer.adapt(training_data)
-    text_vector_ds = vectorize_layer(training_data)
-    vocab = vectorize_layer.get_vocabulary()
-    vocab_size = len(vocab)
-
-    word2vec = Word2Vec(vocab_size, embedding_dim)
-    word2vec.compile(
-        optimizer='adam',
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-        metrics=['accuracy']
-    )
-
-    targets, contexts, labels = generate_training_data(
-        text_vector_ds, window_size=window_size, num_ns=num_ns, vocab_size=vocab_size, seed=seed)
-    BATCH_SIZE = 1024
-    BUFFER_SIZE = 10000
-    dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
-    dataset = dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
-    
-    print(dataset)
-    # Train model
-    word2vec.fit(dataset, epochs=epochs)
-    return word2vec.target_embedding.get_weights()[0]
+    m = gensim.models.Word2Vec(training_data, vector_size=embedding_dim, window=window_size, negative=num_ns, min_count=1, sg=1)
+    return m.wv
