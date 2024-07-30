@@ -113,12 +113,12 @@ class TestNode2Vec(unittest.TestCase):
             walk_size=80, 
             n_walks=100, 
             window_size=10,
-            epochs=1, 
+            epochs=10, 
             p = .25,
             q = 4,
             negative_sample_num=10, # in practice, should be 500
             seed=42,
-            learning_rate=0.001
+            learning_rate=0.01
         )
         node2vec.fit(G)
         # calculate embeddings

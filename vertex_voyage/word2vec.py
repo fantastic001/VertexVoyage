@@ -89,5 +89,16 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
     """
-    m = gensim.models.Word2Vec(training_data, vector_size=embedding_dim, window=window_size, negative=num_ns, min_count=1, sg=1)
+    m = gensim.models.Word2Vec(
+       training_data, 
+       vector_size=embedding_dim, 
+       window=window_size, 
+       negative=num_ns, 
+       min_count=1, 
+       sg=1,
+       alpha=learning_rate,
+       max_vocab_size=None,
+       epochs=epochs,
+       seed=seed  
+    )
     return m.wv
