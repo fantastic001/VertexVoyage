@@ -17,7 +17,8 @@ from gensim import utils
 import numpy as np
 import scipy.sparse
 from scipy.stats import entropy
-from scipy.linalg import get_blas_funcs, triu
+from scipy.linalg import get_blas_funcs
+from scipy.sparse import triu
 from scipy.linalg.lapack import get_lapack_funcs
 from scipy.special import psi  # gamma function utils
 
