@@ -54,21 +54,31 @@ class Node2Vec:
         weights /= weights.sum()
         return np.random.choice(neighbors, p=weights)
 
-    def fit(self, G):
+    def fit(self, G, nodes = None):
         self.G = G
-        self.nodes = {node: self._encode(node) for node in self.G.nodes()}
+        if nodes is None:
+            nodes = list(G.nodes())
+        self.g_nodes = nodes
+        self.nodes = {node: self._encode(node) for node in nodes}
         self.walks = self._random_walks()
-        self.W = self._train()
+        self.W = self._train() 
+        W = np.zeros((len(nodes), self.dim))
+        for i, node in enumerate(nodes):
+            W[i] = self.embed_node(node)
+        self.W = W
         return self.W
 
     def _encode(self, node):
-        result = np.zeros(len(self.G.nodes()))
-        node_index = list(self.G.nodes()).index(node)
+        result = np.zeros(len(self.g_nodes))
+        node_index = list(self.g_nodes).index(node)
         result[node_index] = 1
         return result
 
     def embed_node(self, node):
-        return self.W[list(self.G.nodes()).index(node)]
+        try:
+            return self.W[list(self.nodes).index(node)]
+        except KeyError:
+            return np.zeros(self.dim)
     
     def embed_nodes(self, nodes):
         return [self.embed_node(node) for node in nodes]

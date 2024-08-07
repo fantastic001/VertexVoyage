@@ -19,6 +19,7 @@ class TestNode2Vec(unittest.TestCase):
 
     def test_random_walks(self):
         self.node2vec.G = self.G
+        self.node2vec.g_nodes = list(self.G.nodes())
         self.node2vec.nodes = {node: self.node2vec._encode(node) for node in self.G.nodes()}
         walks = self.node2vec._random_walks()
         self.assertEqual(len(walks), self.node2vec.n_walks)
@@ -30,6 +31,7 @@ class TestNode2Vec(unittest.TestCase):
         G.add_edge(4, 3, weight=1.0)
         node2vec = Node2Vec(dim=2, walk_size=10, n_walks=10, window_size=2, epochs=1, seed=42)
         node2vec.G = G
+        node2vec.g_nodes = list(G.nodes())
         node2vec.nodes = {node: node2vec._encode(node) for node in G.nodes()}
         walks = node2vec._random_walks()
         self.assertEqual(len(walks), node2vec.n_walks)
