@@ -14,6 +14,8 @@ class StorageGraph:
     def __init__(self, name: str):
         self.name = name
         self.GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
+        if not os.path.exists(self.GRAPH_STORE_PATH):
+            os.makedirs(self.GRAPH_STORE_PATH)
         self.path = os.path.join(self.GRAPH_STORE_PATH, name + ".gml")
     
     def get_partition(self, index: int) -> "StorageGraph":
