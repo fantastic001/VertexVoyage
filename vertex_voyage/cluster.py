@@ -57,7 +57,7 @@ def get_ip_by_index(index):
 def get_node_index(node):
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
-    return nodes.index(node) + 1
+    return nodes.index(node)
 
 def get_node_by_index(index):
     zk = get_zk_client()
