@@ -151,7 +151,7 @@ def get_classes(module_name):
 def command_executor_rpc(classes):
     if not isinstance(classes, list):
         classes = [classes]
-    server = SimpleXMLRPCServer(("localhost", 8000))
+    server = SimpleXMLRPCServer(("0.0.0.0", 8000))
     class Dispatcher:
         def __init__(self, classes):
             self.classes = classes
