@@ -79,7 +79,7 @@ def get_current_node():
     return nodes[-1]
 
 def do_rpc(node_index, method_name, **kwargs):
-    print(f"do_rpc({node_index}, {method_name}, {args}, {kwargs})")
+    print(f"do_rpc({node_index}, {method_name}, {kwargs})")
     ip = get_ip_by_index(node_index)
     from xmlrpc.client import ServerProxy
     s = ServerProxy(f'http://{ip}:8000')
