@@ -8,7 +8,7 @@ from vertex_voyage.cluster import *
 import os 
 from vertex_voyage.partitioning import partition_graph
 from vertex_voyage.node2vec import Node2Vec
-
+from httplib2 import Http
 class StorageGraph:
 
     def __init__(self, name: str):
@@ -72,6 +72,12 @@ class StorageGraph:
                     result.append(line.split()[1])
         return result 
 
+    def import_from_url(self, url: str):
+        h = Http()
+        resp, content = h.request(url, "GET")
+        with open(self.path, "wb") as f:
+            f.write(content)
+        return self.path
 
 
 class Executor:
@@ -123,6 +129,13 @@ class Executor:
             return StorageGraph(graph_name).get_nodes()
         else:
             do_rpc_to_leader("get_vertices", graph_name=graph_name)
+
+    def import_karate_club(self, name: str):
+        if is_leader():
+            graph = nx.karate_club_graph()
+            return StorageGraph(name).create_graph(graph)
+        else:
+            do_rpc_to_leader("import_karate_club", name=name)
     def kmeans(self, graph_name: str):
         return None
     def walk(self, graph_name: str):
@@ -165,5 +178,11 @@ class Executor:
             return my_embedding
         else:
             do_rpc_to_leader("process", graph_name)
+
+    def import_gml(self, url: str, graph_name: str):
+        if is_leader():
+            return StorageGraph(graph_name).import_from_url(url)
+        else:
+            do_rpc_to_leader("import_gml", url=url, graph_name=graph_name)
 
 COMMAND_CLASSES = ["Executor"]
