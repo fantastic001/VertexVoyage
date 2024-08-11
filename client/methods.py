@@ -17,12 +17,15 @@ class Client:
         return do_rpc_client(ip, "get_nodes", graph_name=graph_name)
     def get_partition(self, graph_name: str, partition_num: int, *, ip: str="localhost"):
         return do_rpc_client(ip, "get_partition", graph_name=graph_name, partition_num=partition_num)
-    def process(self, graph_name: str, partition_num: int, *, ip: str="localhost"):
-        return do_rpc_client(ip, "process", graph_name=graph_name, partition_num=partition_num)
+    def process(self, graph_name: str, partition_num: int, *, ip: str="localhost", dim: int = 128):
+        return do_rpc_client(ip, "process", graph_name=graph_name, partition_num=partition_num, dim=dim)
     def get_graph(self, graph_name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "get_graph", graph_name=graph_name)
     def get_leader(self, *, ip: str = "localhost"):
         print("get_leader called")
         return do_rpc_client(ip, "get_leader")
+
+    def import_karate_club(self, name: str, *, ip: str = "localhost"):
+        return do_rpc_client(ip, "import_karate_club", name=name)
         
 COMMAND_CLASSES = ["Client"]
