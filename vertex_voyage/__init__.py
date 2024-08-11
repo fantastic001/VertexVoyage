@@ -100,13 +100,20 @@ class Executor:
         if is_leader():
             return StorageGraph(graph_name).partition_graph(self.get_node_number())
         else:
-            do_rpc_to_leader("partition_graph", graph_name=graph_name)
-    def get_embedding(self, graph_name: str):
+            return do_rpc_to_leader("partition_graph", graph_name=graph_name)
+    
+    def get_partition(self, graph_name: str, partition_num: int):
+        if is_leader():
+            part = StorageGraph(graph_name).get_partition(partition_num)
+            return part.get_graph().nodes()
+        else:
+            return do_rpc_to_leader("get_partition", graph_name=graph_name, partition_num=partition_num)
+    def get_embedding(self, graph_name: str, dim: int = 128):
         if is_leader():
             current_node_index = get_node_index(get_current_node())
             partitioned_graph = StorageGraph(graph_name).get_partition(current_node_index).get_graph()
             nv = Node2Vec(
-                dim=128, 
+                dim=dim, 
                 epochs=10,
                 learning_rate=0.01,
                 n_walks=10,
@@ -119,7 +126,7 @@ class Executor:
             nodes = StorageGraph(graph_name).get_nodes()
             nv.fit(partitioned_graph, nodes)
             nodes_on_current_node = list(partitioned_graph.nodes())
-            embeddings = nv.embed_nodes(nodes_on_current_node)
+            embeddings = {node: nv.embed_node(node) for node in nodes_on_current_node}
             return embeddings
         else:
             do_rpc_to_leader("get_embedding", graph_name=graph_name)    
@@ -136,14 +143,6 @@ class Executor:
             return StorageGraph(name).create_graph(graph)
         else:
             do_rpc_to_leader("import_karate_club", name=name)
-    def kmeans(self, graph_name: str):
-        return None
-    def walk(self, graph_name: str):
-        return None
-    def cluster_similarity(self, graph_name1: str, graph_name2: str):
-        return None
-    def graph_similarity(self, graph_name1: str, graph_name2: str):
-        return None
     def get_leader(self):
         return get_leader()
         
@@ -165,17 +164,31 @@ class Executor:
             "current_node": current_node
         }
     
-    def process(self, graph_name: str):
+    def process(self, graph_name: str, *, dim=128):
         if get_leader() == get_current_node():
             my_embedding = self.get_embedding(graph_name)
             nodes = get_nodes()
+            node_to_embeddings_count = {n: 0 for n in nodes}
+            for k in my_embedding:
+                node_to_embeddings_count[k] += 1
             # do xmlrpc to other nodes and add their embeddings to my_embedding
             for node in nodes:
                 if node == get_current_node():
                     continue
-                embedding = do_rpc(get_node_index(node), "get_embedding", graph_name)
-                my_embedding = np.concatenate((my_embedding, embedding))
-            return my_embedding
+                embedding = do_rpc(
+                    get_node_index(node), 
+                    "get_embedding", 
+                    graph_name=graph_name, 
+                    dim=dim
+                )
+                for k, v in embedding.items():
+                    node_to_embeddings_count[k] += 1
+                    if k not in my_embedding:
+                        my_embedding[k] = v
+                    else:
+                        my_embedding[k] = np.array(my_embedding[k]) + np.array(v)
+            for k in my_embedding:
+                my_embedding[k] = my_embedding[k] / node_to_embeddings_count[k]
         else:
             do_rpc_to_leader("process", graph_name)
 
