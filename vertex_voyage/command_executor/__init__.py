@@ -5,6 +5,9 @@ from typing import Dict
 import inspect 
 from vertex_voyage.command_executor.command_class_inspector import * 
 from xmlrpc.server import SimpleXMLRPCServer
+from xmlrpc.server import SimpleXMLRPCRequestHandler
+from socketserver import ThreadingMixIn
+
 
 def get_command_specs(classes):
     spec = []
@@ -151,11 +154,18 @@ def get_classes(module_name):
 def command_executor_rpc(classes):
     if not isinstance(classes, list):
         classes = [classes]
-    server = SimpleXMLRPCServer(("0.0.0.0", 8000))
+    class RequestHandler(SimpleXMLRPCRequestHandler):
+        rpc_paths = ('/RPC2',)
+
+    # Create a class that combines ThreadingMixIn and SimpleXMLRPCServer
+    class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):
+        pass
+    server = ThreadedXMLRPCServer(("0.0.0.0", 8000), requestHandler=RequestHandler)
     class Dispatcher:
         def __init__(self, classes):
             self.classes = classes
         def execute(self, command, params):
+            # do it as separate thread 
             print("Executing %s with params %s" % (command , params))
             result = execute_command(self.classes, command, params)
             print("Result: %s" % result)
