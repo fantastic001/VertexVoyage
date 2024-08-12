@@ -15,8 +15,12 @@ COPY requirements.txt .
 RUN pip install \
     -r requirements.txt
 
+# install cython
+RUN pip install cython
+
 # Copy the rest of the application code into the working directory
 COPY vertex_voyage/ vertex_voyage/
+# COPY gensim/ gensim/ 
 
 # Specify the command to run the application
 # python -m vertex_voyage zk
