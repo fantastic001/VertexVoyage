@@ -211,6 +211,16 @@ class Executor:
             return do_rpc_to_leader("process", graph_name)
 
     def import_gml(self, url: str, graph_name: str):
+        """
+        Imports a GML file from a URL.
+
+        Parameters:
+        - url (str): URL of the GML file.
+        - graph_name (str): Name of the graph to import.
+
+        Returns:
+        - str: Path to the imported GML file.
+        """
         if is_leader():
             print("Importing from URL", url, flush=True)
             return StorageGraph(graph_name).import_from_url(url)
@@ -243,10 +253,30 @@ class Executor:
         url = base_urls[source]
         return self.import_gml(url, dataset_name)
     
-    def generate_graph(self, graph_name: str, sizes: list, p_matrix: list):
+    def generate_graph(self, graph_name: str, n: int, p: float, q: float, c: int):
+        """
+        Generates a planted partition graph.
+
+        Parameters:
+        - graph_name (str): Name of the graph.
+        - n (int): Number of vertices.
+        - p (float): Probability of intra-community edges.
+        - q (float): Probability of inter-community edges.
+        - c (int): Number of communities.
+
+        Returns:
+        - str: Path to the generated GML file.
+        """
         if is_leader():
-            graph = nx.stochastic_block_model(sizes, p_matrix)
-            return StorageGraph(graph_name).create_graph(graph)
+            graph = nx.planted_partition_graph(c, n, p, q)
+            print("Vertex count: ", len(graph.nodes()), flush=True)
+            print("Edge count: ", len(graph.edges()), flush=True)
+            g = nx.Graph()
+            for v in graph.nodes():
+                g.add_node(v)
+            for e in graph.edges():
+                g.add_edge(*e)
+            return StorageGraph(graph_name).create_graph(g)
         else:
             do_rpc_to_leader("generate_graph", graph_name=graph_name, sizes=sizes, p_matrix=p_matrix)
     def list(self):
