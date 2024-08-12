@@ -76,7 +76,11 @@ def get_leader():
 def get_current_node():
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
-    return nodes[-1]
+    for node in nodes:
+        data = get_node_data(node)
+        if data.split()[1].decode() == os.getenv('NODE_ADDRESS'):
+            return node
+    return None
 
 def do_rpc(node_index, method_name, **kwargs):
     print(f"do_rpc({node_index}, {method_name}, {kwargs})")
