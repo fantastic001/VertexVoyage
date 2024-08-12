@@ -10,14 +10,19 @@ from vertex_voyage.partitioning import partition_graph
 from vertex_voyage.node2vec import Node2Vec
 from httplib2 import Http
 class StorageGraph:
+    GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
 
     def __init__(self, name: str):
         self.name = name
-        self.GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
         if not os.path.exists(self.GRAPH_STORE_PATH):
             os.makedirs(self.GRAPH_STORE_PATH)
         self.path = os.path.join(self.GRAPH_STORE_PATH, name + ".gml")
     
+    def list():
+        if not os.path.exists(StorageGraph.GRAPH_STORE_PATH):
+            return []
+        return [s.replace(".gml", "") for s in os.listdir(StorageGraph.GRAPH_STORE_PATH)]
+
     def get_partition(self, index: int) -> "StorageGraph":
         return StorageGraph(self.name + "_part_" + str(index))
 
@@ -207,6 +212,7 @@ class Executor:
 
     def import_gml(self, url: str, graph_name: str):
         if is_leader():
+            print("Importing from URL", url, flush=True)
             return StorageGraph(graph_name).import_from_url(url)
         else:
             do_rpc_to_leader("import_gml", url=url, graph_name=graph_name)
@@ -233,6 +239,34 @@ class Executor:
             return do_rpc_to_leader("download_gml", dataset_name=dataset_name, source=source)
         if source not in base_urls:
             raise ValueError(f"Source '{source}' is not supported. Use 'snap', 'konect', or 'network_repository'.")
-
+        print("Downloading GML", dataset_name, source, flush=True)
         url = base_urls[source]
         return self.import_gml(url, dataset_name)
+    
+    def generate_graph(self, graph_name: str, sizes: list, p_matrix: list):
+        if is_leader():
+            graph = nx.stochastic_block_model(sizes, p_matrix)
+            return StorageGraph(graph_name).create_graph(graph)
+        else:
+            do_rpc_to_leader("generate_graph", graph_name=graph_name, sizes=sizes, p_matrix=p_matrix)
+    def list(self):
+        if is_leader():
+            return StorageGraph.list()
+        else:
+            return do_rpc_to_leader("list")
+    
+    def upload_gml(self, graph_name: str, data: bytes, *, append: bool=False):
+        print("Uploading GML", flush=True)
+        if is_leader():
+            try:
+                path = StorageGraph(graph_name).path
+                print("Path:", path, flush=True)
+                size = 0
+                print("Uploading GML chunk of size ", len(data), flush=True)
+                with open(path, "ab" if append else "wb") as f:
+                    size = f.write(data)
+                return size
+            except: 
+                return -1
+        else:
+            return do_rpc_to_leader("upload_gml", graph_name=graph_name, data=data, append=append)
