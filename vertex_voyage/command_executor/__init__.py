@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import sys
+import traceback
 from typing import Dict 
 import inspect 
 from vertex_voyage.command_executor.command_class_inspector import * 
@@ -76,7 +77,7 @@ def execute_command(classes, command: str, params):
                     try:
                         A[arg["name"]] = arg["type"](A[arg["name"]])
                     except:
-                        raise ValueError("Invalid value %s for argument %s" % arg["name"])
+                        raise ValueError("Invalid value for argument %s" % arg["name"])
                 if arg["valid_values"] is not None:
                     if A[arg["name"]] not in arg["valid_values"]:
                         raise ValueError("Invalid value %s for argument %s" % (A[arg], arg))
@@ -167,7 +168,13 @@ def command_executor_rpc(classes):
         def execute(self, command, params):
             # do it as separate thread 
             print("Executing %s with params %s" % (command , params))
-            result = execute_command(self.classes, command, params)
+            result = None
+            try:
+                result = execute_command(self.classes, command, params)
+            except Exception as e:
+                print("Error: %s" % e)
+                print(traceback.format_exc())
+                raise e 
             print("Result: %s" % result)
             if isinstance(result, Path):
                 return str(result)
