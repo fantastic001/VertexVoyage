@@ -46,31 +46,18 @@ class StorageGraph:
         result = [] 
         for i, part in enumerate(partitioned_graph):
             storage_graph = self.get_partition(i)
-            storage_graph.create_graph(part)
+            subgraph = graph.subgraph(part)
+            storage_graph.create_graph(subgraph)
             result.append(storage_graph)
         return result
     
     def get_node_num(self):
-        """
-        Gets node number from GML file. This does not load whole graph into memory.
-        """
-        counter = 0
-        with open(self.path, "r") as f:
-            for line in f:
-                if "node" in line:
-                    counter += 1
-        return counter
+        graph = self.get_graph()
+        return len(graph.nodes())
     
     def get_nodes(self):
-        """
-        Gets list of nodes from GML file without loading whole graph into memory.
-        """
-        result = []
-        with open(self.path, "r") as f:
-            for line in f:
-                if "node" in line:
-                    result.append(line.split()[1])
-        return result 
+        graph = self.get_graph()
+        return list(graph.nodes())
 
     def import_from_url(self, url: str):
         h = Http()
@@ -98,39 +85,58 @@ class Executor:
             do_rpc_to_leader("add_edge", graph_name=graph_name, vertex1=vertex1, vertex2=vertex2)
     def partition_graph(self, graph_name: str):
         if is_leader():
-            return StorageGraph(graph_name).partition_graph(self.get_node_number())
+            return StorageGraph(graph_name).partition_graph(len(get_nodes()))
         else:
             return do_rpc_to_leader("partition_graph", graph_name=graph_name)
     
     def get_partition(self, graph_name: str, partition_num: int):
         if is_leader():
             part = StorageGraph(graph_name).get_partition(partition_num)
-            return part.get_graph().nodes()
+            return {
+                "name": part.name,
+                "path": part.path,
+                "nodes": list(part.get_graph().nodes()),
+                "edges": list(part.get_graph().edges())
+            }
         else:
             return do_rpc_to_leader("get_partition", graph_name=graph_name, partition_num=partition_num)
-    def get_embedding(self, graph_name: str, dim: int = 128):
+    def get_embedding(self, graph_name: str, *, dim: int = 128):
+        print("Getting embedding", flush=True)
+        current_node_index = get_node_index(get_current_node())
         if is_leader():
-            current_node_index = get_node_index(get_current_node())
             partitioned_graph = StorageGraph(graph_name).get_partition(current_node_index).get_graph()
-            nv = Node2Vec(
-                dim=dim, 
-                epochs=10,
-                learning_rate=0.01,
-                n_walks=10,
-                negative_sample_num=1,
-                p=1,
-                q=1,
-                window_size=10,
-                walk_size=10
-            )
-            nodes = StorageGraph(graph_name).get_nodes()
-            nv.fit(partitioned_graph, nodes)
-            nodes_on_current_node = list(partitioned_graph.nodes())
-            embeddings = {node: nv.embed_node(node) for node in nodes_on_current_node}
-            return embeddings
         else:
-            do_rpc_to_leader("get_embedding", graph_name=graph_name)    
-    
+            partitioned_graph = do_rpc_to_leader("get_partition", graph_name=graph_name, partition_num=current_node_index)
+            g = nx.Graph()
+            for v in partitioned_graph["nodes"]:
+                g.add_node(v)
+            for e in partitioned_graph["edges"]:
+                g.add_edge(*e)
+            partitioned_graph = g
+        print("Partitioned graph:", partitioned_graph.nodes(), flush=True)
+        print("Current node:", get_current_node(), flush=True)
+        print("Launching node2vec", flush=True)
+        nv = Node2Vec(
+            dim=dim, 
+            epochs=10,
+            learning_rate=0.01,
+            n_walks=10,
+            negative_sample_num=1,
+            p=1,
+            q=1,
+            window_size=10,
+            walk_size=10
+        )
+        if is_leader():
+            nodes = StorageGraph(graph_name).get_nodes()
+        else:
+            nodes = do_rpc_to_leader("get_vertices", graph_name=graph_name)
+        nv.fit(partitioned_graph, nodes)
+        nodes_on_current_node = list(partitioned_graph.nodes())
+        print("Nodes on current node:", nodes_on_current_node, flush=True)
+        embeddings = {node: nv.embed_node(node) if node in nodes_on_current_node else np.zeros(dim) for node in nodes}
+        embeddings = {node: embeddings[node].tolist() for node in embeddings}
+        return embeddings
     def get_vertices(self, graph_name: str):
         if is_leader():
             return StorageGraph(graph_name).get_nodes()
@@ -164,17 +170,21 @@ class Executor:
             "current_node": current_node
         }
     
-    def process(self, graph_name: str, *, dim=128):
-        if get_leader() == get_current_node():
+    def process(self, graph_name: str, *, dim: int=128):
+        if is_leader():
+            print("Processing on leader", flush=True)
             my_embedding = self.get_embedding(graph_name)
             nodes = get_nodes()
-            node_to_embeddings_count = {n: 0 for n in nodes}
+            graph_vertices = StorageGraph(graph_name).get_nodes()
+            print("Nodes:", nodes, flush=True)
+            node_to_embeddings_count = {n: 0 for n in graph_vertices}
             for k in my_embedding:
                 node_to_embeddings_count[k] += 1
             # do xmlrpc to other nodes and add their embeddings to my_embedding
             for node in nodes:
                 if node == get_current_node():
                     continue
+                print("Getting embedding from", node, flush=True)
                 embedding = do_rpc(
                     get_node_index(node), 
                     "get_embedding", 
@@ -182,15 +192,18 @@ class Executor:
                     dim=dim
                 )
                 for k, v in embedding.items():
+                    print("Adding embedding for", k, flush=True)
                     node_to_embeddings_count[k] += 1
                     if k not in my_embedding:
                         my_embedding[k] = v
                     else:
                         my_embedding[k] = np.array(my_embedding[k]) + np.array(v)
+            print("Normalizing embeddings", flush=True)
             for k in my_embedding:
                 my_embedding[k] = my_embedding[k] / node_to_embeddings_count[k]
+            return {k: my_embedding[k].tolist() for k in my_embedding}
         else:
-            do_rpc_to_leader("process", graph_name)
+            return do_rpc_to_leader("process", graph_name)
 
     def import_gml(self, url: str, graph_name: str):
         if is_leader():
