@@ -24,8 +24,12 @@ class Client:
     def get_leader(self, *, ip: str = "localhost"):
         print("get_leader called")
         return do_rpc_client(ip, "get_leader")
+    def get_embedding(self, graph_name: str, *, ip: str = "localhost", dim: int = 128):
+        return do_rpc_client(ip, "get_embedding", graph_name=graph_name, dim=dim)
 
     def import_karate_club(self, name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "import_karate_club", name=name)
-        
+    
+    def get_vertices(self, graph_name: str, *, ip: str = "localhost"):
+        return do_rpc_client(ip, "get_vertices", graph_name=graph_name)
 COMMAND_CLASSES = ["Client"]
