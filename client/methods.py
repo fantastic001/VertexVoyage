@@ -1,6 +1,22 @@
 
 from vertex_voyage.cluster import * 
 from vertex_voyage.command_executor import *
+import termcolor
+
+def red(text):
+    return termcolor.colored(text, "red")
+
+def green(text):
+    return termcolor.colored(text, "green")
+
+def yellow(text):
+    return termcolor.colored(text, "yellow")
+
+def print_step(text):
+    print("* " + green(text))
+
+def print_substep(text):
+    print("  - " + yellow(text))
 
 class Client:
     def create_graph(self, name: str, *, ip: str = "localhost"):
@@ -17,8 +33,8 @@ class Client:
         return do_rpc_client(ip, "get_nodes", graph_name=graph_name)
     def get_partition(self, graph_name: str, partition_num: int, *, ip: str="localhost"):
         return do_rpc_client(ip, "get_partition", graph_name=graph_name, partition_num=partition_num)
-    def process(self, graph_name: str, partition_num: int, *, ip: str="localhost", dim: int = 128):
-        return do_rpc_client(ip, "process", graph_name=graph_name, partition_num=partition_num, dim=dim)
+    def process(self, graph_name: str, *, ip: str="localhost", dim: int = 128):
+        return do_rpc_client(ip, "process", graph_name=graph_name, dim=dim)
     def get_graph(self, graph_name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "get_graph", graph_name=graph_name)
     def get_leader(self, *, ip: str = "localhost"):
@@ -33,18 +49,14 @@ class Client:
     def get_vertices(self, graph_name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "get_vertices", graph_name=graph_name)
 
-    def get_datasets(self, *, ip: str = "localhost", no_sbm: bool = False):
-        snap_datasets = [
-            "twitch-gamers"
-        ]
+    def get_datasets(self, datasets: str, *, ip: str = "localhost", no_sbm: bool = False):
+        datasets_file = open(datasets, "r")
         sbms = [
             {
-                "sizes": [100000, 100000],
-                "p_matrix": [[0.1, 0.01], [0.01, 0.1]],
-            },
-            {
-                "sizes": [100000, 100000],
-                "p_matrix": [[0.5, 0.01], [0.01, 0.5]],
+                "size": 10000,
+                "p": 0.1,
+                "q": 0.01,
+                "communities": 2
             }
         ]
         if no_sbm:
@@ -52,15 +64,23 @@ class Client:
         for i, sbm in enumerate(sbms):
             do_rpc_client(ip, "generate_graph", 
                 graph_name=f"sbm{i}",
-                sizes=sbm["sizes"],
-                p_matrix=sbm["p_matrix"]
+                n=sbm["size"],
+                p=sbm["p"],
+                q=sbm["q"],
+                c=sbm["communities"]
             )
-            dataset_counter += 1
-        for i, dataset in enumerate(snap_datasets):
-            do_rpc_client(ip, "download_gml", 
-                dataset_name=dataset,
-                graph_name=f"snap{i}"
-            )
+        for line in datasets_file:
+            line = line.strip()
+            if line == "":
+                continue
+            if line.startswith("#"):
+                continue
+            path = line 
+            name = path.split("/")[-1].split(".")[0]
+            if path.endswith(".gml"):
+                self.upload_gml(name, path, ip=ip)
+            else:
+                self.upload_csv(name, path, ip=ip)
         datasets = do_rpc_client(ip, "list")
         return datasets
 
@@ -110,7 +130,89 @@ class Client:
     
     def list(self, *, ip: str = "localhost"):
         return do_rpc_client(ip, "list")
+    
+    def execute(self, pipeline: str, *, ip: str = "localhost"):
+        """
+        Execute commands specified in pipeline YAML file given. 
 
+        Pipeline file contains name of pipeline and list of commands to execute in order.
+        Every command has its name which corresponds to a method in the Client class and its arguments.
+
+        Result of each execution is saved into file inside folder which is named after the pipeline name.
+
+        Result is JSON file which is named after the order of the command in the pipeline.
+
+        Command in pipeline can be of several types:
+
+        - oneshot - execute exactly as specified
+        - vary - execute with different values of parameter
+            - parameter - name of parameter to vary
+            - start - start value of parameter
+            - end - end value of parameter
+            - step - step value of parameter
+        - multiple - execute with multiple values of parameter
+            - parameter - name of parameter to vary
+            - values - list of values to use
+
+        Args:
+            pipeline (str): Path to pipeline YAML file
+            ip (str, optional): IP address of server. Defaults to "localhost".
+        """
+        import yaml 
+        import json
+        with open(pipeline, "r") as f:
+            pipeline = yaml.safe_load(f)
+        pipeline_name = pipeline["name"]
+        print_step(f"Executing pipeline {pipeline_name}")
+        if not os.path.exists(pipeline_name):
+            os.makedirs(pipeline_name)
+        with open(f"{pipeline_name}/pipeline.yaml", "w") as f:
+            yaml.safe_dump(pipeline, f)
+        for i, command in enumerate(pipeline["commands"]):
+            command_name = command["name"]
+            print_substep(f"Executing command {command_name}")
+            if command_name not in dir(self):
+                print(f"Command {command_name} not found in Client class")
+                return 
+            if command["type"] == "oneshot":
+                result = getattr(self, command_name)(**command["args"], ip=ip)
+                with open(f"{pipeline_name}/{i}.json", "w") as f:
+                    json.dump(result, f)
+            elif command["type"] == "vary":
+                parameter = command["parameter"]
+                start = command["start"]
+                end = command["end"]
+                step = command["step"]
+                values = list(range(start, end, step))
+                results = []
+                for value in values:
+                    print(f"Varying {parameter} to {value} / {end}" + 16*" ", end="\r")
+                    result = getattr(self, command_name)(**{**command["args"], parameter: value}, ip=ip)
+                    results.append({
+                        parameter: value,
+                        "result": result
+                    })
+                with open(f"{pipeline_name}/{i}.json", "w") as f:
+                    json.dump(results, f)
+            elif command["type"] == "multiple":
+                parameter = command["parameter"]
+                values = command["values"]
+                results = []
+                for value in values:
+                    print(f"Varying {parameter} to {value}" + 16*" ", end="\r")
+                    result = getattr(self, command_name)(**{**command["args"], parameter: value}, ip=ip)
+                    results.append({
+                        parameter: value,
+                        "result": result
+                    })
+                with open(f"{pipeline_name}/{i}.json", "w") as f:
+                    json.dump(results, f)
+            else:
+                print(f"Unknown command type {command['type']}")
+        return {
+            "pipeline": pipeline_name,
+            "Results folder": os.path.abspath(pipeline_name)
+        }
 
 
 COMMAND_CLASSES = ["Client"]
