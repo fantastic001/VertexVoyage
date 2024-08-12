@@ -97,7 +97,7 @@ class Client:
         read = 0
         with open(path, "rb") as f:
             while True:
-                data = f.read(1024)
+                data = f.read(5*1024*1024)
                 read += len(data)
                 print(f"Read {read}/{file_size} bytes", end="\r")
                 if not data:
