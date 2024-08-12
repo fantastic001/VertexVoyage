@@ -178,7 +178,7 @@ class Executor:
     def process(self, graph_name: str, *, dim: int=128):
         if is_leader():
             print("Processing on leader", flush=True)
-            my_embedding = self.get_embedding(graph_name)
+            my_embedding = self.get_embedding(graph_name, dim=dim)
             nodes = get_nodes()
             graph_vertices = StorageGraph(graph_name).get_nodes()
             print("Nodes:", nodes, flush=True)
@@ -186,23 +186,26 @@ class Executor:
             for k in my_embedding:
                 node_to_embeddings_count[k] += 1
             # do xmlrpc to other nodes and add their embeddings to my_embedding
-            for node in nodes:
-                if node == get_current_node():
-                    continue
-                print("Getting embedding from", node, flush=True)
-                embedding = do_rpc(
-                    get_node_index(node), 
-                    "get_embedding", 
-                    graph_name=graph_name, 
-                    dim=dim
-                )
-                for k, v in embedding.items():
-                    print("Adding embedding for", k, flush=True)
-                    node_to_embeddings_count[k] += 1
-                    if k not in my_embedding:
-                        my_embedding[k] = v
-                    else:
-                        my_embedding[k] = np.array(my_embedding[k]) + np.array(v)
+            if len(nodes) > 1:
+                for node in nodes:
+                    if node == get_current_node():
+                        continue
+                    print("Getting embedding from", node, flush=True)
+                    embedding = do_rpc(
+                        get_node_index(node), 
+                        "get_embedding", 
+                        graph_name=graph_name, 
+                        dim=dim
+                    )
+                    for k, v in embedding.items():
+                        print("Adding embedding for", k, flush=True)
+                        node_to_embeddings_count[k] += 1
+                        if k not in my_embedding:
+                            my_embedding[k] = v
+                        else:
+                            my_embedding[k] = np.array(my_embedding[k]) + np.array(v)
+            for k, v in my_embedding.items():
+                my_embedding[k] = np.array(v)
             print("Normalizing embeddings", flush=True)
             for k in my_embedding:
                 my_embedding[k] = my_embedding[k] / node_to_embeddings_count[k]
