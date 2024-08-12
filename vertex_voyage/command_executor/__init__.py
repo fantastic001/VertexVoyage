@@ -8,7 +8,7 @@ from vertex_voyage.command_executor.command_class_inspector import *
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 from socketserver import ThreadingMixIn
-
+import xmlrpc.client
 
 def get_command_specs(classes):
     spec = []
@@ -75,8 +75,12 @@ def execute_command(classes, command: str, params):
                         raise ValueError("Path %s does not exist" % A[arg])
                 if not isinstance(A[arg["name"]], arg["type"]):
                     try:
-                        A[arg["name"]] = arg["type"](A[arg["name"]])
+                        if arg["type"] == bytes and isinstance(A[arg["name"]], xmlrpc.client.Binary):
+                            A[arg["name"]] = A[arg["name"]].data
+                        else:
+                            A[arg["name"]] = arg["type"](A[arg["name"]])
                     except:
+                        traceback.print_exc()
                         raise ValueError("Invalid value for argument %s" % arg["name"])
                 if arg["valid_values"] is not None:
                     if A[arg["name"]] not in arg["valid_values"]:
