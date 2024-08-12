@@ -6,3 +6,7 @@ tensorflow
 zookeeper
 kazoo
 binpacking
+httplib2
+lxml
+pyyaml
+gensim
