@@ -211,4 +211,28 @@ class Executor:
         else:
             do_rpc_to_leader("import_gml", url=url, graph_name=graph_name)
 
-COMMAND_CLASSES = ["Executor"]
+
+    def download_gml(self, dataset_name: str, *, source: str="snap"):
+        """
+        Downloads a GML file for the given dataset name from the specified source.
+
+        Parameters:
+        - dataset_name (str): Name of the dataset/graph to download.
+        - source (str): The source to download from. Options are "snap", "konect", or "network_repository".
+        - save_dir (str): Directory to save the downloaded GML file.
+
+        Returns:
+        - str: Path to the downloaded GML file.
+        """
+        base_urls = {
+            "snap": f"https://snap.stanford.edu/data/{dataset_name}.gml",
+            "konect": f"http://konect.cc/files/download.tsv.{dataset_name}.gml",
+            "network_repository": f"http://networkrepository.com/{dataset_name}.gml"
+        }
+        if not is_leader():
+            return do_rpc_to_leader("download_gml", dataset_name=dataset_name, source=source)
+        if source not in base_urls:
+            raise ValueError(f"Source '{source}' is not supported. Use 'snap', 'konect', or 'network_repository'.")
+
+        url = base_urls[source]
+        return self.import_gml(url, dataset_name)
