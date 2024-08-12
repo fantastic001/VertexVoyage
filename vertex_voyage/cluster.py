@@ -6,11 +6,13 @@ import random
 import re
 
 zk = None 
-
+USE_ZK = os.getenv('USE_ZK', '1').lower() == '1'
 ZK_PATH = '/vertex_voyage'
 ZK_NODE_PATH = ZK_PATH + '/nodes/'
 ENV_NODE_NAME = os.getenv('NODE_NAME', random.randbytes(4).hex())
 def get_zk_client():
+    if not USE_ZK:
+        return
     global zk 
     if zk is None:
         hosts = os.getenv('ZK_HOSTS', 'localhost:2181')
@@ -22,6 +24,8 @@ def get_zk_client():
     return zk
 
 def register_node():
+    if not USE_ZK:
+        return
     zk = get_zk_client()
     if not zk.exists(ZK_PATH):
         zk.create(ZK_PATH, b'')
@@ -39,32 +43,44 @@ def register_node():
         zk.create(mynodepath, node_data, ephemeral=True)
 
 def get_nodes():
+    if not USE_ZK:
+        return ["localhost"]
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
     return nodes
 
 def get_node_data(node):
+    if not USE_ZK:
+        return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
     node_path = ZK_NODE_PATH + node
     data, stat = zk.get(node_path)
     return data
 
 def get_ip_by_index(index):
+    if not USE_ZK:
+        return os.getenv('NODE_ADDRESS', "")
     node = get_node_by_index(index)
     data = get_node_data(node)
     return data.split()[1].decode()
 
 def get_node_index(node):
+    if not USE_ZK:
+        return 0
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
     return nodes.index(node)
 
 def get_node_by_index(index):
+    if not USE_ZK:
+        return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
     return nodes[index - 1]
 
 def get_leader():
+    if not USE_ZK:
+        return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
     register_node()
     nodes = zk.get_children(ZK_NODE_PATH)
@@ -74,6 +90,8 @@ def get_leader():
         return None
 
 def get_current_node():
+    if not USE_ZK:
+        return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
     for node in nodes:
@@ -90,6 +108,8 @@ def do_rpc(node_index, method_name, **kwargs):
     return s.execute(method_name, kwargs)
 
 def get_node_index_by_ip(ip):
+    if not USE_ZK:
+        return 0
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
     for i, node in enumerate(nodes):
@@ -100,14 +120,24 @@ def get_node_index_by_ip(ip):
 
 
 def do_rpc_to_leader(method_name, **kwargs):
+    if not USE_ZK:
+        return do_rpc(0, method_name, **kwargs)
     leader = get_leader()
     leader_index = get_node_index(leader)
     return do_rpc(leader_index, method_name, **kwargs)
 
 def is_leader():
+    if not USE_ZK:
+        return True
     return get_leader() == get_current_node()
 
 def do_rpc_client(ip, method_name, **kwargs):
-    from xmlrpc.client import ServerProxy
+    from xmlrpc.client import ServerProxy, Fault
     s = ServerProxy(f'http://{ip}:8000')
-    return s.execute(method_name, kwargs)
+    try:
+        return s.execute(method_name, kwargs)
+    except Fault as err:
+        return {
+            "error": err.faultString,
+            "code": err.faultCode
+        }
