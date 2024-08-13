@@ -73,8 +73,7 @@ class StorageGraph:
 
     def get_graph(self) -> nx.Graph:
         G = nx.read_gml(self.path)
-        # rename nodes 
-        mapping = {n: i for i, n in enumerate(G.nodes())}
+        mapping = {v: int(v) for v in G.nodes()}
         G = nx.relabel_nodes(G, mapping)
         return G
     
@@ -95,8 +94,10 @@ class StorageGraph:
             return [self.copy(self.name + "_part_0")]
         graph = self.get_graph()
         partitioned_graph = partition_graph(graph, num_nodes)
+        print("Partitioned graph:", partitioned_graph, flush=True)
         result = [] 
         for i, part in enumerate(partitioned_graph):
+            print("Creating partition %d with nodes %s" % (i, part), flush=True)
             storage_graph = self.get_partition(i)
             subgraph = graph.subgraph(part)
             storage_graph.create_graph(subgraph)
