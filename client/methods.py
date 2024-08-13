@@ -300,6 +300,7 @@ class Client:
             edges = edge_result["result"]
             original = nx.Graph()
             emb = embedding["result"]["embeddings"]
+            emb = {int(k): v for k, v in emb.items()}
             keys = sorted(emb.keys())
             emb = [emb[key] for key in keys]
             emb = [np.array(e) for e in emb]
