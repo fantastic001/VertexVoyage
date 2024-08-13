@@ -32,7 +32,7 @@ def register_node():
     if not zk.exists(ZK_NODE_PATH):
         zk.create(ZK_NODE_PATH, b'')
     nodes = zk.get_children(ZK_NODE_PATH)
-    node_name = 'node_' + str(len(nodes) + 1)
+    node_name = 'node_' + ENV_NODE_NAME
     node_data = ENV_NODE_NAME.encode() 
     # put ip address of current node into node data 
     node_data = node_data + b' ' + os.getenv('NODE_ADDRESS').encode()
