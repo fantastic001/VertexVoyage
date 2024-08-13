@@ -65,7 +65,11 @@ class StorageGraph:
         return self.path
 
     def get_graph(self) -> nx.Graph:
-        return nx.read_gml(self.path)
+        G = nx.read_gml(self.path)
+        # rename nodes 
+        mapping = {n: i for i, n in enumerate(G.nodes())}
+        G = nx.relabel_nodes(G, mapping)
+        return G
     
     def add_vertex(self, vertex_name):
         graph = self.get_graph()
