@@ -311,3 +311,5 @@ TSWLatexianTemp*
 
 # PDF 
 **.pdf
+my_pipeline/
+results/
