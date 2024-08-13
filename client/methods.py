@@ -71,6 +71,9 @@ class Client:
     def get_vertices(self, graph_name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "get_vertices", graph_name=graph_name)
 
+    def get_edges(self, graph_name: str, *, ip: str = "localhost"):
+        return do_rpc_client(ip, "get_edges", graph_name=graph_name)
+
     def get_datasets(self, datasets: str, *, ip: str = "localhost", no_sbm: bool = False):
         datasets_file = open(datasets, "r")
         sbms = [
@@ -246,6 +249,69 @@ class Client:
             "pipeline": pipeline_name,
             "Results folder": os.path.abspath(pipeline_name)
         }
+
+    def analyze_embeddings(self, single_node_result: str, multi_node_result: str, clusters: int):
+        import json 
+        with open(single_node_result, "r") as f:
+            single_node_results = json.load(f)
+        with open(multi_node_result, "r") as f:
+            multi_node_results = json.load(f)
+        x_label = [k for k in single_node_results[0].keys() if k != "result" and k != "time"][0]
+        y_label = "Cluster similarity"
+        import pandas as pd 
+        x = []
+        y = []
+        for single_node_result, multi_node_result in zip(single_node_results, multi_node_results):
+            x.append(single_node_result[x_label])
+            keys = sorted(single_node_result["result"]["embeddings"].keys())
+            single = single_node_result["result"]["embeddings"]
+            multi = multi_node_result["result"]["embeddings"]
+            single = [single[key] for key in keys]
+            multi = [multi[key] for key in keys]
+            from sklearn.cluster import KMeans
+            single_k_means = KMeans(n_clusters=clusters).fit_predict(single)
+            multi_k_means = KMeans(n_clusters=clusters).fit_predict(multi)
+            from sklearn.metrics import adjusted_rand_score
+            similarity = adjusted_rand_score(single_k_means, multi_k_means)
+            y.append(similarity)
+        df = pd.DataFrame({
+            x_label: x,
+            y_label: y
+        })
+        df.to_csv("analysis.csv")
+
+    def analyze_reconstruction(self, vertex_result: str, edge_result: str, embeddings_result: str):
+        import json 
+        import pandas as pd
+        from vertex_voyage.reconstruction import reconstruct, get_f1_score
+        import networkx as nx 
+        vertex_result = json.load(open(vertex_result, "r"))
+        edge_result = json.load(open(edge_result, "r"))
+        embeddings_result = json.load(open(embeddings_result, "r"))
+        x_label = [k for k in embeddings_result[0].keys() if k != "result" and k != "time"][0]
+        y_label = "F1 score"
+        x = []
+        y = []
+        for embedding in embeddings_result:
+            x.append(embedding[x_label])
+            vertices = vertex_result["result"]
+            edges = edge_result["result"]
+            original = nx.Graph()
+            for vertex in vertices:
+                original.add_node(vertex)
+            for edge in edges:
+                original.add_edge(edge[0], edge[1])
+            reconstructed = reconstruct(embedding["result"]["embeddings"], vertices)
+            y.append(get_f1_score(original, reconstructed))
+        df = pd.DataFrame({
+            x_label: x,
+            y_label: y
+        })
+        df.to_csv("analysis.csv")
+        
+
+
+        
 
 
 COMMAND_CLASSES = ["Client"]
