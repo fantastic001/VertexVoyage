@@ -78,6 +78,7 @@ services:
     environment:
       - ZK_HOSTS=zoo1:2181,zoo2:2181,zoo3:2181
       - NODE_ADDRESS=vv1
+      - NODE_NAME=vv1
     healthcheck:
       test: ["CMD", "nc", "-z", "zoo1", "2181"]
       interval: 30s
@@ -97,6 +98,7 @@ services:
     environment:
       - ZK_HOSTS=zoo1:2181,zoo2:2181,zoo3:2181
       - NODE_ADDRESS=vv2
+      - NODE_NAME=vv2
     healthcheck:
       test: ["CMD", "nc", "-z", "zoo1", "2181"]
       interval: 30s
@@ -116,6 +118,7 @@ services:
     environment:
       - ZK_HOSTS=zoo1:2181,zoo2:2181,zoo3:2181
       - NODE_ADDRESS=vv3
+      - NODE_NAME=vv3
     healthcheck:
       test: ["CMD", "nc", "-z", "zoo1", "2181"]
       interval: 30s
