@@ -23,7 +23,11 @@ def get_zk_client():
         if not zk.connected:
             zk.start()
     return zk
-
+def zk_callback(event):
+    print(f"Zookeeper event: {event}", flush=True)
+    if event.type == 'DELETED':
+        print("Node deleted")
+        register_node()
 def register_node():
     if not USE_ZK:
         return
@@ -46,6 +50,7 @@ def register_node():
             zk.create(ZK_NODE_PATH, b'')
         except NodeExistsError as e:
             print(f"Path {ZK_NODE_PATH} already exists", flush=True)
+    zk.add_listener(zk_callback)
     node_name = 'node_' + ENV_NODE_NAME
     node_data = ENV_NODE_NAME.encode() 
     # put ip address of current node into node data 
