@@ -4,6 +4,7 @@ from kazoo.client import KazooClient
 import os 
 import random 
 import re
+from kazoo.exceptions import NodeExistsError
 
 zk = None 
 USE_ZK = os.getenv('USE_ZK', '1').lower() == '1'
@@ -26,6 +27,7 @@ def get_zk_client():
 def register_node():
     if not USE_ZK:
         return
+    print("Registering node")
     zk = get_zk_client()
     for i in range(5):
         if zk.connected:
@@ -33,10 +35,17 @@ def register_node():
         zk.start()
     if not zk.connected:
         raise RuntimeError("Zookeeper client is not connected")
+    print("Connected to zookeeper")
     if not zk.exists(ZK_PATH):
-        zk.create(ZK_PATH, b'')
+        try:
+            zk.create(ZK_PATH, b'')
+        except NodeExistsError as e:
+            print(f"Path {ZK_PATH} already exists")
     if not zk.exists(ZK_NODE_PATH):
-        zk.create(ZK_NODE_PATH, b'')
+        try:
+            zk.create(ZK_NODE_PATH, b'')
+        except NodeExistsError as e:
+            print(f"Path {ZK_NODE_PATH} already exists")
     node_name = 'node_' + ENV_NODE_NAME
     node_data = ENV_NODE_NAME.encode() 
     # put ip address of current node into node data 
