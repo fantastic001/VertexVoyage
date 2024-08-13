@@ -67,6 +67,7 @@ services:
     image: vertexvoyage:latest
     hostname: vv1
     container_name: vertex_voyage1
+    restart: always
     depends_on:
       - zoo1
       - zoo2
@@ -89,6 +90,7 @@ services:
     image: vertexvoyage:latest
     hostname: vv2
     container_name: vertex_voyage2
+    restart: always
     depends_on:
       - zoo1
       - zoo2
@@ -109,6 +111,7 @@ services:
     image: vertexvoyage:latest
     hostname: vv3
     container_name: vertex_voyage3
+    restart: always
     depends_on:
       - zoo1
       - zoo2
