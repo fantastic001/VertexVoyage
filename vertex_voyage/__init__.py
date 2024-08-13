@@ -129,7 +129,10 @@ class Executor:
             do_rpc_to_leader("add_edge", graph_name=graph_name, vertex1=vertex1, vertex2=vertex2)
     def partition_graph(self, graph_name: str):
         if is_leader():
-            return StorageGraph(graph_name).partition_graph(len(get_nodes()))
+            return {
+                "partition_count": len(get_nodes()),
+                "partitions": StorageGraph(graph_name).partition_graph(len(get_nodes()))
+            }
         else:
             return do_rpc_to_leader("partition_graph", graph_name=graph_name)
     
