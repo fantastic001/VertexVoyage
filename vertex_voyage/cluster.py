@@ -27,6 +27,12 @@ def register_node():
     if not USE_ZK:
         return
     zk = get_zk_client()
+    for i in range(5):
+        if zk.connected:
+            break
+        zk.start()
+    if not zk.connected:
+        raise RuntimeError("Zookeeper client is not connected")
     if not zk.exists(ZK_PATH):
         zk.create(ZK_PATH, b'')
     if not zk.exists(ZK_NODE_PATH):
