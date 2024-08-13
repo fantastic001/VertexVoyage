@@ -202,6 +202,12 @@ class Executor:
         else:
             do_rpc_to_leader("get_vertices", graph_name=graph_name)
 
+    def get_edges(self, graph_name: str):
+        if is_leader():
+            return list(StorageGraph(graph_name).get_graph().edges())
+        else:
+            do_rpc_to_leader("get_edges", graph_name=graph_name)
+
     def import_karate_club(self, name: str):
         if is_leader():
             graph = nx.karate_club_graph()
