@@ -39,9 +39,12 @@ def parallel_function_call(func, param_list, max_workers=None):
             except Exception as e:
                 print(f"Function call raised an exception: {e}")
     
+    print("All function calls completed.")
+    print("Results:", results)
     return results
 
 
+COMMAND_CLASSES = ["Executor"]
 
 class StorageGraph:
     GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
@@ -58,7 +61,11 @@ class StorageGraph:
         return [s.replace(".gml", "") for s in os.listdir(StorageGraph.GRAPH_STORE_PATH)]
 
     def get_partition(self, index: int) -> "StorageGraph":
-        return StorageGraph(self.name + "_part_" + str(index))
+        try:
+            return StorageGraph(self.name + "_part_" + str(index))
+        except FileNotFoundError:
+            raise ValueError(f"Partition {index} does not exist.")
+        
 
     def create_graph(self, graph: nx.Graph):
         nx.write_gml(graph, self.path)
@@ -143,13 +150,18 @@ class Executor:
     
     def get_partition(self, graph_name: str, partition_num: int):
         if is_leader():
-            part = StorageGraph(graph_name).get_partition(partition_num)
-            return {
-                "name": part.name,
-                "path": part.path,
-                "nodes": list(part.get_graph().nodes()),
-                "edges": list(part.get_graph().edges())
-            }
+            try:
+                part = StorageGraph(graph_name).get_partition(partition_num)
+                return {
+                    "name": part.name,
+                    "path": part.path,
+                    "nodes": list(part.get_graph().nodes()),
+                    "edges": list(part.get_graph().edges())
+                }
+            except FileNotFoundError:
+                return {
+                    "error": f"Partition {partition_num} does not exist."
+                }
         else:
             return do_rpc_to_leader("get_partition", graph_name=graph_name, partition_num=partition_num)
     def get_embedding(self, 
@@ -198,7 +210,7 @@ class Executor:
         nodes_on_current_node = list(partitioned_graph.nodes())
         print("Nodes on current node:", nodes_on_current_node, flush=True)
         embeddings = {node: nv.embed_node(node) if node in nodes_on_current_node else np.zeros(dim) for node in nodes}
-        embeddings = {node: embeddings[node].tolist() for node in embeddings}
+        embeddings = {str(node): embeddings[node].tolist() for node in embeddings}
         return embeddings
     def get_vertices(self, graph_name: str):
         if is_leader():
@@ -292,10 +304,13 @@ class Executor:
                         learning_rate=learning_rate
                     )
                 other_nodes = [n for n in nodes if n != get_current_node()]
+                print("Other nodes:", other_nodes, flush=True)
                 embeddings = parallel_function_call(f_exec, other_nodes)
                 end_time = time.time()
                 for embedding in embeddings:
+                    print("Embedding from other node:", embedding, flush=True)
                     for k, v in embedding.items():
+                        k = int(k)
                         print("Adding embedding for", k, flush=True)
                         node_to_embeddings_count[k] += 1
                         if k not in my_embedding:
