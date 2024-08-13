@@ -2,6 +2,7 @@
 from vertex_voyage.cluster import * 
 from vertex_voyage.command_executor import *
 import termcolor
+import time 
 
 def red(text):
     return termcolor.colored(text, "red")
@@ -175,9 +176,14 @@ class Client:
                 print(f"Command {command_name} not found in Client class")
                 return 
             if command["type"] == "oneshot":
+                start_time = time.time()
                 result = getattr(self, command_name)(**command["args"], ip=ip)
+                end_time = time.time()
                 with open(f"{pipeline_name}/{i}.json", "w") as f:
-                    json.dump(result, f)
+                    json.dump({
+                        "result": result,
+                        "time": (end_time - start_time)
+                    }, f)
             elif command["type"] == "vary":
                 parameter = command["parameter"]
                 start = command["start"]
@@ -187,10 +193,13 @@ class Client:
                 results = []
                 for value in values:
                     print(f"Varying {parameter} to {value} / {end}" + 16*" ", end="\r")
+                    start_time = time.time()
                     result = getattr(self, command_name)(**{**command["args"], parameter: value}, ip=ip)
+                    end_time = time.time()
                     results.append({
                         parameter: value,
-                        "result": result
+                        "result": result,
+                        "time": (end_time - start_time)
                     })
                 with open(f"{pipeline_name}/{i}.json", "w") as f:
                     json.dump(results, f)
@@ -200,10 +209,13 @@ class Client:
                 results = []
                 for value in values:
                     print(f"Varying {parameter} to {value}" + 16*" ", end="\r")
+                    start_time = time.time()
                     result = getattr(self, command_name)(**{**command["args"], parameter: value}, ip=ip)
+                    end_time = time.time()
                     results.append({
                         parameter: value,
-                        "result": result
+                        "result": result,
+                        "time": (end_time - start_time)
                     })
                 with open(f"{pipeline_name}/{i}.json", "w") as f:
                     json.dump(results, f)
