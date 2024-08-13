@@ -9,6 +9,39 @@ import os
 from vertex_voyage.partitioning import partition_graph
 from vertex_voyage.node2vec import Node2Vec
 from httplib2 import Http
+import concurrent.futures
+
+def parallel_function_call(func, param_list, max_workers=None):
+    """
+    Parallelizes the execution of a function with a parameter list.
+    
+    Args:
+        func (callable): The function to be executed in parallel.
+        param_list (list): A list of parameters where each parameter is passed to func.
+        max_workers (int, optional): The maximum number of threads to use. Defaults to None.
+        
+    Returns:
+        list: A list of results from the function calls.
+    """
+    results = []
+    
+    # Use ThreadPoolExecutor or ProcessPoolExecutor based on your needs
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Map the function and the parameter list to the executor
+        future_to_param = {executor.submit(func, param): param for param in param_list}
+        
+        # Collect results as they complete
+        for future in concurrent.futures.as_completed(future_to_param):
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                print(f"Function call raised an exception: {e}")
+    
+    return results
+
+
+
 class StorageGraph:
     GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
 
@@ -193,16 +226,17 @@ class Executor:
                 node_to_embeddings_count[k] += 1
             # do xmlrpc to other nodes and add their embeddings to my_embedding
             if len(nodes) > 1:
-                for node in nodes:
-                    if node == get_current_node():
-                        continue
+                def f_exec(node):
                     print("Getting embedding from", node, flush=True)
-                    embedding = do_rpc(
+                    return do_rpc(
                         get_node_index(node), 
                         "get_embedding", 
                         graph_name=graph_name, 
                         dim=dim
                     )
+                other_nodes = [n for n in nodes if n != get_current_node()]
+                embeddings = parallel_function_call(f_exec, other_nodes)
+                for embedding in embeddings:
                     for k, v in embedding.items():
                         print("Adding embedding for", k, flush=True)
                         node_to_embeddings_count[k] += 1
