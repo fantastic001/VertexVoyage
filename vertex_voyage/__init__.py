@@ -10,6 +10,7 @@ from vertex_voyage.partitioning import partition_graph
 from vertex_voyage.node2vec import Node2Vec
 from httplib2 import Http
 import concurrent.futures
+import time 
 
 def parallel_function_call(func, param_list, max_workers=None):
     """
@@ -220,6 +221,7 @@ class Executor:
     def process(self, graph_name: str, *, dim: int=128):
         if is_leader():
             print("Processing on leader", flush=True)
+            start_time = time.time()
             my_embedding = self.get_embedding(graph_name, dim=dim)
             nodes = get_nodes()
             graph_vertices = StorageGraph(graph_name).get_nodes()
@@ -239,6 +241,7 @@ class Executor:
                     )
                 other_nodes = [n for n in nodes if n != get_current_node()]
                 embeddings = parallel_function_call(f_exec, other_nodes)
+                end_time = time.time()
                 for embedding in embeddings:
                     for k, v in embedding.items():
                         print("Adding embedding for", k, flush=True)
@@ -252,7 +255,10 @@ class Executor:
             print("Normalizing embeddings", flush=True)
             for k in my_embedding:
                 my_embedding[k] = my_embedding[k] / node_to_embeddings_count[k]
-            return {k: my_embedding[k].tolist() for k in my_embedding}
+            return {
+                "embeddings": {k: my_embedding[k].tolist() for k in my_embedding},
+                "time": end_time - start_time
+            }
         else:
             return do_rpc_to_leader("process", graph_name)
 
