@@ -279,6 +279,7 @@ class Executor:
                 q=q,
                 learning_rate=learning_rate
             )
+            my_embedding = {int(k): np.array(v) for k, v in my_embedding.items()}
             nodes = get_nodes()
             graph_vertices = StorageGraph(graph_name).get_nodes()
             print("Nodes:", nodes, flush=True)
