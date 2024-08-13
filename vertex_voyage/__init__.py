@@ -46,6 +46,8 @@ class StorageGraph:
         return self.path
     
     def partition_graph(self, num_nodes: int) -> list:
+        if num_nodes == 1:
+            return [self.copy(self.name + "_part_0")]
         graph = self.get_graph()
         partitioned_graph = partition_graph(graph, num_nodes)
         result = [] 
@@ -71,6 +73,10 @@ class StorageGraph:
             f.write(content)
         return self.path
 
+    def copy(self, destination_name: str):
+        import shutil
+        shutil.copy(self.path, os.path.join(self.GRAPH_STORE_PATH, destination_name + ".gml"))
+        return os.path.join(self.GRAPH_STORE_PATH, destination_name + ".gml")
 
 class Executor:
     def create_graph(self, name: str):
