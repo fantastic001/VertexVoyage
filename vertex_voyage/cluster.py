@@ -67,7 +67,7 @@ def get_nodes():
         return ["localhost"]
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
-    return nodes
+    return sorted(nodes)
 
 def get_node_data(node):
     if not USE_ZK:
