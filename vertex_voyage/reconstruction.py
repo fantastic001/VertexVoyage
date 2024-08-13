@@ -34,6 +34,7 @@ def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     return graph
 
 def get_f1_score(G, reconstructed_graph):
+    nodes = G.nodes()
     recall = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(G.neighbors(n))) for n in nodes]) / len(G.nodes())
     precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
     f1 = 2 * (precision * recall) / (precision + recall)
