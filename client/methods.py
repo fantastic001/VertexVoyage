@@ -196,6 +196,7 @@ class Client:
         for i, command in enumerate(pipeline["commands"]):
             command_name = command["name"]
             print_substep(f"Executing command {command_name}")
+            command_result_name = f"{pipeline_name}/{i}_{command_name}.json"
             if command_name not in dir(self):
                 print(f"Command {command_name} not found in Client class")
                 return 
@@ -203,7 +204,7 @@ class Client:
                 start_time = time.time()
                 result = getattr(self, command_name)(**command["args"], ip=ip)
                 end_time = time.time()
-                with open(f"{pipeline_name}/{i}.json", "w") as f:
+                with open(command_result_name, "w") as f:
                     json.dump({
                         "result": result,
                         "time": (end_time - start_time)
@@ -225,7 +226,7 @@ class Client:
                         "result": result,
                         "time": (end_time - start_time)
                     })
-                with open(f"{pipeline_name}/{i}.json", "w") as f:
+                with open(command_result_name, "w") as f:
                     json.dump(results, f)
             elif command["type"] == "multiple":
                 parameter = command["parameter"]
@@ -241,7 +242,7 @@ class Client:
                         "result": result,
                         "time": (end_time - start_time)
                     })
-                with open(f"{pipeline_name}/{i}.json", "w") as f:
+                with open(command_result_name, "w") as f:
                     json.dump(results, f)
             else:
                 print(f"Unknown command type {command['type']}")
@@ -285,6 +286,7 @@ class Client:
         import pandas as pd
         from vertex_voyage.reconstruction import reconstruct, get_f1_score
         import networkx as nx 
+        import numpy as np
         vertex_result = json.load(open(vertex_result, "r"))
         edge_result = json.load(open(edge_result, "r"))
         embeddings_result = json.load(open(embeddings_result, "r"))
@@ -297,11 +299,16 @@ class Client:
             vertices = vertex_result["result"]
             edges = edge_result["result"]
             original = nx.Graph()
+            emb = embedding["result"]["embeddings"]
+            keys = sorted(emb.keys())
+            emb = [emb[key] for key in keys]
+            emb = [np.array(e) for e in emb]
+            print(emb)
             for vertex in vertices:
                 original.add_node(vertex)
             for edge in edges:
                 original.add_edge(edge[0], edge[1])
-            reconstructed = reconstruct(embedding["result"]["embeddings"], vertices)
+            reconstructed = reconstruct(len(edges), emb, vertices)
             y.append(get_f1_score(original, reconstructed))
         df = pd.DataFrame({
             x_label: x,
