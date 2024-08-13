@@ -27,7 +27,7 @@ def get_zk_client():
 def register_node():
     if not USE_ZK:
         return
-    print("Registering node")
+    print("Registering node", flush=True)
     zk = get_zk_client()
     for i in range(5):
         if zk.connected:
@@ -35,17 +35,17 @@ def register_node():
         zk.start()
     if not zk.connected:
         raise RuntimeError("Zookeeper client is not connected")
-    print("Connected to zookeeper")
+    print("Connected to zookeeper", flush=True)
     if not zk.exists(ZK_PATH):
         try:
             zk.create(ZK_PATH, b'')
         except NodeExistsError as e:
-            print(f"Path {ZK_PATH} already exists")
+            print(f"Path {ZK_PATH} already exists", flush=True)
     if not zk.exists(ZK_NODE_PATH):
         try:
             zk.create(ZK_NODE_PATH, b'')
         except NodeExistsError as e:
-            print(f"Path {ZK_NODE_PATH} already exists")
+            print(f"Path {ZK_NODE_PATH} already exists", flush=True)
     node_name = 'node_' + ENV_NODE_NAME
     node_data = ENV_NODE_NAME.encode() 
     # put ip address of current node into node data 
