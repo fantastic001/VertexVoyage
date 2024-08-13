@@ -1,0 +1,44 @@
+name: my_pipeline
+commands:
+  - name: import_karate_club
+    type: oneshot
+    args:
+      name: karate_club
+  - name: partition_graph
+    type: oneshot
+    args:
+      graph_name: karate_club
+  - name: process
+    type: vary
+    parameter: dim
+    start: 2
+    end: 256
+    step: 14
+    args:
+      graph_name: karate_club
+      walk_size: 80
+      n_walks: 100
+      window_size: 10
+      epochs: 10
+      p: 0.25
+      q: 4
+      negative_sample_num: 10
+      learning_rate: 0.01
+
+  # - name: upload_csv 
+  #   type: oneshot
+  #   args:
+  #     graph_name: twitch
+  #     path: /home/stefan//Downloads/twitch/large_twitch_edges.csv
+  # - name: partition_graph
+  #   type: oneshot
+  #   args:
+  #     graph_name: twitch
+  # - name: process
+  #   type: vary
+  #   parameter: dim
+  #   start: 2
+  #   end: 256
+  #   step: 14
+  #   args:
+  #     graph_name: twitch
