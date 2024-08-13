@@ -34,8 +34,29 @@ class Client:
         return do_rpc_client(ip, "get_nodes", graph_name=graph_name)
     def get_partition(self, graph_name: str, partition_num: int, *, ip: str="localhost"):
         return do_rpc_client(ip, "get_partition", graph_name=graph_name, partition_num=partition_num)
-    def process(self, graph_name: str, *, ip: str="localhost", dim: int = 128):
-        return do_rpc_client(ip, "process", graph_name=graph_name, dim=dim)
+    def process(self, graph_name: str, *, ip: str="localhost", 
+                dim: int = 128,
+                epochs: int=10,
+                learning_rate: float=0.01,
+                n_walks: int=10,
+                negative_sample_num: int=1,
+                p: float=1,
+                q: float=1,
+                window_size: int=10,
+                walk_size: int=10
+        ):
+        return do_rpc_client(ip, "process", 
+                    graph_name=graph_name, 
+                    dim=dim,
+                    epochs=epochs,
+                    walk_size=walk_size,
+                    n_walks=n_walks,
+                    window_size=window_size,
+                    negative_sample_num=negative_sample_num,
+                    p=p,
+                    q=q,
+                    learning_rate=learning_rate
+        )
     def get_graph(self, graph_name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "get_graph", graph_name=graph_name)
     def get_leader(self, *, ip: str = "localhost"):

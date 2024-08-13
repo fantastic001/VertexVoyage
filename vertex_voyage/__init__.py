@@ -148,7 +148,18 @@ class Executor:
             }
         else:
             return do_rpc_to_leader("get_partition", graph_name=graph_name, partition_num=partition_num)
-    def get_embedding(self, graph_name: str, *, dim: int = 128):
+    def get_embedding(self, 
+                      graph_name: str, *, 
+                      dim: int = 128,
+                        epochs: int = 10,
+                        learning_rate: float = 0.01,
+                        n_walks: int = 10,
+                        negative_sample_num: int = 1,
+                        p: float = 1,
+                        q: float = 1,
+                        window_size: int = 10,
+                        walk_size: int = 10
+        ):
         print("Getting embedding", flush=True)
         current_node_index = get_node_index(get_current_node())
         if is_leader():
@@ -166,14 +177,14 @@ class Executor:
         print("Launching node2vec", flush=True)
         nv = Node2Vec(
             dim=dim, 
-            epochs=10,
-            learning_rate=0.01,
-            n_walks=10,
-            negative_sample_num=1,
-            p=1,
-            q=1,
-            window_size=10,
-            walk_size=10
+            epochs=epochs,
+            learning_rate=learning_rate,
+            n_walks=n_walks,
+            negative_sample_num=negative_sample_num,
+            p=p,
+            q=q,
+            window_size=window_size,
+            walk_size=walk_size
         )
         if is_leader():
             nodes = StorageGraph(graph_name).get_nodes()
@@ -218,11 +229,34 @@ class Executor:
             "current_node": current_node
         }
     
-    def process(self, graph_name: str, *, dim: int=128):
+    def process(self, 
+                graph_name: str, *, 
+                dim: int=128,
+                epochs: int=10,
+                learning_rate: float=0.01,
+                n_walks: int=10,
+                negative_sample_num: int=1,
+                p: float=1,
+                q: float=1,
+                window_size: int=10,
+                walk_size: int=10
+        ):
         if is_leader():
             print("Processing on leader", flush=True)
             start_time = time.time()
-            my_embedding = self.get_embedding(graph_name, dim=dim)
+            end_time = None 
+            my_embedding = self.get_embedding(
+                graph_name, 
+                dim=dim,
+                epochs=epochs,
+                walk_size=walk_size,
+                n_walks=n_walks,
+                window_size=window_size,
+                negative_sample_num=negative_sample_num,
+                p=p,
+                q=q,
+                learning_rate=learning_rate
+            )
             nodes = get_nodes()
             graph_vertices = StorageGraph(graph_name).get_nodes()
             print("Nodes:", nodes, flush=True)
@@ -237,7 +271,15 @@ class Executor:
                         get_node_index(node), 
                         "get_embedding", 
                         graph_name=graph_name, 
-                        dim=dim
+                        dim=dim,
+                        epochs=epochs,
+                        walk_size=walk_size,
+                        n_walks=n_walks,
+                        window_size=window_size,
+                        negative_sample_num=negative_sample_num,
+                        p=p,
+                        q=q,
+                        learning_rate=learning_rate
                     )
                 other_nodes = [n for n in nodes if n != get_current_node()]
                 embeddings = parallel_function_call(f_exec, other_nodes)
@@ -250,6 +292,8 @@ class Executor:
                             my_embedding[k] = v
                         else:
                             my_embedding[k] = np.array(my_embedding[k]) + np.array(v)
+            else:
+                end_time = time.time()
             for k, v in my_embedding.items():
                 my_embedding[k] = np.array(v)
             print("Normalizing embeddings", flush=True)
