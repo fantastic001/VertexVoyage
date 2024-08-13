@@ -31,7 +31,6 @@ def register_node():
         zk.create(ZK_PATH, b'')
     if not zk.exists(ZK_NODE_PATH):
         zk.create(ZK_NODE_PATH, b'')
-    nodes = zk.get_children(ZK_NODE_PATH)
     node_name = 'node_' + ENV_NODE_NAME
     node_data = ENV_NODE_NAME.encode() 
     # put ip address of current node into node data 
@@ -41,6 +40,12 @@ def register_node():
         zk.set(mynodepath, node_data)
     else:
         zk.create(mynodepath, node_data, ephemeral=True)
+        print(f"Registered node {node_name}")
+        print(f"Node data: {node_data}")
+        print("Current leader: ", get_leader())
+        print("Node count: ", len(get_nodes()))
+        print("Nodes in cluster: ", get_nodes(), flush=True)
+        print("Is leader: ", is_leader(), flush=True)
 
 def get_nodes():
     if not USE_ZK:
@@ -76,14 +81,15 @@ def get_node_by_index(index):
         return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
     nodes = zk.get_children(ZK_NODE_PATH)
-    return nodes[index - 1]
+    return nodes[index]
 
 def get_leader():
     if not USE_ZK:
         return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
     register_node()
-    nodes = zk.get_children(ZK_NODE_PATH)
+    nodes = sorted(zk.get_children(ZK_NODE_PATH))
+    print(f"nodes: {nodes}")
     if len(nodes) > 0:
         return nodes[0]
     else:
@@ -129,6 +135,8 @@ def do_rpc_to_leader(method_name, **kwargs):
 def is_leader():
     if not USE_ZK:
         return True
+    print("Leader: ", get_leader())
+    print("Current: ", get_current_node())
     return get_leader() == get_current_node()
 
 def do_rpc_client(ip, method_name, **kwargs):
