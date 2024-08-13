@@ -310,7 +310,7 @@ class Executor:
             for k in my_embedding:
                 my_embedding[k] = my_embedding[k] / node_to_embeddings_count[k]
             return {
-                "embeddings": {k: my_embedding[k].tolist() for k in my_embedding},
+                "embeddings": {str(k): my_embedding[k].tolist() for k in my_embedding},
                 "time": end_time - start_time
             }
         else:
