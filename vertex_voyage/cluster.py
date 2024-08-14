@@ -5,6 +5,8 @@ import os
 import random 
 import re
 from kazoo.exceptions import NodeExistsError
+import threading
+
 
 zk = None 
 USE_ZK = os.getenv('USE_ZK', '1').lower() == '1'
@@ -29,43 +31,51 @@ def zk_callback(event):
         print("Node deleted")
         register_node()
 def register_node():
-    if not USE_ZK:
-        return
-    print("Registering node", flush=True)
-    zk = get_zk_client()
-    for i in range(5):
-        if zk.connected:
-            break
-        zk.start()
-    if not zk.connected:
-        raise RuntimeError("Zookeeper client is not connected")
-    print("Connected to zookeeper", flush=True)
-    if not zk.exists(ZK_PATH):
-        try:
-            zk.create(ZK_PATH, b'')
-        except NodeExistsError as e:
-            print(f"Path {ZK_PATH} already exists", flush=True)
-    if not zk.exists(ZK_NODE_PATH):
-        try:
-            zk.create(ZK_NODE_PATH, b'')
-        except NodeExistsError as e:
-            print(f"Path {ZK_NODE_PATH} already exists", flush=True)
-    zk.add_listener(zk_callback)
-    node_name = 'node_' + ENV_NODE_NAME
-    node_data = ENV_NODE_NAME.encode() 
-    # put ip address of current node into node data 
-    node_data = node_data + b' ' + os.getenv('NODE_ADDRESS').encode()
-    mynodepath = ZK_NODE_PATH + node_name
-    if zk.exists(mynodepath):
-        zk.set(mynodepath, node_data)
-    else:
-        zk.create(mynodepath, node_data, ephemeral=True)
-        print(f"Registered node {node_name}")
-        print(f"Node data: {node_data}")
-        print("Current leader: ", get_leader())
-        print("Node count: ", len(get_nodes()))
-        print("Nodes in cluster: ", get_nodes(), flush=True)
-        print("Is leader: ", is_leader(), flush=True)
+    def f():
+        if not USE_ZK:
+            return
+        print("Registering node", flush=True)
+        zk = get_zk_client()
+        for i in range(5):
+            if zk.connected:
+                break
+            zk.start()
+        if not zk.connected:
+            raise RuntimeError("Zookeeper client is not connected")
+        print("Connected to zookeeper", flush=True)
+        if not zk.exists(ZK_PATH):
+            try:
+                zk.create(ZK_PATH, b'')
+            except NodeExistsError as e:
+                print(f"Path {ZK_PATH} already exists", flush=True)
+        if not zk.exists(ZK_NODE_PATH):
+            try:
+                zk.create(ZK_NODE_PATH, b'')
+            except NodeExistsError as e:
+                print(f"Path {ZK_NODE_PATH} already exists", flush=True)
+        zk.add_listener(zk_callback)
+        node_name = 'node_' + ENV_NODE_NAME
+        node_data = ENV_NODE_NAME.encode() 
+        # put ip address of current node into node data 
+        node_data = node_data + b' ' + os.getenv('NODE_ADDRESS').encode()
+        mynodepath = ZK_NODE_PATH + node_name
+        if zk.exists(mynodepath):
+            zk.set(mynodepath, node_data)
+        else:
+            zk.create(mynodepath, node_data, ephemeral=True)
+            print(f"Registered node {node_name}")
+            print(f"Node data: {node_data}")
+            print("Current leader: ", get_leader())
+            print("Node count: ", len(get_nodes()))
+            print("Nodes in cluster: ", get_nodes(), flush=True)
+            print("Is leader: ", is_leader(), flush=True)
+    # run f in separate thread and wait 10 seconds until it finishes, if it is not completed
+    # raise RuntimeError
+    t = threading.Thread(target=f)
+    t.start()
+    t.join(timeout=10)
+    if t.is_alive():
+        raise RuntimeError("Registering node is taking too long")
 
 def get_nodes():
     if not USE_ZK:
