@@ -78,7 +78,7 @@ class Client:
         datasets_file = open(datasets, "r")
         sbms = [
             {
-                "size": 10000,
+                "size": 1000,
                 "p": 0.1,
                 "q": 0.01,
                 "communities": 2
