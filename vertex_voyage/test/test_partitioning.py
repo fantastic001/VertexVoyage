@@ -1,7 +1,7 @@
 
 
 import unittest
-from vertex_voyage.partitioning import partition_graph
+from vertex_voyage.partitioning import calculate_corruptability, calculate_partitioning_corruption, partition_graph
 import networkx as nx
 from vertex_voyage.node2vec import Node2Vec
 import numpy as np 
@@ -89,3 +89,32 @@ class TestPartitioning(unittest.TestCase):
         precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
         f1 = 2 * (precision * recall) / (precision + recall)
         self.assertGreaterEqual(f1, 0.41)
+
+    def test_partitioning_corruption(self):
+        zachary = nx.karate_club_graph()
+        partition_num = 2
+        communities = partition_graph(zachary, partition_num)
+        corruption = calculate_partitioning_corruption(zachary, communities)
+        self.assertGreaterEqual(corruption, 0)
+        self.assertLessEqual(corruption, 1.0)
+    
+    def test_calculate_corruptability(self):
+        zachary = nx.karate_club_graph()
+        partition_num = 2
+        corruptability = calculate_corruptability(zachary, partition_num)
+        self.assertGreaterEqual(corruptability, 0)
+        self.assertLessEqual(corruptability, 1.0)
+
+        self.assertEqual(calculate_corruptability(zachary, 1), 0)
+
+        x = list(range(1, 100))
+        y = [calculate_corruptability(zachary, i) for i in x]
+        self.assertEqual(len(x), len(y))
+        # do linear regression to check if the corruptability is increasing 
+        # with the number of partitions
+        from sklearn.linear_model import LinearRegression
+        x = np.array(x).reshape(-1, 1)-1
+        y = np.array(y).reshape(-1, 1)
+        reg = LinearRegression().fit(x, y)
+        self.assertGreaterEqual(reg.coef_[0][0], 0)
+        print(reg.coef_)
