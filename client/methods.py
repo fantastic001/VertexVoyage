@@ -316,10 +316,160 @@ class Client:
             y_label: y
         })
         df.to_csv("analysis.csv")
-        
+    
+    def analyze_sbm_corruptability(self):
+        import pandas as pd 
+        from vertex_voyage.partitioning import calculate_graph_corruptability
+        import networkx as nx 
+        import numpy as np 
+        import matplotlib.pyplot as plt
+        qs = list(np.linspace(0.00, 0.03, 30))
+        ps = [0.4, 0.5, 0.6]
+        plt.title("Koruptabilnost SBM modela u zavisnosti od verovatnoće veza između zajednica")
+        plt.xlabel("q")
+        plt.ylabel("Koruptabilnost")
+        for p in ps:
+            corruptabilities = []
+            print(f"Calculating for p={p}")
+            for q in qs:
+                print(f"Calculating for q={q}     ", end="")
+                # create SBM with community relation probability 0.1 and between community relation probability q
+                sizes = [100, 100, 100]
+                P = [
+                    [p, q, q],
+                    [q, p, q],
+                    [q, q, p]
+                ]
+                colsize = 20
+                def stage(text):
+                    print(text + (colsize - len(text))*" ", end="")
+                def back():
+                    print(colsize*"\b", end="")
+                stage("Creating SBM")
+                sbm = nx.stochastic_block_model(sizes, P)
+                back()
+                # calculate corruptability of the graph
+                stage("Calculating cor.")
+                corruptability = calculate_graph_corruptability(sbm, 3, use_modified_lfm=True)
+                back()
+                print("\r", end="" )
+                corruptabilities.append(corruptability)
+            # decrease outliers 
+            for i in range(1, len(corruptabilities)-1):
+                corruptabilities[i] = (corruptabilities[i-1] + corruptabilities[i] + corruptabilities[i+1]) / 3
+            print()
+            plt.plot(qs, corruptabilities, label=f"p={p}")
+        print()
+        plt.legend()
+        print("Saving plot")
+        plt.show()
+        # plt.savefig("corruptability_sbm.png")
+    def calculate_corruptability_for_popular_datasets(self):
+        import pandas as pd 
+        from vertex_voyage.partitioning import calculate_graph_corruptability
+        import networkx as nx 
+        import numpy as np 
+        datasets = {
+            "Zaharijev karate klub": nx.karate_club_graph(),
+            "Les Mis": nx.les_miserables_graph(),
+            "Davis southern women": nx.davis_southern_women_graph(),
+            "Florentine families": nx.florentine_families_graph()
+        }
+        data = []
+        for name, dataset in datasets.items():
+            print(f"Calculating corruptability for {name}")
+            corruptability = calculate_graph_corruptability(dataset, 3)
+            data.append({
+                "Mreža": name,
+                "Koruptabilnost": corruptability
+            })
+        df = pd.DataFrame(data)
+        return df
 
-
-        
-
+    def calculate_partitioning_time_for_popular_datasets(self):
+        import pandas as pd 
+        from vertex_voyage.partitioning import partition_graph
+        import networkx as nx 
+        import numpy as np 
+        import time 
+        datasets = {
+            "Zaharijev karate klub": nx.karate_club_graph(),
+            "Les Mis": nx.les_miserables_graph(),
+            "Davis southern women": nx.davis_southern_women_graph(),
+            "Florentine families": nx.florentine_families_graph()
+        }
+        data = []
+        for name, dataset in datasets.items():
+            print(f"Calculating partitioning time for {name}")
+            start = time.time()
+            partition_graph(dataset, 3)
+            end = time.time()
+            data.append({
+                "Mreža": name,
+                "Vreme particionisanja": end-start,
+                "Broj čvorova": dataset.number_of_nodes(),
+                "Broj grana": dataset.number_of_edges()
+            })
+        df = pd.DataFrame(data)
+        return df.to_html(index=False)
+    
+    def calculate_partitioning_time_for_sbm(self):
+        import pandas as pd 
+        from vertex_voyage.partitioning import partition_graph
+        import networkx as nx 
+        import numpy as np 
+        import time 
+        data = []
+        p = .1
+        q = .01
+        x = [] 
+        y = [] 
+        for i in range(1, 11):
+            print(f"Calculating partitioning time for SBM {i}")
+            sizes = [100*i, 100*i, 100*i]
+            x.append(100*i)
+            P = [
+                [p, q, q],
+                [q, p, q],
+                [q, q, p]
+            ]
+            sbm = nx.stochastic_block_model(sizes, P)
+            start = time.time()
+            partition_graph(sbm, 3)
+            end = time.time()
+            original_lfm_time = end-start
+            y.append(original_lfm_time)
+            start = time.time()
+            partition_graph(sbm, 3, use_modified_lfm=True)
+            end = time.time()
+            modified_lfm_time = end-start
+            y.append(end-start)
+            data.append({
+                "Veličina zajednice": 100*i,
+                "Vreme particionisanja (originalni LFM)": original_lfm_time,
+                "Vreme particionisanja (modifikovani LFM)": modified_lfm_time,
+                "Broj čvorova": sbm.number_of_nodes(),
+                "Broj grana": sbm.number_of_edges()
+            })
+        df = pd.DataFrame(data)
+        return df.to_html(index=False)
+    
+    def analyze_corruptability_modified_lfm(self):
+        import pandas as pd 
+        from vertex_voyage.partitioning import calculate_graph_corruptability
+        import networkx as nx 
+        import numpy as np 
+        import matplotlib.pyplot as plt
+        thresholds = list(np.linspace(0.1, 0.9, 10))
+        corruptabilities = [] 
+        for threshold in thresholds:
+            print(f"Calculating corruptability for threshold {threshold}")
+            corruptability = calculate_graph_corruptability(nx.karate_club_graph(), 3, use_modified_lfm=True, threshold=threshold)
+            corruptabilities.append(corruptability)
+        plt.title("Koruptabilnost Karate kluba u zavisnosti od praga modifikovanog LFM algoritma (threshold)")
+        plt.xlabel("Threshold")
+        plt.ylabel("Koruptabilnost")
+        plt.plot(thresholds, corruptabilities)
+        plt.show()
 
 COMMAND_CLASSES = ["Client"]
