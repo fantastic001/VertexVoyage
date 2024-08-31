@@ -77,12 +77,13 @@ def calculate_partitioning_corruption(G: nx.Graph, partitions: list):
     partitioning_corruption = 1-len(partitions_edges) / original_edges
     return partitioning_corruption
 
-def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm = False, threshold = 0.5):
+def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm = False, threshold = 0.5, partitions = None):
     """
     Calculate the corruptability of the graph.
     """
     # partition the graph into a given number of partitions
-    partitions = partition_graph(G, partition_num, use_modified_lfm=use_modified_lfm, threshold=threshold)
+    if partitions is None:
+        partitions = partition_graph(G, partition_num, use_modified_lfm=use_modified_lfm, threshold=threshold)
     # calculate the partitioning corruption
     corruption = calculate_partitioning_corruption(G, partitions)
     return corruption
