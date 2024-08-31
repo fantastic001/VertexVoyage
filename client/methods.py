@@ -68,6 +68,16 @@ class Client:
     def import_karate_club(self, name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "import_karate_club", name=name)
     
+    def import_known_graph(self, name: str, graph_name: str, *, ip: str = "localhost"):
+        import networkx as nx 
+        G = getattr(nx, name)()
+        vv_dir = os.path.join("/tmp", "vertex_voyage")
+        if not os.path.exists(vv_dir):
+            os.makedirs(vv_dir)
+        tmpfile = os.path.join("/tmp", "vertex_voyage", f"{name}.gml")
+        nx.write_gml(G, tmpfile)
+        return self.upload_gml(graph_name, tmpfile, ip=ip)
+    
     def get_vertices(self, graph_name: str, *, ip: str = "localhost"):
         return do_rpc_client(ip, "get_vertices", graph_name=graph_name)
 
@@ -156,7 +166,7 @@ class Client:
     def list(self, *, ip: str = "localhost"):
         return do_rpc_client(ip, "list")
     
-    def execute(self, pipeline: str, *, ip: str = "localhost"):
+    def execute(self, pipeline: str, *, ip: str = "localhost", results_folder: str = None):
         """
         Execute commands specified in pipeline YAML file given. 
 
@@ -188,15 +198,17 @@ class Client:
         with open(pipeline, "r") as f:
             pipeline = yaml.safe_load(f)
         pipeline_name = pipeline["name"]
+        if results_folder is None:
+            results_folder = pipeline_name
         print_step(f"Executing pipeline {pipeline_name}")
-        if not os.path.exists(pipeline_name):
-            os.makedirs(pipeline_name)
-        with open(f"{pipeline_name}/pipeline.yaml", "w") as f:
+        if not os.path.exists(results_folder):
+            os.makedirs(results_folder)
+        with open(f"{results_folder}/pipeline.yaml", "w") as f:
             yaml.safe_dump(pipeline, f)
         for i, command in enumerate(pipeline["commands"]):
             command_name = command["name"]
             print_substep(f"Executing command {command_name}")
-            command_result_name = f"{pipeline_name}/{i}_{command_name}.json"
+            command_result_name = f"{results_folder}/{i}_{command_name}.json"
             if command_name not in dir(self):
                 print(f"Command {command_name} not found in Client class")
                 return 
@@ -248,7 +260,7 @@ class Client:
                 print(f"Unknown command type {command['type']}")
         return {
             "pipeline": pipeline_name,
-            "Results folder": os.path.abspath(pipeline_name)
+            "Results folder": os.path.abspath(results_folder)
         }
 
     def analyze_embeddings(self, single_node_result: str, multi_node_result: str, clusters: int):
@@ -310,7 +322,10 @@ class Client:
             for edge in edges:
                 original.add_edge(edge[0], edge[1])
             reconstructed = reconstruct(len(edges), emb, vertices)
-            y.append(get_f1_score(original, reconstructed))
+            try:
+                y.append(get_f1_score(original, reconstructed))
+            except ZeroDivisionError:
+                y.append(0)
         df = pd.DataFrame({
             x_label: x,
             y_label: y
@@ -471,5 +486,50 @@ class Client:
         plt.ylabel("Koruptabilnost")
         plt.plot(thresholds, corruptabilities)
         plt.show()
+    
+    def merge_csv(self, first: str, second: str, column: str, renamed_column: str):
+        import pandas as pd 
+        first = pd.read_csv(first)
+        second = pd.read_csv(second)
+        first[renamed_column] = second[column]
+        return first.to_html(index=False)
+
+    def analyze_time(self, single_results: str, multi_results: str):
+        import json 
+        import pandas as pd 
+        single_results = json.load(open(single_results, "r"))
+        multi_results = json.load(open(multi_results, "r"))
+        x_label = [k for k in single_results[0].keys() if k != "result" and k != "time"][0]
+        y_label = "Vreme"
+        x = []
+        y1 = []
+        y2 = []
+        for single_result, multi_result in zip(single_results, multi_results):
+            x.append(single_result[x_label])
+            y1.append(single_result["result"]["time"])
+            y2.append(multi_result["result"]["time"])
+        df = pd.DataFrame({
+            x_label: x,
+            y_label + " (serijska obrada)": y1,
+            y_label + " (paralelna obrada)": y2
+        })
+        return df.to_html(index=False)
+    
+    def get_time_data(self, results: str):
+        import json 
+        import pandas as pd 
+        results = json.load(open(results, "r"))
+        x_label = [k for k in results[0].keys() if k != "result" and k != "time"][0]
+        y_label = "Vreme"
+        x = []
+        y = []
+        for result in results:
+            x.append(result[x_label])
+            y.append(result["result"]["time"])
+        df = pd.DataFrame({
+            x_label: x,
+            y_label: y
+        })
+        return df
 
 COMMAND_CLASSES = ["Client"]
