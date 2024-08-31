@@ -6,7 +6,7 @@ import numpy as np
 import vertex_voyage.node2vec as nv 
 from vertex_voyage.cluster import *
 import os 
-from vertex_voyage.partitioning import partition_graph
+from vertex_voyage.partitioning import partition_graph, calculate_corruptability
 from vertex_voyage.node2vec import Node2Vec
 from httplib2 import Http
 import concurrent.futures
@@ -91,9 +91,10 @@ class StorageGraph:
     
     def partition_graph(self, num_nodes: int) -> list:
         if num_nodes == 1:
-            return [self.copy(self.name + "_part_0")]
+            return [self.copy(self.name + "_part_0")], 0
         graph = self.get_graph()
         partitioned_graph = partition_graph(graph, num_nodes)
+        corruptability = calculate_corruptability(graph, num_nodes, partitions=partitioned_graph)
         print("Partitioned graph:", partitioned_graph, flush=True)
         result = [] 
         for i, part in enumerate(partitioned_graph):
@@ -102,7 +103,7 @@ class StorageGraph:
             subgraph = graph.subgraph(part)
             storage_graph.create_graph(subgraph)
             result.append(storage_graph)
-        return result
+        return result, corruptability
     
     def get_node_num(self):
         graph = self.get_graph()
@@ -142,9 +143,11 @@ class Executor:
             do_rpc_to_leader("add_edge", graph_name=graph_name, vertex1=vertex1, vertex2=vertex2)
     def partition_graph(self, graph_name: str):
         if is_leader():
+            partitions, corruptability = StorageGraph(graph_name).partition_graph(len(get_nodes()))
             return {
                 "partition_count": len(get_nodes()),
-                "partitions": StorageGraph(graph_name).partition_graph(len(get_nodes()))
+                "partitions": partitions,
+                "corruptability": corruptability
             }
         else:
             return do_rpc_to_leader("partition_graph", graph_name=graph_name)
