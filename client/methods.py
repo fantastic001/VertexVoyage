@@ -75,6 +75,9 @@ class Client:
         if not os.path.exists(vv_dir):
             os.makedirs(vv_dir)
         tmpfile = os.path.join("/tmp", "vertex_voyage", f"{name}.gml")
+        # replace vertex names with numbers
+        mapping = {node: i for i, node in enumerate(G.nodes())}
+        G = nx.relabel_nodes(G, mapping)
         nx.write_gml(G, tmpfile)
         return self.upload_gml(graph_name, tmpfile, ip=ip)
     
@@ -293,7 +296,7 @@ class Client:
         })
         df.to_csv("analysis.csv")
 
-    def analyze_reconstruction(self, vertex_result: str, edge_result: str, embeddings_result: str):
+    def analyze_reconstruction(self, vertex_result: str, edge_result: str, embeddings_result: str, output: str):
         import json 
         import pandas as pd
         from vertex_voyage.reconstruction import reconstruct, get_f1_score
@@ -330,7 +333,8 @@ class Client:
             x_label: x,
             y_label: y
         })
-        df.to_csv("analysis.csv")
+        print("Saving to", output)
+        df.to_csv(output)
     
     def analyze_sbm_corruptability(self):
         import pandas as pd 
