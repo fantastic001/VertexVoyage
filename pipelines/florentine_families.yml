@@ -1,9 +1,9 @@
-name: zachary
+name: florentine_families
 commands:
   - name: import_known_graph
     type: oneshot
     args:
-      name: les_miserables_graph
+      name: florentine_families_graph
       graph_name: sample_graph
   - name: partition_graph
     type: oneshot

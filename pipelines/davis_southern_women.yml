@@ -1,9 +1,9 @@
-name: zachary
+name: davis_southern
 commands:
   - name: import_known_graph
     type: oneshot
     args:
-      name: florentine_families_graph
+      name: davis_southern_women_graph
       graph_name: sample_graph
   - name: partition_graph
     type: oneshot
