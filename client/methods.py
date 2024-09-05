@@ -266,7 +266,7 @@ class Client:
             "Results folder": os.path.abspath(results_folder)
         }
 
-    def analyze_embeddings(self, single_node_result: str, multi_node_result: str, clusters: int):
+    def analyze_embeddings(self, single_node_result: str, multi_node_result: str, clusters: int, output: str):
         import json 
         with open(single_node_result, "r") as f:
             single_node_results = json.load(f)
@@ -294,7 +294,11 @@ class Client:
             x_label: x,
             y_label: y
         })
-        df.to_csv("analysis.csv")
+        # create parent directory if nonexisting 
+        parent_dir = os.path.dirname(output)
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+        df.to_csv(output)
 
     def analyze_reconstruction(self, vertex_result: str, edge_result: str, embeddings_result: str, output: str):
         import json 
