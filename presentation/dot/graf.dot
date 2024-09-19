@@ -1,0 +1,18 @@
+graph G {
+    rankdir=LR;
+    // Definicija čvorova
+    node [shape=circle];
+    A [style=filled, fillcolor=blue];
+    B [style=filled, fillcolor=blue];
+    C [style=filled, fillcolor=yellow];
+    D [style=filled, fillcolor=yellow];
+
+    // Grane između čvorova iste boje
+    A -- B;
+    C -- D;
+
+    // Grane između čvorova različitih boja
+    A -- C [color=red];
+    A -- D [color=red];
+    B -- D [color=red];
+}
