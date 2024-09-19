@@ -22,8 +22,8 @@ commands:
       n_walks: 100
       window_size: 10
       epochs: 10
-      p: 0.25
-      q: 4
+      p: 1
+      q: 1
       negative_sample_num: 10
       learning_rate: 0.01
   - name: process
@@ -38,8 +38,8 @@ commands:
       dim: 128
       window_size: 10
       epochs: 10
-      p: 0.25
-      q: 4
+      p: 1
+      q: 1
       negative_sample_num: 10
       learning_rate: 0.01
   - name: get_vertices
