@@ -139,13 +139,9 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{frame}{Rekonstrukcija}
     $$ \text{recall} = \frac{\sum_{n \in V} \frac{|N(n) \cap N'(n)|}{|N(n)|}}{|V|} $$
     $$ \text{precision} = \frac{\sum_{n \in V} \frac{|N(n) \cap N'(n)|}{|N'(n)|}}{|V'|} $$
-    $$ \text{f1} = \frac{2 \cdot \text{precision} \cdot \text{recall}}{\text{precision} + \text{recall}} $$
+    $$ F_1 = \frac{2 \cdot \text{precision} \cdot \text{recall}}{\text{precision} + \text{recall}} $$
 \end{frame}
 
-\section{KMeans}
-\begin{frame}{KMeans Klasterisanje}
-    \includegraphics[width=\textwidth]{./png/kmeans.png}
-\end{frame}
 
 \section{ARI}
 \begin{frame}{Adjusted Rand Index (ARI)}
@@ -157,7 +153,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \section{Skupovi Podataka}
-\begin{frame}{Skupovi Podataka - 1}
+\begin{frame}{Skupovi Podataka}
     \begin{itemize}
         \item Poznati grafovi iz literature 
         \item Twitch mreža
