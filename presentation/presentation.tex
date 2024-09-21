@@ -168,94 +168,184 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \section{Skupovi Podataka}
 \begin{frame}{Skupovi Podataka - 1}
     \begin{itemize}
-        \item Pregled korišćenih skupova podataka
+        \item Poznati grafovi iz literature 
+        \item Twitch mreža
+        \item Sintetički grafovi 
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Skupovi Podataka - 2}
-    \begin{itemize}
-        \item Detalji o skupovima podataka
-    \end{itemize}
+\begin{frame}{Twitch}
+    \centering
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline
+        \textbf{Karakteristika} & \textbf{Vrednost} \\
+        \hline
+        Broj čvorova & 168.114 \\
+        Broj grana & 6.797.557 \\
+        Gustina & 0.0005 \\
+        \hline
+    \end{tabular}
 \end{frame}
 
 \section{Rezultati}
-\begin{frame}{Rezultati - 1}
+\begin{frame}{Vreme particionisanja za neke popularne mreže}
+    \centering
+    \begin{table}
+        \label{tab:4.2}
+        \begin{tabular}{lp{1in}p{1in}p{0.5in}}
+        Mreža & Vreme particionisanja & Broj čvorova & Broj grana \\
+        \hline
+        Zaharijev karate klub & 0.001 & 34 & 78 \\
+        Les Mis & 0.004 & 77 & 254 \\
+        Davis southern women & 0.004 & 32 & 89 \\
+        Florentine families & 0.0006 & 15 & 20 \\
+        Twitch  & 1638.00 & 168114 & 6797557 \\
+    \end{tabular}
+\end{table}
+\end{frame}
+    
+\begin{frame}{Vreme particionisanja za sintetički graf}
+    \centering
+    \includegraphics[height=0.8\textheight]{csv/4.3.png}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Ukupno vreme ugrađivanja na sintetičkom grafu}
+    \centering
+    \begin{table}
+        \label{tab:4.13}
+        \begin{tabular}{p{1in}p{1in}p{1in}}
+            \hline
+            Broj šetnji & Vreme (serijska implementacija) & Vreme (paralelna implementacija) \\
+            \hline
+        300 & 27.032333 & 46.671196 \\
+        600 & 34.207081 & 52.855629 \\
+        900 & 49.972453 & 59.757545 \\
+        1200 & 61.620000 & 68.144959 \\
+        1500 & 72.930000 & 77.180386 \\
+        1800 & 85.400000 & 84.556964 \\
+        2100 & 97.770000 & 93.268643 \\
+        2400 & 109.315041 & 100.895541 \\
+        \hline
+    \end{tabular}
+\end{table}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Specifikacija sintetičkog grafa koji je rekonstruisan iz ugrađivanja}
     \begin{itemize}
-        \item Rezultati eksperimenta 1
+        \item Broj čvorova po zajednici: 1000
+        \item Broj zajednica: 2
+        \item Verovatnoća povezivanja čvorova unutar zajednice: 0.1
+        \item Verovatnoća povezivanja čvorova između zajednica: 0.01
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Rezultati - 2}
-    \begin{itemize}
-        \item Rezultati eksperimenta 2
-    \end{itemize}
+\begin{frame}{F1 mera rekonstrukcije sintetičkog grafa}
+    \centering
+        \begin{table}
+        \label{tab:4.10}
+        \begin{tabular}{p{1in}p{1in}p{1in}}
+        \hline
+        Broj šetnji & F1 mera serijske implementacije & F1 mera paralelne implementacije \\
+        \hline
+        100 & 0.058427 & 0.108415 \\
+        200 & 0.074563 & 0.120501 \\
+        300 & 0.105385 & 0.136140 \\
+        400 & 0.121520 & 0.149141 \\
+        500 & 0.118749 & 0.156055 \\
+        600 & 0.117749 & 0.171991 \\
+        700 & 0.119408 & 0.173323 \\
+        800 & 0.121913 & 0.172578 \\
+        900 & 0.129534 & 0.180858 \\
+        \hline
+    \end{tabular}
+    \end{table}
+\end{frame}
+    
+\begin{frame}{F1 mera rekonstrukcije Zaharijevog karate kluba}
+    \centering 
+    \begin{table}
+        \label{tab:4.4}
+        \begin{tabular}{p{1in}p{1in}p{1in}}
+        \hline
+        Broj šetnji & F1 mera serijske implementacije & F1 mera paralelne implementacije \\
+        \hline
+        100 & 0.580310 & 0.575914 \\
+        200 & 0.624504 & 0.654000 \\
+        300 & 0.701834 & 0.645231 \\
+        400 & 0.717563 & 0.708462 \\
+        500 & 0.727480 & 0.711250 \\
+        600 & 0.774543 & 0.725454 \\
+        700 & 0.786713 & 0.744720 \\
+        800 & 0.787490 & 0.721272 \\
+        900 & 0.775203 & 0.717695 \\
+        \hline
+    \end{tabular}
+\end{table}
 \end{frame}
 
-\begin{frame}{Rezultati - 3}
-    \begin{itemize}
-        \item Rezultati eksperimenta 3
-    \end{itemize}
+\begin{frame}{Sličnost klasterovanja}
+    \centering
+    \begin{table}
+        \label{tab:4.11}
+        \begin{tabular}{p{1in}p{1in}}
+        \hline
+        Skup podataka & Sličnost \\
+        \hline
+        Zaharijev karate klub & 1.000000 \\
+        Davis Southern Women & 0.650000 \\
+        Florentine Families & 0.380000 \\
+        Les Miserables & 0.450000 \\
+        Twitch & 0.970000 \\
+        SBM generisan graf & 0.990000 \\
+        \hline
+    \end{tabular}
+    \end{table}
 \end{frame}
 
-\begin{frame}{Rezultati - 4}
-    \begin{itemize}
-        \item Diskusija rezultata
-    \end{itemize}
+\begin{frame}{Parametri modela}
+    \centering
+    \begin{table}
+        \label{tab:4.12}
+        \begin{tabular}{p{2in}p{2in}}
+        \hline
+        Parametar & Vrednost \\
+        \hline
+        Veličina šetnje (walk\_size) & 800 \\
+        Dimenzija (dim) & 128 \\
+        Veličina prozora (window\_size) & 10 \\
+        Broj epoha (epochs) & 10 \\
+        Parametar p & 0.250000 \\
+        Parametar q & 4.000000 \\
+        Broj negativnih uzoraka (negative\_sample\_num) & 10 \\
+        Stopa učenja (learning\_rate) & 0.010000 \\
+        Broj šetnji & 400 \\
+        \hline
+    \end{tabular}
+\end{table}
 \end{frame}
 
-\begin{frame}{Rezultati - 5}
-    \begin{itemize}
-        \item Vizuelizacija i poređenje rezultata
-    \end{itemize}
+
+\begin{frame}{Odnos F1 mera u zavisnosti od gubitaka strukturnih informacija}
+    \includegraphics[height=0.8\textheight]{png/grafik.png}
 \end{frame}
 
 \section{Zaključak}
 \begin{frame}{Zaključak}
     \begin{itemize}
-        \item Završna razmatranja i budući pravci
+        \item Rezultati su pokazali da je paralelna implementacija algoritma brža od serijske, nakon određenog broja šetnji, dok zadržava kvalitet rekonstrukcije grafa
+        \item Rezultati su pokazali da je klasterovanje dobijeno paralelnim ugrađivanjem slično klasterovanju dobijenom serijskim ugrađivanjem
+        \item Unapređenja:
+        \begin{itemize}
+            \item Upotreba specifične baze podataka koja bi indeksirala čvorove tako da particionisanje bude brže
+            \item Poređenje paralelne i serijske implementacije na drugim primenama
+            \item fino podešavanje parametara modela za velike mreže 
+        \end{itemize}
     \end{itemize}
 \end{frame}
 
 
-% \begin{frame}
-% 	\frametitle{Problem}
-% 	% graphics - rendered document and its tree representation 
-% 	\begin{columns}
-% 		\begin{column}{0.5\textwidth}
-% 			\includegraphics[width=\textwidth]{./png/segmented-doc.png}
-% 		\end{column}
-% 		\begin{column}{0.5\textwidth}
-% 			\includegraphics[width=\textwidth]{./png/tree.png}
-% 		\end{column}
-% 	\end{columns}
-% \end{frame}
-
-
-% \begin{frame}
-% 	\frametitle{Reprezentacija celog sistema}
-% 	\includegraphics[width=\textwidth]{./png/system.png}
-% \end{frame}
-
-
-
-% \begin{frame}
-% 	\frametitle{Rezultati}
-% 	\begin{table}
-% 		\begin{tabular}{rllr}
-% 		 & Metod kodiranja & Klasifikator & Tačnost (\%)\\
-% 		\hline
-% 		1 & \texttt{histogram} & RF & 71.792\\
-% 		2 & \texttt{img\_attrs} & RF & 72.034\\
-% 		3 & \texttt{img\_attrs} & one rule & 63.153\\
-% 		4 & \texttt{pixels} & NN & 38.451\\
-% 		5 & \texttt{simple} & NN & 42.345\\
-% 		6 & \texttt{simple} & RF & 70.422\\
-% 		7 & \texttt{simple} & one rule & 63.216\\
-% 		\end{tabular}
-% 		\caption{Tačnost klasifikatora u odnosu na metode kodiranja}
-% 	\end{table}
-
-% \end{frame}
 
 \begin{frame}
 	\frametitle{Pitanja}
