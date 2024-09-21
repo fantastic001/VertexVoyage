@@ -1,6 +1,8 @@
 
 # Introduction 
 
+VertexVoyage is distribued implementation of node2vec algorithm for graph embedding. 
+
 ## Setting up ZK client 
 
 Export `ZK_HOSTS` envvar 
@@ -11,7 +13,7 @@ Run ZK test
 
     vertex_voyage zk 
 
-# Running ZK istance 
+# Running ZK instance 
 
 You can run inside Docker container 
 
@@ -20,4 +22,17 @@ You can run inside Docker container
 Where 1 iz ZK id
 
 You can also run ensemble. 
+
+
+# Starting VertexVoyage 
+
+please take a look at `docker-compose.yml` file inside `docker/` directory to see how to run VertexVoyage cluster. 
+
+You can create pipeline which you can use to communicate specific requests to cluster. Take a look at few samples inside `pipelines/` directory. 
+
+to run specific pipeline, run:
+
+    python -m client execute --pipeline pipelines/zachary.yml  --results-folder results/
+
+Please run `python -m client --help` for full list of possible commands. 
 
