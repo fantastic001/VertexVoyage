@@ -369,14 +369,17 @@ class Client:
                 def back():
                     print(colsize*"\b", end="")
                 stage("Creating SBM")
-                sbm = nx.stochastic_block_model(sizes, P)
-                back()
-                # calculate corruptability of the graph
-                stage("Calculating cor.")
-                corruptability = calculate_graph_corruptability(sbm, 3, use_modified_lfm=True)
+                samples = [] 
+                for i in range(10):
+                    sbm = nx.stochastic_block_model(sizes, P)
+                    back()
+                    # calculate corruptability of the graph
+                    stage("Calculating cor.")
+                    corruptability = calculate_graph_corruptability(sbm, 3, use_modified_lfm=True)
+                    samples.append(corruptability)
+                corruptabilities.append(np.mean(samples))
                 back()
                 print("\r", end="" )
-                corruptabilities.append(corruptability)
             # decrease outliers 
             for i in range(1, len(corruptabilities)-1):
                 corruptabilities[i] = (corruptabilities[i-1] + corruptabilities[i] + corruptabilities[i+1]) / 3
