@@ -1,4 +1,4 @@
-Broj šetnji,Vreme (serijska implementacija),Vreme (paralelna implementacija)
+Broj šetnji,Serijska implementacija,Paralelna implementacija
 300,27.032333,46.671196
 600,34.207081,52.855629
 900,49.972453,59.757545

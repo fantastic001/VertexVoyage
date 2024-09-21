@@ -31,7 +31,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \titlepage
 }
 
-\section{Uvod i Motivacija}
+\section{Uvod i motivacija}
 \begin{frame}{Uvod}
     \includegraphics[width=\textwidth]{png/uvod.png}
     % add footnote
@@ -41,8 +41,8 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \begin{frame}
-	\frametitle{Ugrađivanje čvorova}
-	Neka je $ G = (V, E) $ graf, tada je ugrađivanje funkcija 
+	\frametitle{Ugrađivanje (embedovanje) čvorova}
+	Neka je $ G = (V, E) $ graf, tada je ugrađivanje (embedovanje) funkcija 
 
 	$$ U : V \to \mathbb{R}^n $$ 
 
@@ -51,7 +51,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 
 \end{frame}
 
-\begin{frame}{node2vec}
+\begin{frame}{node2vec algoritam}
 	\centering
     \begin{tikzpicture}[node distance=2cm]
 
@@ -65,7 +65,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{3 pitanja u radu}
+\begin{frame}{Cilj istraživanja}
     \centering 
 	\begin{tikzpicture}[node distance=2cm]
 		\node (q1) [block, text width=8cm, align=center] {Koliko paralelni algoritam ubrzava ceo proces?};
@@ -87,7 +87,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \section{Particionisanje}
-\begin{frame}{LFM Algoritam}
+\begin{frame}{Detekcija preklapajućih zajednica}
     \begin{itemize}
         \item Algoritam za detekciju preklapajućih zajednica 
         \item Za svaki čvor koji nije dodeljen zajednici, dodeljuje se nova zajednica 
@@ -97,14 +97,14 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Modifikacija Algoritma}
+\begin{frame}{Detekcija preklapajućih zajednica - modifikacija algoritma}
     \begin{itemize}
         \item Zbog povećanja brzine, algoritam se modifikuje tako da ne traje sve dok postoje čvorovi koji nisu dodeljeni zajednici
         \item Umesto toga, algoritam se izvršava dok određeni broj čvorova nije dodeljen zajednici
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Bin Packing}
+\begin{frame}{Particionisanje po čvorovima u klasteru}
     \begin{itemize}
         \item Nakon detekcije zajednica, potrebno je raspodeliti zajednice po čvorovima u klasteru
         \item U ovom radu, koristi se bin packing algoritam
@@ -116,7 +116,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \begin{frame}
-    \frametitle{Bin packing}
+    \frametitle{Particionisanje po čvorovima u klasteru}
     \begin{itemize}
         \item Algoritam dodeljuje particije zajednicama, počevši od najveće zajednice. Uvek se dodeljuje particija koja je najmanje opterećena
         \item Ukoliko ne postoji particija koja ima potreban kapacitet, kapacitet particija se povećava za prosečnu veličinu zajednice koja još nije dodeljena particiji. 
@@ -127,18 +127,22 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 
 \section{Gubici strukturnih informacija}
 \begin{frame}{Mera gubitka strukturnih informacija}
-    \includegraphics[width=\textwidth]{dot/graf.png}
+    \begin{columns}
+		\begin{column}{0.5\textwidth}
+            \includegraphics[width=\textwidth]{dot/graf.png}
+		\end{column}
+		\begin{column}{0.5\textwidth}
+            Neka je $ E_p $ skup svih grana koje sadrže čvorove takve da su oba čvora u particiji $ p $  i neka je $ P $ skup svih particija za graf $ G = (V, E) $
+            
+            Tada je mera gubitka strukturnih informacija $ L $ definisana kao
+            
+            $$ L = \frac{\sum_{p \in P} |E_p|}{|E|} $$
+            
+            , gde je $ |E_p| $ broj grana koje sadrže čvorove iz particije $ p $, a $ |E| $ ukupan broj grana u grafu $ G $.
+		\end{column}
+	\end{columns}
 \end{frame}
 
-\begin{frame}{Mera gubitka strukturnih informacija}
-    Neka je $ E_p $ skup svih grana koje sadrže čvorove takve da su oba čvora u particiji $ p $  i neka je $ P $ skup svih particija za graf $ G = (V, E) $
-
-    Tada je mera gubitka strukturnih informacija $ L $ definisana kao
-
-    $$ L = \frac{\sum_{p \in P} |E_p|}{|E|} $$
-
-    Gde je $ |E_p| $ broj grana koje sadrže čvorove iz particije $ p $, a $ |E| $ ukupan broj grana u grafu $ G $
-\end{frame}
 
 \section{Rekonstrukcija}
 \begin{frame}{Rekonstrukcija}
@@ -148,8 +152,8 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 
-\section{ARI}
-\begin{frame}{Adjusted Rand Index (ARI)}
+\section{Prilagođeni Randov indeks}
+\begin{frame}{Prilagođeni Randov indeks}
     \begin{itemize}
         \item Meri sličnost između dva klasterovanja
         \item Vrednost je bliska 0 za slučajno klasterovanje, a 1 za identična klasterovanja
@@ -161,6 +165,12 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{frame}{Skupovi podataka}
     \begin{itemize}
         \item Poznati grafovi iz literature 
+        \begin{itemize}
+            \item Zaharijev karate klub
+            \item Les Miserables
+            \item Davis southern women
+            \item Florentine families
+        \end{itemize}
         \item Twitch mreža
         \item Sintetički grafovi 
     \end{itemize}
@@ -180,7 +190,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \section{Rezultati}
-\begin{frame}{Vreme particionisanja za neke popularne mreže}
+\begin{frame}{Vreme particionisanja za realne mreže iz literature i Twitch}
     \centering
     \begin{table}
         \label{tab:4.2}
@@ -276,8 +286,12 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \section{Zaključak}
 \begin{frame}{Zaključak}
     \begin{itemize}
-        \item Rezultati su pokazali da je paralelna implementacija algoritma brža od serijske, nakon određenog broja šetnji, dok zadržava kvalitet rekonstrukcije grafa
-        \item Rezultati su pokazali da je klasterovanje dobijeno paralelnim ugrađivanjem slično klasterovanju dobijenom serijskim ugrađivanjem
+        \item Pokazano je da:
+        \begin{itemize}
+            \item Paralelna implementacija algoritma brža od serijske, nakon određenog broja šetnji, dok zadržava kvalitet rekonstrukcije grafa
+            \item Klasterovanje dobijeno paralelnim ugrađivanjem slično klasterovanju dobijenom serijskim ugrađivanjem
+        \end{itemize}
+        \item \textbf{Predloženi metod se može koristiti da ubrza ugrađivanje čvorova ili da, uz dodatno vreme particionisanja, uveća tačnost zbog većeg broja mogućih slučajnih šetnji}
         \item Unapređenja:
         \begin{itemize}
             \item Upotreba specifične baze podataka koja bi indeksirala čvorove tako da particionisanje bude brže
@@ -290,9 +304,8 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 
 
 \begin{frame}
-	\frametitle{Pitanja}
 	\begin{center}
-		\huge{?}
+		\Huge Hvala na pažnji!
 	\end{center}
 \end{frame}
 

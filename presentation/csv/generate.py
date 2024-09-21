@@ -3,6 +3,7 @@ import pandas as pd
 import os 
 import sys 
 import matplotlib.pyplot as plt 
+import json 
 
 path = sys.argv[1]
 
@@ -17,4 +18,9 @@ for file in os.listdir(path):
         else:
             df = df.set_index(df.columns[0])
             df.plot.bar()
+            if os.path.exists(os.path.join(path, f"{basename}.json")):
+                with open(os.path.join(path, f"{basename}.json"), 'r') as f:
+                    data = json.load(f)
+                    for param, value in data.items():
+                        getattr(plt, param)(value)
             plt.savefig(os.path.join(path, f"{basename}.png"), bbox_inches='tight')
