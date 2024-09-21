@@ -25,6 +25,7 @@ Univerzitet u Novom Sadu. \\
 Tip rada: master rad \\
 Mentor: \MakeLowercase{dr} Miloš Savić
 }
+\date{23. septembar 2024.}
 
 \frame{
 \titlepage
@@ -69,7 +70,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 	\begin{tikzpicture}[node distance=2cm]
 		\node (q1) [block, text width=8cm, align=center] {Koliko paralelni algoritam ubrzava ceo proces?};
 		\node (q2) [block, text width=8cm, align=center, below of=q1] {Kako paralelizacija utiče na kvalitet rekonstrukcije grafa iz ugrađivanja?};		
-		\node (q3) [block, text width=8cm, align=center, below of=q2] {Koliko je klasterovanje iz ugrađivanja serijskom implementacijom slično sa klasterovanjem i ugrađivanja paralelnom implementacijom};
+		\node (q3) [block, text width=8cm, align=center, below of=q2] {Koliko je klasterovanje iz ugrađivanja serijskom implementacijom slično sa klasterovanjem ugrađivanja paralelnom implementacijom?};
 	\end{tikzpicture}
 \end{frame}
 
@@ -81,7 +82,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \section{Blokovski prikaz algoritma}
-\begin{frame}{Generalni Algoritam}
+\begin{frame}{Blokovski prikaz algoritma}
     \includegraphics[width=\textwidth]{./png/Blokovski prikaz algoritma.drawio.png}
 \end{frame}
 
@@ -150,14 +151,14 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \section{ARI}
 \begin{frame}{Adjusted Rand Index (ARI)}
     \begin{itemize}
-        \item Meri sličnost između dve klasterovanja
+        \item Meri sličnost između dva klasterovanja
         \item Vrednost je bliska 0 za slučajno klasterovanje, a 1 za identična klasterovanja
         \item $ \text{ARI} = \frac{\text{RI} - \text{Expected\_RI}}{\text{max(RI)} - \text{Expected\_RI}} $
     \end{itemize}
 \end{frame}
 
-\section{Skupovi Podataka}
-\begin{frame}{Skupovi Podataka}
+\section{Skupovi podataka}
+\begin{frame}{Skupovi podataka}
     \begin{itemize}
         \item Poznati grafovi iz literature 
         \item Twitch mreža
@@ -183,7 +184,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \centering
     \begin{table}
         \label{tab:4.2}
-        \begin{tabular}{lp{1in}p{1in}p{0.5in}}
+        \begin{tabular}{p{1in}p{0.5in}p{0.5in}p{0.5in}}
         Mreža & Vreme particionisanja & Broj čvorova & Broj grana \\
         \hline
         Zaharijev karate klub & 0.001 & 34 & 78 \\
@@ -203,23 +204,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{frame}
     \frametitle{Ukupno vreme ugrađivanja na sintetičkom grafu}
     \centering
-    \begin{table}
-        \label{tab:4.13}
-        \begin{tabular}{p{1in}p{1in}p{1in}}
-            \hline
-            Broj šetnji & Vreme (serijska implementacija) & Vreme (paralelna implementacija) \\
-            \hline
-        300 & 27.032333 & 46.671196 \\
-        600 & 34.207081 & 52.855629 \\
-        900 & 49.972453 & 59.757545 \\
-        1200 & 61.620000 & 68.144959 \\
-        1500 & 72.930000 & 77.180386 \\
-        1800 & 85.400000 & 84.556964 \\
-        2100 & 97.770000 & 93.268643 \\
-        2400 & 109.315041 & 100.895541 \\
-        \hline
-    \end{tabular}
-\end{table}
+    \includegraphics[height=0.8\textheight]{csv/4.13.png}
 \end{frame}
 
 \begin{frame}
@@ -234,46 +219,12 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 
 \begin{frame}{F1 mera rekonstrukcije sintetičkog grafa}
     \centering
-        \begin{table}
-        \label{tab:4.10}
-        \begin{tabular}{p{1in}p{1in}p{1in}}
-        \hline
-        Broj šetnji & F1 mera serijske implementacije & F1 mera paralelne implementacije \\
-        \hline
-        100 & 0.058427 & 0.108415 \\
-        200 & 0.074563 & 0.120501 \\
-        300 & 0.105385 & 0.136140 \\
-        400 & 0.121520 & 0.149141 \\
-        500 & 0.118749 & 0.156055 \\
-        600 & 0.117749 & 0.171991 \\
-        700 & 0.119408 & 0.173323 \\
-        800 & 0.121913 & 0.172578 \\
-        900 & 0.129534 & 0.180858 \\
-        \hline
-    \end{tabular}
-    \end{table}
+    \includegraphics[height=0.8\textheight]{./csv/4.10.png}
 \end{frame}
     
 \begin{frame}{F1 mera rekonstrukcije Zaharijevog karate kluba}
     \centering 
-    \begin{table}
-        \label{tab:4.4}
-        \begin{tabular}{p{1in}p{1in}p{1in}}
-        \hline
-        Broj šetnji & F1 mera serijske implementacije & F1 mera paralelne implementacije \\
-        \hline
-        100 & 0.580310 & 0.575914 \\
-        200 & 0.624504 & 0.654000 \\
-        300 & 0.701834 & 0.645231 \\
-        400 & 0.717563 & 0.708462 \\
-        500 & 0.727480 & 0.711250 \\
-        600 & 0.774543 & 0.725454 \\
-        700 & 0.786713 & 0.744720 \\
-        800 & 0.787490 & 0.721272 \\
-        900 & 0.775203 & 0.717695 \\
-        \hline
-    \end{tabular}
-\end{table}
+    \includegraphics[height=0.8\textheight]{./csv/4.4.png}
 \end{frame}
 
 \begin{frame}{Sličnost klasterovanja}

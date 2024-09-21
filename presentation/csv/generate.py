@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 path = sys.argv[1]
 
-images = ["4.3"] 
+images = ["4.3", "4.13", "4.10", "4.4"] 
 
 for file in os.listdir(path):
     if file.endswith('.csv'):
@@ -17,4 +17,4 @@ for file in os.listdir(path):
         else:
             df = df.set_index(df.columns[0])
             df.plot.bar()
-            plt.savefig(os.path.join(path, f"{basename}.png"))
+            plt.savefig(os.path.join(path, f"{basename}.png"), bbox_inches='tight')
