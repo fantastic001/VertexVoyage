@@ -19,10 +19,10 @@
 
 \title{VertexVoyage: Distribuirani node2vec algoritam za embedovanje čvorova u realnim mrežama}
 \author{Stefan Nožinić \\
+Master rad \\
 Departman za matematiku i informatiku \\
 Prirodno-matematički fakultet \\
-Univerzitet u Novom Sadu. \\
-Tip rada: master rad \\
+Univerzitet u Novom Sadu \\
 Mentor: \MakeLowercase{dr} Miloš Savić
 }
 \date{23. septembar 2024.}
@@ -35,9 +35,9 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{frame}{Uvod}
     \includegraphics[width=\textwidth]{png/uvod.png}
     % add footnote
-    \begin{footnotesize}
+    \begin{tiny}
         Izvor: Interian, Ruben i Ribeiro, Celso. (2018). An empirical investigation of network polarization. Applied Mathematics and Computation. 339. 651-662. 10.1016/j.amc.2018.07.066.
-    \end{footnotesize}
+    \end{tiny}
 \end{frame}
 
 \begin{frame}
@@ -65,7 +65,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{Cilj istraživanja}
+\begin{frame}{Ciljevi istraživanja}
     \centering 
 	\begin{tikzpicture}[node distance=2cm]
 		\node (q1) [block, text width=8cm, align=center] {Koliko paralelni algoritam ubrzava ceo proces?};
@@ -91,9 +91,9 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \begin{itemize}
         \item Algoritam za detekciju preklapajućih zajednica 
         \item Za svaki čvor koji nije dodeljen zajednici, dodeljuje se nova zajednica 
-        \item U zajednicu se dodaju susedni čvorovi čvorova u zajednici takvi da poboljšavaju kvalitet zajednice po funkciji $ f = \frac{k_\text{in}}{(k_\text{out} + k_\text{in})^\alpha} $ 
-        \item Nakon dodavanja, čvorovi takvi da njihovo uklanjanje povećava kvalitet zajednice se uklanjaju
-        \item Postupak se ponavlja sve dok postoje čvorovi koji nisu dodeljeni nekog zajednici
+        \item Dodaju se susedni čvorovi čvorova u zajednici čije dodavanje uvećava kvalitet zajednice po funkciji $ f = \frac{k_\text{in}}{(k_\text{out} + k_\text{in})^\alpha} $ 
+        \item Nakon dodavanja, uklanjaju se čvorovi čije uklanjanje povećava kvalitet zajednice
+        \item Postupak se ponavlja sve dok postoje čvorovi koji nisu dodeljeni nekoj zajednici
     \end{itemize}
 \end{frame}
 
@@ -106,10 +106,10 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 
 \begin{frame}{Particionisanje po čvorovima u klasteru}
     \begin{itemize}
-        \item Nakon detekcije zajednica, potrebno je raspodeliti zajednice po čvorovima u klasteru
-        \item U ovom radu, koristi se bin packing algoritam
-        \item Algoritam raspoređuje zajednice po čvorovima tako da čvorovi u klasteru budu što sličniji po svom opterećenju
-        \item Opterećenje čvora K kom su raspoređene zajednice $ S_K $ je $ \sum_{s \in S_K} |s| $
+        \item Nakon detekcije zajednica, potrebno je rasporediti zajednice po čvorovima u klasteru
+        \item U ovom radu, korišćen je bin packing algoritam
+        \item Algoritam raspoređuje zajednice po čvorovima, tako da čvorovi u klasteru budu što sličniji po svom opterećenju
+        \item Opterećenje čvora K, kom su raspoređene zajednice $ S_K $, je $ \sum_{s \in S_K} |s| $
         \item Težine se zatim sortiraju u opadajućem redosledu, počevši od najveće.
         \item Inicijalno, maksimalna veličina (kapacitet) particije je prosečna veličina zajednice 
     \end{itemize}
@@ -161,7 +161,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \end{itemize}
 \end{frame}
 
-\section{Skupovi podataka}
+\section{Korišćeni skupovi podataka}
 \begin{frame}{Skupovi podataka}
     \begin{itemize}
         \item Poznati grafovi iz literature 
@@ -194,8 +194,8 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \centering
     \begin{table}
         \label{tab:4.2}
-        \begin{tabular}{p{1in}p{0.5in}p{0.5in}p{0.5in}}
-        Mreža & Vreme particionisanja & Broj čvorova & Broj grana \\
+        \begin{tabular}{p{1.4in}p{1in}p{0.5in}p{0.5in}}
+        Mreža & Vreme particionisanja (s)& Broj čvorova & Broj grana \\
         \hline
         Zaharijev karate klub & 0.001 & 34 & 78 \\
         Les Mis & 0.004 & 77 & 254 \\
@@ -241,7 +241,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \centering
     \begin{table}
         \label{tab:4.11}
-        \begin{tabular}{p{1in}p{1in}}
+        \begin{tabular}{p{1.5in}p{1in}}
         \hline
         Skup podataka & Sličnost \\
         \hline
@@ -260,7 +260,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \centering
     \begin{table}
         \label{tab:4.12}
-        \begin{tabular}{p{2in}p{2in}}
+        \begin{tabular}{p{2.5in}p{1in}}
         \hline
         Parametar & Vrednost \\
         \hline
@@ -270,7 +270,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
         Broj epoha (epochs) & 10 \\
         Parametar p & 0.250000 \\
         Parametar q & 4.000000 \\
-        Broj negativnih uzoraka (negative\_sample\_num) & 10 \\
+        Broj negativnih uzoraka & 10 \\
         Stopa učenja (learning\_rate) & 0.010000 \\
         Broj šetnji & 400 \\
         \hline
@@ -280,7 +280,14 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 
 
 \begin{frame}{Odnos F1 mera u zavisnosti od gubitaka strukturnih informacija}
-    \includegraphics[height=0.8\textheight]{png/grafik.png}
+    \begin{columns}
+        \begin{column}{0.2\textwidth}
+            $$ \text{Odnos} = \frac{F_1^p}{F_1^s} $$ 
+        \end{column}
+        \begin{column}{0.8\textwidth}
+            \includegraphics[height=0.6\textheight]{png/grafik.png}
+        \end{column}
+    \end{columns}
 \end{frame}
 
 \section{Zaključak}
@@ -288,8 +295,8 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \begin{itemize}
         \item Pokazano je da:
         \begin{itemize}
-            \item Paralelna implementacija algoritma brža od serijske, nakon određenog broja šetnji, dok zadržava kvalitet rekonstrukcije grafa
-            \item Klasterovanje dobijeno paralelnim ugrađivanjem slično klasterovanju dobijenom serijskim ugrađivanjem
+            \item Paralelna implementacija algoritma jeste brža od serijske, nakon određenog broja šetnji, dok zadržava kvalitet rekonstrukcije grafa
+            \item Klasterovanje dobijeno paralelnim ugrađivanjem jeste slično klasterovanju dobijenom serijskim ugrađivanjem
         \end{itemize}
         \item \textbf{Predloženi metod se može koristiti da ubrza ugrađivanje čvorova ili da, uz dodatno vreme particionisanja, uveća tačnost zbog većeg broja mogućih slučajnih šetnji}
         \item Unapređenja:
