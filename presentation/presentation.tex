@@ -136,30 +136,13 @@ Mentor: \MakeLowercase{dr} Miloš Savić
             
             Tada je mera gubitka strukturnih informacija $ L $ definisana kao
             
-            $$ L = \frac{\sum_{p \in P} |E_p|}{|E|} $$
+            $$ L = 1-\frac{\sum_{p \in P} |E_p|}{|E|} $$
             
             , gde je $ |E_p| $ broj grana koje sadrže čvorove iz particije $ p $, a $ |E| $ ukupan broj grana u grafu $ G $.
 		\end{column}
 	\end{columns}
 \end{frame}
 
-
-\section{Rekonstrukcija}
-\begin{frame}{Rekonstrukcija}
-    $$ \text{recall} = \frac{\sum_{n \in V} \frac{|N(n) \cap N'(n)|}{|N(n)|}}{|V|} $$
-    $$ \text{precision} = \frac{\sum_{n \in V} \frac{|N(n) \cap N'(n)|}{|N'(n)|}}{|V'|} $$
-    $$ F_1 = \frac{2 \cdot \text{precision} \cdot \text{recall}}{\text{precision} + \text{recall}} $$
-\end{frame}
-
-
-\section{Prilagođeni Randov indeks}
-\begin{frame}{Prilagođeni Randov indeks}
-    \begin{itemize}
-        \item Meri sličnost između dva klasterovanja
-        \item Vrednost je bliska 0 za slučajno klasterovanje, a 1 za identična klasterovanja
-        \item $ \text{ARI} = \frac{\text{RI} - \text{Expected\_RI}}{\text{max(RI)} - \text{Expected\_RI}} $
-    \end{itemize}
-\end{frame}
 
 \section{Korišćeni skupovi podataka}
 \begin{frame}{Skupovi podataka}
@@ -227,6 +210,15 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \end{itemize}
 \end{frame}
 
+
+\section{Rekonstrukcija}
+\begin{frame}{Rekonstrukcija}
+    $$ \text{recall} = \frac{\sum_{n \in V} \frac{|N(n) \cap N'(n)|}{|N(n)|}}{|V|} $$
+    $$ \text{precision} = \frac{\sum_{n \in V} \frac{|N(n) \cap N'(n)|}{|N'(n)|}}{|V'|} $$
+    $$ F_1 = \frac{2 \cdot \text{precision} \cdot \text{recall}}{\text{precision} + \text{recall}} $$
+\end{frame}
+
+
 \begin{frame}{F1 mera rekonstrukcije sintetičkog grafa}
     \centering
     \includegraphics[height=0.8\textheight]{./csv/4.10.png}
@@ -235,6 +227,26 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{frame}{F1 mera rekonstrukcije Zaharijevog karate kluba}
     \centering 
     \includegraphics[height=0.8\textheight]{./csv/4.4.png}
+\end{frame}
+
+\begin{frame}{Odnos F1 mera u zavisnosti od gubitaka strukturnih informacija}
+    \begin{columns}
+        \begin{column}{0.2\textwidth}
+            $$ \text{Odnos} = \frac{F_1^p}{F_1^s} $$ 
+        \end{column}
+        \begin{column}{0.8\textwidth}
+            \includegraphics[height=0.6\textheight]{png/grafik.png}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\section{Prilagođeni Randov indeks}
+\begin{frame}{Prilagođeni Randov indeks}
+    \begin{itemize}
+        \item Meri sličnost između dva klasterovanja
+        \item Vrednost je bliska 0 za slučajno klasterovanje, a 1 za identična klasterovanja
+        \item $ \text{ARI} = \frac{\text{RI} - \text{Expected\_RI}}{\text{max(RI)} - \text{Expected\_RI}} $
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{Sličnost klasterovanja}
@@ -279,16 +291,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 
-\begin{frame}{Odnos F1 mera u zavisnosti od gubitaka strukturnih informacija}
-    \begin{columns}
-        \begin{column}{0.2\textwidth}
-            $$ \text{Odnos} = \frac{F_1^p}{F_1^s} $$ 
-        \end{column}
-        \begin{column}{0.8\textwidth}
-            \includegraphics[height=0.6\textheight]{png/grafik.png}
-        \end{column}
-    \end{columns}
-\end{frame}
+
 
 \section{Zaključak}
 \begin{frame}{Zaključak}
