@@ -26,8 +26,13 @@ if USE_MPI:
     print("MPI is not yet supported but will be in the future!")
     exit(1)
 
+USE_SLURM = "SLURM_JOB_ID" in os.environ
 
 def get_zk_client():
+    if USE_MPI:
+        return
+    if USE_SLURM:
+        return
     if not USE_ZK:
         return
     global zk 
@@ -47,6 +52,10 @@ def zk_callback(event):
 
 def register_node():
     def f():
+        if USE_MPI:
+            return
+        if USE_SLURM:
+            return
         if not USE_ZK:
             return
         print("Registering node", flush=True)
@@ -93,6 +102,8 @@ def register_node():
         raise RuntimeError("Registering node is taking too long")
 
 def get_nodes():
+    if USE_SLURM:
+        return os.getenv('SLURM_NODELIST').split(',')
     if USE_MPI:
         return [f"node_{i}" for i in range(size)]
     if not USE_ZK:
@@ -102,6 +113,8 @@ def get_nodes():
     return sorted(nodes)
 
 def get_node_data(node):
+    if USE_SLURM:
+        return node
     if USE_MPI:
         return f"node_{node} localhost"
     if not USE_ZK:
@@ -112,6 +125,8 @@ def get_node_data(node):
     return data
 
 def get_ip_by_index(index):
+    if USE_SLURM:
+        return get_nodes()[index]
     if USE_MPI:
         return "localhost"
     if not USE_ZK:
@@ -121,6 +136,8 @@ def get_ip_by_index(index):
     return data.split()[1].decode()
 
 def get_node_index(node):
+    if USE_SLURM:
+        return get_nodes().index(node)
     if USE_MPI:
         return int(node.split('_')[1])
     if not USE_ZK:
@@ -130,6 +147,8 @@ def get_node_index(node):
     return nodes.index(node)
 
 def get_node_by_index(index):
+    if USE_SLURM:
+        return get_nodes()[index]
     if USE_MPI:
         return f"node_{index}"
     if not USE_ZK:
@@ -139,6 +158,8 @@ def get_node_by_index(index):
     return nodes[index]
 
 def get_leader():
+    if USE_SLURM:
+        return get_nodes()[0]
     if USE_MPI:
         return "node_0"
     if not USE_ZK:
@@ -153,6 +174,8 @@ def get_leader():
         return None
 
 def get_current_node():
+    if USE_SLURM:
+        return os.getenv('SLURMD_NODENAME')
     if USE_MPI:
         return f"node_{rank}"
     if not USE_ZK:
@@ -184,6 +207,8 @@ def do_rpc(node_index, method_name, **kwargs):
     return s.execute(method_name, kwargs)
 
 def get_node_index_by_ip(ip):
+    if USE_SLURM:
+        return get_nodes().index(ip)
     if USE_MPI:
         return 0
     if not USE_ZK:
