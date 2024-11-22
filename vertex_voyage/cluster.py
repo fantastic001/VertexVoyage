@@ -103,7 +103,7 @@ def register_node():
 
 def get_nodes():
     if USE_SLURM:
-        return os.getenv('SLURM_NODELIST').split(',')
+        return os.getenv('SLURM_JOB_NODELIST').split(',')
     if USE_MPI:
         return [f"node_{i}" for i in range(size)]
     if not USE_ZK:
