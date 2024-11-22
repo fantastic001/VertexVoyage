@@ -13,6 +13,20 @@ USE_ZK = os.getenv('USE_ZK', '1').lower() == '1'
 ZK_PATH = '/vertex_voyage'
 ZK_NODE_PATH = ZK_PATH + '/nodes/'
 ENV_NODE_NAME = os.getenv('NODE_NAME', random.randbytes(4).hex())
+
+MPI = None 
+USE_MPI = os.getenv('USE_MPI', '0').lower() == '1'
+if USE_MPI:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    ENV_NODE_NAME = f"node_{rank}"
+    print(f"MPI rank: {rank}, size: {size}")
+    print("MPI is not yet supported but will be in the future!")
+    exit(1)
+
+
 def get_zk_client():
     if not USE_ZK:
         return
@@ -30,6 +44,7 @@ def zk_callback(event):
     if event.type == 'DELETED':
         print("Node deleted")
         register_node()
+
 def register_node():
     def f():
         if not USE_ZK:
@@ -78,6 +93,8 @@ def register_node():
         raise RuntimeError("Registering node is taking too long")
 
 def get_nodes():
+    if USE_MPI:
+        return [f"node_{i}" for i in range(size)]
     if not USE_ZK:
         return ["localhost"]
     zk = get_zk_client()
@@ -85,6 +102,8 @@ def get_nodes():
     return sorted(nodes)
 
 def get_node_data(node):
+    if USE_MPI:
+        return f"node_{node} localhost"
     if not USE_ZK:
         return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
@@ -93,6 +112,8 @@ def get_node_data(node):
     return data
 
 def get_ip_by_index(index):
+    if USE_MPI:
+        return "localhost"
     if not USE_ZK:
         return os.getenv('NODE_ADDRESS', "")
     node = get_node_by_index(index)
@@ -100,6 +121,8 @@ def get_ip_by_index(index):
     return data.split()[1].decode()
 
 def get_node_index(node):
+    if USE_MPI:
+        return int(node.split('_')[1])
     if not USE_ZK:
         return 0
     zk = get_zk_client()
@@ -107,6 +130,8 @@ def get_node_index(node):
     return nodes.index(node)
 
 def get_node_by_index(index):
+    if USE_MPI:
+        return f"node_{index}"
     if not USE_ZK:
         return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
@@ -114,6 +139,8 @@ def get_node_by_index(index):
     return nodes[index]
 
 def get_leader():
+    if USE_MPI:
+        return "node_0"
     if not USE_ZK:
         return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
@@ -126,6 +153,8 @@ def get_leader():
         return None
 
 def get_current_node():
+    if USE_MPI:
+        return f"node_{rank}"
     if not USE_ZK:
         return os.getenv('NODE_ADDRESS', "")
     zk = get_zk_client()
@@ -137,6 +166,17 @@ def get_current_node():
     return None
 
 def do_rpc(node_index, method_name, **kwargs):
+    if USE_MPI:
+        print(f"do_rpc({node_index}, {method_name}, {kwargs})")
+        data = {
+            "method": method_name,
+            "args": kwargs
+        }
+        if node_index == rank:
+            return data
+        else:
+            comm.send(data, dest=node_index)
+            return comm.recv(source=node_index)
     print(f"do_rpc({node_index}, {method_name}, {kwargs})")
     ip = get_ip_by_index(node_index)
     from xmlrpc.client import ServerProxy
@@ -144,6 +184,8 @@ def do_rpc(node_index, method_name, **kwargs):
     return s.execute(method_name, kwargs)
 
 def get_node_index_by_ip(ip):
+    if USE_MPI:
+        return 0
     if not USE_ZK:
         return 0
     zk = get_zk_client()
