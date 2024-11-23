@@ -13,6 +13,8 @@ def register_commands(control_interface: ControlInterface):
         graphs = cluster.do_rpc_client("localhost", "list")
         if "test" in graphs:
             print("Smoke test passed")
+            f = open("smoke_test_passed", "w")
+            f.write("Smoke test passed")
             print("Killing the process gracefully")
             os.kill(os.getpid(), 15)
     control_interface.start_background_thread(f)
