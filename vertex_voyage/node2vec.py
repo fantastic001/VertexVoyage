@@ -4,6 +4,9 @@ import numpy as np
 import tensorflow as tf
 import random 
 from vertex_voyage.word2vec import word2vec
+import vertex_voyage.config as cfg 
+
+@cfg.pluggable
 class Node2Vec:
 
     def __init__(self, 

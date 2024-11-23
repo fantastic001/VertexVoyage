@@ -156,7 +156,7 @@ def get_classes(module_name):
     result = list(classes.values())
     return result
 
-def command_executor_rpc(classes):
+def command_executor_rpc(classes, port: int = 8000):
     if not isinstance(classes, list):
         classes = [classes]
     class RequestHandler(SimpleXMLRPCRequestHandler):
@@ -165,7 +165,7 @@ def command_executor_rpc(classes):
     # Create a class that combines ThreadingMixIn and SimpleXMLRPCServer
     class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):
         pass
-    server = ThreadedXMLRPCServer(("0.0.0.0", 8000), requestHandler=RequestHandler)
+    server = ThreadedXMLRPCServer(("0.0.0.0", port), requestHandler=RequestHandler)
     class Dispatcher:
         def __init__(self, classes):
             self.classes = classes

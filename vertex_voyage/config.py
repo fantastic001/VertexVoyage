@@ -12,7 +12,7 @@ class VertexVoyageConflictError(Exception):
 def get_config_location():
     return os.environ.get("VERTEX_VOYAGE_CONFIG", os.path.join(os.path.expanduser("~"), ".vertex_voyage", "config.json"))
 
-def get_config(key: str, default, expected_type=str):
+def get_config(key: str, default, doc, expected_type=str):
     config = {} 
     envvar = "VERTEX_VOYAGE_" + key.upper()
     if envvar in os.environ:
@@ -31,20 +31,23 @@ def get_config(key: str, default, expected_type=str):
         config = json.load(f)
     return expected_type(config.get(key, default))
 
-def get_config_int(key: str, default) -> int:
-    return get_config(key, default, expected_type=int)
+def get_config_int(key: str, default, doc) -> int:
+    return get_config(key, default, doc, expected_type=int)
 
-def get_config_float(key: str, default) -> float:
-    return get_config(key, default, expected_type=float)
+def get_config_str(key: str, default, doc) -> str:
+    return get_config(key, default, doc, expected_type=str)
 
-def get_config_bool(key: str, default) -> bool:
-    return get_config(key, default, expected_type=bool)
+def get_config_bool(key: str, default, doc) -> bool:
+    return get_config(key, default, doc, expected_type=bool)
 
-def get_config_str(key: str, default) -> str:
-    return get_config(key, default, expected_type=str)
+def get_config_list(key: str, default, doc) -> list:
+    return get_config(key, default, doc, expected_type=list)
 
-def get_config_list(key: str, default) -> list:
-    return get_config(key, default, expected_type=list)
+def get_config_dict(key: str, default, doc) -> dict:
+    return get_config(key, default, doc, expected_type=dict)
+
+def get_config_float(key: str, default, doc) -> float:
+    return get_config(key, default, doc, expected_type=float)
 
 def set_config(key: str, value):
     config_location = get_config_location()
@@ -57,10 +60,10 @@ def set_config(key: str, value):
         json.dump(config, f)
 
 def load_plugins():
-    search_path = get_config_list("plugin_search_path", [])
+    search_path = get_config_list("plugin_search_path", [], "List of plugin search paths")
     oldpath = sys.path
     sys.path = search_path + sys.path
-    plugins = get_config_list("plugins", [])
+    plugins = get_config_list("plugins", [], "List of plugins to load")
     result = []
     for plugin in plugins:
         try:

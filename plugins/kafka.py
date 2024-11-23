@@ -4,13 +4,13 @@ from kafka import KafkaProducer
 
 
 def get_producer() -> KafkaProducer:
-    servers = get_config_list('kafka_bootstrap_servers', ['localhost:9092'])
+    servers = get_config_list('kafka_bootstrap_servers', ['localhost:9092'], "List of Kafka bootstrap servers")
     producer = KafkaProducer(bootstrap_servers=servers)
     return producer
 
 def send_message(message):
     producer = get_producer()
-    topic = get_config_str('kafka_topic', 'default')
+    topic = get_config_str('kafka_topic', 'default', 'Kafka topic to send messages to')
     producer.send(message.encode('utf-8'))
     producer.flush()
 

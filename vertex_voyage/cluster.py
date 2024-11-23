@@ -197,6 +197,9 @@ def get_current_node():
             return node
     return None
 
+def get_binding_port():
+    return cfg.get_config_int("port", 8000, "Port to bind to")
+
 @cfg.pluggable
 def do_rpc(node_index, method_name, **kwargs):
     if USE_MPI:
@@ -213,7 +216,7 @@ def do_rpc(node_index, method_name, **kwargs):
     print(f"do_rpc({node_index}, {method_name}, {kwargs})")
     ip = get_ip_by_index(node_index)
     from xmlrpc.client import ServerProxy
-    s = ServerProxy(f'http://{ip}:8000')
+    s = ServerProxy(f'http://{ip}:%d' % get_binding_port())
     return s.execute(method_name, kwargs)
 
 @cfg.pluggable
@@ -252,7 +255,7 @@ def is_leader():
 @cfg.pluggable
 def do_rpc_client(ip, method_name, **kwargs):
     from xmlrpc.client import ServerProxy, Fault
-    s = ServerProxy(f'http://{ip}:8000')
+    s = ServerProxy(f'http://{ip}:{get_binding_port()}')
     try:
         return s.execute(method_name, kwargs)
     except Fault as err:
