@@ -313,3 +313,14 @@ TSWLatexianTemp*
 **.pdf
 my_pipeline/
 results/
+
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pyzw
+*.egg-info/
+dist/
+build/
