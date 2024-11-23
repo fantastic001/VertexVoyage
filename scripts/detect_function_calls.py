@@ -10,6 +10,15 @@ from typing import List, Dict, Any, Tuple
 import re 
 import pandas as pd 
 import os 
+
+def print_code(node):
+    """
+    Print code of a node
+    """
+    if isinstance(node, ast.Constant):
+        return node.value
+    return ast.unparse(node)
+
 def detect_calls(filepath):
     """
     Detects function calls in a line of code and their parameters
@@ -40,7 +49,7 @@ def detect_calls(filepath):
                     elif isinstance(arg, ast.Name):
                         call["args"].append(arg.id)
                     elif isinstance(arg, ast.List):
-                        call["args"].append([str(elt) for elt in arg.elts])
+                        call["args"].append([print_code(elt) for elt in arg.elts])
                     elif isinstance(arg, ast.Dict):
                         call["args"].append({str(k): str(v) for k, v in zip(arg.keys, arg.values)})
                     else:
