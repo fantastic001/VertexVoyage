@@ -6,6 +6,9 @@ import sys
 class VertexVoyageConfigurationError(Exception):
     pass
 
+class VertexVoyageConflictError(Exception):
+    pass
+
 def get_config(key: str, default, expected_type=str):
     config = {} 
     envvar = "VERTEX_VOYAGE_" + key.upper()
@@ -48,7 +51,7 @@ def load_plugins():
     result = []
     for plugin in plugins:
         try:
-            result.append(importlib.import_module(plugin))
+            result.append((plugin, importlib.import_module(plugin)))
         except ImportError as e:
             print(f"Error loading plugin {plugin}: {e}")
     sys.path = oldpath
@@ -56,8 +59,19 @@ def load_plugins():
 
 def notify_plugins(method_name, *args, **kwargs):
     plugins = load_plugins()
-    for plugin in plugins:
+    for name, plugin in plugins:
         if hasattr(plugin, method_name):
             return getattr(plugin, method_name)(*args, **kwargs)
     
 
+def get_plugin_result(method_name, *args, **kwargs):
+    plugins = load_plugins()
+    found_results = []
+    for name, plugin in plugins:
+        if hasattr(plugin, method_name):
+            found_results.append((name, getattr(plugin, method_name)(*args, **kwargs)))
+    if len(found_results) == 0:
+        return None
+    if len(found_results) == 1:
+        return found_results[0][1]
+    raise VertexVoyageConflictError(f"Multiple plugins returned results for {method_name}: {found_results}")
