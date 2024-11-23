@@ -82,7 +82,7 @@ def list_plugins():
     plugins += get_config_list("plugins", [], "List of plugins to load")
     disabled_plugins = get_disabled_plugins()
     plugins = [plugin for plugin in plugins if plugin not in disabled_plugins]
-    return plugins
+    return list(set(plugins))
 
 def load_plugins():
     oldpath = sys.path
