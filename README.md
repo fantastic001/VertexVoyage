@@ -95,3 +95,20 @@ environment variable.
 For instance, `port` can be specified in configuration file and can be modified using `VERTEX_VOYAGE_PORT` environment variable. 
 
 Configuration file is specified using `VERTEX_VOYAGE_CONFIG` and default location is at `~/.vertex_voyage/config.json`
+
+
+# Running Vertex Voyage without ZooKeeper
+
+To run Vertex Voyage without ZooKeeper, you need to ensure that the configuration does not require ZooKeeper for its operations. Follow these steps:
+
+1. **Modify Configuration**: Update the configuration file to disable ZooKeeper dependencies. You can specify the configuration file using the `VERTEX_VOYAGE_CONFIG` environment variable. The default location is `~/.vertex_voyage/config.json`.
+
+2. **Set Environment Variables**: Ensure that any necessary configuration parameters are set via environment variables. For example, you can set the port using the `VERTEX_VOYAGE_PORT` environment variable. In order not to use ZK, set `NO_ZK=0` in your environment.
+
+3. **Run Vertex Voyage**: Execute the Vertex Voyage application as usual. If you are running it inside a SLURM cluster, Vertex Voyage will automatically detect the SLURM environment and configure itself accordingly.
+
+
+Example command to run Vertex Voyage:
+```sh
+VERTEX_VOYAGE_CONFIG=~/.vertex_voyage/config.json VERTEX_VOYAGE_PORT=8080 vertex_voyage
+```
