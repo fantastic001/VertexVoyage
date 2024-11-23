@@ -46,7 +46,7 @@ def parallel_function_call(func, param_list, max_workers=None):
 
 
 COMMAND_CLASSES = ["Executor"]
-
+@cfg.pluggable
 class StorageGraph:
     GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
 

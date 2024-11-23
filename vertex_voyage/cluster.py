@@ -6,6 +6,7 @@ import random
 import re
 from kazoo.exceptions import NodeExistsError
 import threading
+import vertex_voyage.config as cfg 
 
 
 zk = None 
@@ -50,6 +51,7 @@ def zk_callback(event):
         print("Node deleted")
         register_node()
 
+@cfg.pluggable
 def register_node():
     def f():
         if USE_MPI:
@@ -101,6 +103,7 @@ def register_node():
     if t.is_alive():
         raise RuntimeError("Registering node is taking too long")
 
+@cfg.pluggable
 def get_nodes():
     if USE_SLURM:
         return os.getenv('SLURM_JOB_NODELIST').split(',')
@@ -112,6 +115,7 @@ def get_nodes():
     nodes = zk.get_children(ZK_NODE_PATH)
     return sorted(nodes)
 
+@cfg.pluggable
 def get_node_data(node):
     if USE_SLURM:
         return node
@@ -124,6 +128,7 @@ def get_node_data(node):
     data, stat = zk.get(node_path)
     return data
 
+@cfg.pluggable
 def get_ip_by_index(index):
     if USE_SLURM:
         return get_nodes()[index]
@@ -135,6 +140,7 @@ def get_ip_by_index(index):
     data = get_node_data(node)
     return data.split()[1].decode()
 
+@cfg.pluggable
 def get_node_index(node):
     if USE_SLURM:
         return get_nodes().index(node)
@@ -146,6 +152,7 @@ def get_node_index(node):
     nodes = zk.get_children(ZK_NODE_PATH)
     return nodes.index(node)
 
+@cfg.pluggable
 def get_node_by_index(index):
     if USE_SLURM:
         return get_nodes()[index]
@@ -157,6 +164,7 @@ def get_node_by_index(index):
     nodes = zk.get_children(ZK_NODE_PATH)
     return nodes[index]
 
+@cfg.pluggable
 def get_leader():
     if USE_SLURM:
         return get_nodes()[0]
@@ -173,6 +181,7 @@ def get_leader():
     else:
         return None
 
+@cfg.pluggable
 def get_current_node():
     if USE_SLURM:
         return os.getenv('SLURMD_NODENAME')
@@ -188,6 +197,7 @@ def get_current_node():
             return node
     return None
 
+@cfg.pluggable
 def do_rpc(node_index, method_name, **kwargs):
     if USE_MPI:
         print(f"do_rpc({node_index}, {method_name}, {kwargs})")
@@ -206,6 +216,7 @@ def do_rpc(node_index, method_name, **kwargs):
     s = ServerProxy(f'http://{ip}:8000')
     return s.execute(method_name, kwargs)
 
+@cfg.pluggable
 def get_node_index_by_ip(ip):
     if USE_SLURM:
         return get_nodes().index(ip)
@@ -222,6 +233,7 @@ def get_node_index_by_ip(ip):
     return None
 
 
+@cfg.pluggable
 def do_rpc_to_leader(method_name, **kwargs):
     if not USE_ZK:
         return do_rpc(0, method_name, **kwargs)
@@ -229,6 +241,7 @@ def do_rpc_to_leader(method_name, **kwargs):
     leader_index = get_node_index(leader)
     return do_rpc(leader_index, method_name, **kwargs)
 
+@cfg.pluggable
 def is_leader():
     if not USE_ZK:
         return True
@@ -236,6 +249,7 @@ def is_leader():
     print("Current: ", get_current_node())
     return get_leader() == get_current_node()
 
+@cfg.pluggable
 def do_rpc_client(ip, method_name, **kwargs):
     from xmlrpc.client import ServerProxy, Fault
     s = ServerProxy(f'http://{ip}:8000')

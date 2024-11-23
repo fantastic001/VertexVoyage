@@ -88,3 +88,12 @@ def get_plugin_result(method_name, *args, **kwargs):
     if len(found_results) == 1:
         return found_results[0][1]
     raise VertexVoyageConflictError(f"Multiple plugins returned results for {method_name}: {found_results}")
+
+def pluggable(func):
+    func_name = func.__name__
+    def wrapper(*args, **kwargs):
+        result = get_plugin_result(func_name, *args, **kwargs)
+        if result is not None:
+            return result
+        return func(*args, **kwargs)
+    return wrapper
