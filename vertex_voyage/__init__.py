@@ -431,3 +431,16 @@ class Executor:
                 return -1
         else:
             return do_rpc_to_leader("upload_gml", graph_name=graph_name, data=data, append=append)
+    
+    def get_config_location(self):
+        return cfg.get_config_location()
+    
+    def get_config(self, key: str):
+        value = cfg.get_config(key, None)
+        if value is None:
+            return "" 
+        else:
+            return value
+    
+    def set_config(self, key: str, value: str):
+        return cfg.set_config(key, value)

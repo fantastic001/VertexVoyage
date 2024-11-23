@@ -190,6 +190,15 @@ class Client:
     def list(self, *, ip: str = "localhost"):
         return do_rpc_client(ip, "list")
     
+    def get_config_location(self, *, ip: str = "localhost"):
+        return do_rpc_client(ip, "get_config_location")
+    
+    def get_config(self, key: str, *, ip: str = "localhost"):
+        return do_rpc_client(ip, "get_config", key=key)
+    
+    def set_config(self, key: str, value: str, *, ip: str = "localhost"):
+        return do_rpc_client(ip, "set_config", key=key, value=value)
+    
     def execute(self, pipeline: str, *, ip: str = "localhost", results_folder: str = None):
         """
         Execute commands specified in pipeline YAML file given. 

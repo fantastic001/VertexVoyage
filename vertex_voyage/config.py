@@ -9,6 +9,9 @@ class VertexVoyageConfigurationError(Exception):
 class VertexVoyageConflictError(Exception):
     pass
 
+def get_config_location():
+    return os.environ.get("VERTEX_VOYAGE_CONFIG", os.path.join(os.path.expanduser("~"), ".vertex_voyage", "config.json"))
+
 def get_config(key: str, default, expected_type=str):
     config = {} 
     envvar = "VERTEX_VOYAGE_" + key.upper()
@@ -42,6 +45,16 @@ def get_config_str(key: str, default) -> str:
 
 def get_config_list(key: str, default) -> list:
     return get_config(key, default, expected_type=list)
+
+def set_config(key: str, value):
+    config_location = get_config_location()
+    config = {}
+    if os.path.exists(config_location):
+        with open(config_location) as f:
+            config = json.load(f)
+    config[key] = value
+    with open(config_location, "w") as f:
+        json.dump(config, f)
 
 def load_plugins():
     search_path = get_config_list("plugin_search_path", [])
