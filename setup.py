@@ -19,9 +19,11 @@ setup(
         'lxml',
         'pyyaml',
         'gensim',
-        'mpi4py',
         'tabulate'
     ],
+    extras_require={
+        'mpi': ['mpi4py']
+    },
     entry_points={
         'console_scripts': [
             'vertex_voyage = vertex_voyage.__main__:main',
