@@ -15,6 +15,7 @@ PROJECT_ENVVAR_PREFIX = "VERTEX_VOYAGE"
 DEFAULT_PLUGINS = [
     "vertex_voyage.plugins.greeting",
     "vertex_voyage.plugins.config_commands",
+    "vertex_voyage.plugins.plugin_manager",
 ]
 
 def get_config_location():
@@ -67,18 +68,26 @@ def set_config(key: str, value):
     with open(config_location, "w") as f:
         json.dump(config, f)
 
-def load_plugins():
-    search_path = get_config_list("plugin_search_path", [
+def get_search_path():
+    return get_config_list("plugin_search_path", [
         "/usr/local/share/vertex_voyage/plugins",
         "/usr/share/vertex_voyage/plugins",
         os.path.join(os.path.expanduser("~"), ".vertex_voyage", "plugins")
     ], "List of plugin search paths")
-    oldpath = sys.path
-    sys.path = search_path + sys.path
+
+get_disabled_plugins = lambda: get_config_list("disabled_plugins", [], "List of plugins to disable")
+
+def list_plugins():
     plugins = DEFAULT_PLUGINS
     plugins += get_config_list("plugins", [], "List of plugins to load")
-    disabled_plugins = get_config_list("disabled_plugins", [], "List of plugins to disable")
+    disabled_plugins = get_disabled_plugins()
     plugins = [plugin for plugin in plugins if plugin not in disabled_plugins]
+    return plugins
+
+def load_plugins():
+    oldpath = sys.path
+    sys.path = get_search_path() + sys.path
+    plugins = list_plugins()
     result = []
     for plugin in plugins:
         try:
@@ -92,7 +101,7 @@ def notify_plugins(method_name, *args, **kwargs):
     plugins = load_plugins()
     for name, plugin in plugins:
         if hasattr(plugin, method_name):
-            return getattr(plugin, method_name)(*args, **kwargs)
+            getattr(plugin, method_name)(*args, **kwargs)
     
 
 def get_plugin_result(method_name, *args, **kwargs):
