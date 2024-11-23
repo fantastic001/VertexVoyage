@@ -11,6 +11,7 @@ from vertex_voyage.node2vec import Node2Vec
 from httplib2 import Http
 import concurrent.futures
 import time 
+import vertex_voyage.config as cfg 
 
 def parallel_function_call(func, param_list, max_workers=None):
     """
@@ -69,6 +70,7 @@ class StorageGraph:
 
     def create_graph(self, graph: nx.Graph):
         nx.write_gml(graph, self.path)
+        cfg.notify_plugins("graph_created", self.path)
         return self.path
 
     def get_graph(self) -> nx.Graph:
@@ -81,12 +83,14 @@ class StorageGraph:
         graph = self.get_graph()
         graph.add_node(vertex_name)
         self.create_graph(graph)
+        cfg.notify_plugins("vertex_added", self.path, graph, vertex_name)
         return self.path
 
     def add_edge(self, vertex1, vertex2):
         graph = self.get_graph()
         graph.add_edge(vertex1, vertex2)
         self.create_graph(graph)
+        cfg.notify_plugins("edge_added", self.path, graph, vertex1, vertex2)
         return self.path
     
     def partition_graph(self, num_nodes: int) -> list:
@@ -103,6 +107,7 @@ class StorageGraph:
             subgraph = graph.subgraph(part)
             storage_graph.create_graph(subgraph)
             result.append(storage_graph)
+        cfg.notify_plugins("graph_partitioned", self.path, graph, partitioned_graph, corruptability, result)
         return result, corruptability
     
     def get_node_num(self):
