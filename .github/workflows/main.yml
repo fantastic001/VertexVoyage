@@ -1,0 +1,35 @@
+name: Run Vertex Voyage Smoke Test
+
+on:
+    push:
+        branches:
+            - main
+            - master
+jobs:
+    smoke_test:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with:
+                    python-version: 3.x
+
+            - name: Install dependencies
+              run: pip install -r requirements.txt
+
+            - name: Run smoke test
+              run: |
+                    python -m vertex_voyage &
+                    sleep 10
+
+            - name: Check process termination
+              run: |
+                    if [ -f smoke_test_passed ]; then
+                        echo "Smoke test passed"
+                    else
+                        echo "Smoke test failed"
+                        exit 1
+                    fi
