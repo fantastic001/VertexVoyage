@@ -12,6 +12,10 @@ class VertexVoyageConflictError(Exception):
 PROJECT_NAME = "vertex_voyage"
 PROJECT_VERSION = "0.1.0"
 PROJECT_ENVVAR_PREFIX = "VERTEX_VOYAGE"
+DEFAULT_PLUGINS = [
+    "vertex_voyage.plugins.greeting",
+    "vertex_voyage.plugins.config_commands",
+]
 
 def get_config_location():
     return os.environ.get(PROJECT_ENVVAR_PREFIX + "_CONFIG", os.path.join(os.path.expanduser("~"), ".vertex_voyage", "config.json"))
@@ -65,15 +69,14 @@ def set_config(key: str, value):
 
 def load_plugins():
     search_path = get_config_list("plugin_search_path", [
-        "./vertex_voyage/plugins",
         "/usr/local/share/vertex_voyage/plugins",
         "/usr/share/vertex_voyage/plugins",
         os.path.join(os.path.expanduser("~"), ".vertex_voyage", "plugins")
     ], "List of plugin search paths")
-    
     oldpath = sys.path
     sys.path = search_path + sys.path
-    plugins = get_config_list("plugins", [], "List of plugins to load")
+    plugins = DEFAULT_PLUGINS
+    plugins += get_config_list("plugins", [], "List of plugins to load")
     disabled_plugins = get_config_list("disabled_plugins", [], "List of plugins to disable")
     plugins = [plugin for plugin in plugins if plugin not in disabled_plugins]
     result = []

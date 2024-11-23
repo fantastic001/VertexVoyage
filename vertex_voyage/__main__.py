@@ -7,4 +7,12 @@ notify_plugins("node_starting")
 register_node()
 notify_plugins("node_started")
 
-command_executor_rpc(get_classes("vertex_voyage"), get_binding_port())
+
+additional_classes = [] 
+class ControlInterface:
+    def add_command_class(self, cls):
+        additional_classes.append(cls)
+
+notify_plugins("register_commands", ControlInterface())
+
+command_executor_rpc(get_classes("vertex_voyage") + additional_classes, get_binding_port())
