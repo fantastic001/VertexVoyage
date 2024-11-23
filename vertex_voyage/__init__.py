@@ -13,6 +13,20 @@ import concurrent.futures
 import time 
 import vertex_voyage.config as cfg 
 
+class ControlInterface:
+
+    additional_classes = [] 
+    threads = []
+
+    def add_command_class(self, cls):
+        ControlInterface.additional_classes.append(cls)
+    
+    def start_background_thread(self, target, *args, **kwargs):
+        t = threading.Thread(target=target, args=args, kwargs=kwargs)
+        t.start()
+        ControlInterface.threads.append(t)
+
+
 def parallel_function_call(func, param_list, max_workers=None):
     """
     Parallelizes the execution of a function with a parameter list.
@@ -46,7 +60,6 @@ def parallel_function_call(func, param_list, max_workers=None):
 
 
 COMMAND_CLASSES = ["Executor"]
-@cfg.pluggable
 class StorageGraph:
     GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
 
@@ -130,6 +143,11 @@ class StorageGraph:
         shutil.copy(self.path, os.path.join(self.GRAPH_STORE_PATH, destination_name + ".gml"))
         return os.path.join(self.GRAPH_STORE_PATH, destination_name + ".gml")
 
+@cfg.pluggable
+def get_graph_storage_class(default_storage_class):
+    return default_storage_class
+
+StorageGraph = get_graph_storage_class(StorageGraph)
 class Executor:
     def create_graph(self, name: str):
         if is_leader():
