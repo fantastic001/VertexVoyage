@@ -10,3 +10,5 @@ httplib2
 lxml
 pyyaml
 gensim
+mpi4py
+tabulate
