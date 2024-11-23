@@ -166,6 +166,38 @@ class Client:
         print("Uploading GML")
         return self.upload_gml(graph_name, tmpfile, ip=ip)
     
+    def upload_json(self, graph_name: str, path: str, *, ip: str = "localhost", jsonpath: str = None):
+        import json 
+        data = []
+        with open(path, "r") as f:
+            data = f.read()
+            data = json.loads(data)
+            if jsonpath is not None:
+                for key in jsonpath.split("."):
+                    data = data[key]
+            import networkx as nx
+            g = nx.Graph()
+            for edge in data:
+                g.add_edge(edge[0], edge[1])
+        tmpfile = f"/tmp/{graph_name}.gml"
+        print(f"Writing to {tmpfile}")
+        nx.write_gml(g, tmpfile)
+        print("Uploading GML")
+        return self.upload_gml(graph_name, tmpfile, ip=ip)
+    
+    def upload_tsv(self, graph_name: str, path: str, *, ip: str = "localhost", sep: str = "\t"):
+        import networkx as nx 
+        g = nx.Graph()
+        with open(path, "r") as f:
+            for line in f.readlines()[1:]:
+                u, v = line.strip().split(sep)
+                g.add_edge(u, v)
+        tmpfile = f"/tmp/{graph_name}.gml"
+        print(f"Writing to {tmpfile}")
+        nx.write_gml(g, tmpfile)
+        print("Uploading GML")
+        return self.upload_gml(graph_name, tmpfile, ip=ip)
+    
     def list(self, *, ip: str = "localhost"):
         return do_rpc_client(ip, "list")
     
