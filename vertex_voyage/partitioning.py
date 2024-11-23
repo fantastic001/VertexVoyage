@@ -5,6 +5,7 @@ from cdlib.algorithms import lfm
 from cdlib.algorithms.internal.lfm import Community
 from binpacking import to_constant_bin_number
 import random 
+import vertex_voyage.config as cfg 
 
 def modified__lfm(G: nx.Graph, alpha: float = 1, threshold: float = 0.5) -> list:
     communities = []
@@ -46,7 +47,7 @@ def modified__lfm(G: nx.Graph, alpha: float = 1, threshold: float = 0.5) -> list
         random_comm.append(node)
     return list(communities)
 
-
+@cfg.pluggable
 def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = False, threshold: float = 0.5) -> list:
     """
     Partition the graph into a given number of partitions using LFM algorithm.
@@ -62,6 +63,7 @@ def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = Fa
     partitions = [list(sum(part, [])) for part in partitions]
     return partitions
 
+@cfg.pluggable
 def calculate_partitioning_corruption(G: nx.Graph, partitions: list):
     """
     Partitioning corruption is 1 - ratio of size of edges of union of subgraphs of G induced by partitions and number of edges in original graph G  
@@ -77,6 +79,7 @@ def calculate_partitioning_corruption(G: nx.Graph, partitions: list):
     partitioning_corruption = 1-len(partitions_edges) / original_edges
     return partitioning_corruption
 
+@cfg.pluggable
 def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm = False, threshold = 0.5, partitions = None):
     """
     Calculate the corruptability of the graph.
@@ -88,6 +91,7 @@ def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm =
     corruption = calculate_partitioning_corruption(G, partitions)
     return corruption
 
+@cfg.pluggable
 def calculate_graph_corruptability(G: nx.Graph, max_partition_num: int, use_modified_lfm = False, threshold=0.5):
     """
     Calculate the corruptability of the graph for all partition numbers from 1 to max_partition_num and returns linear coefficient of function corruptability(pnum) = k * (pnum-1).
