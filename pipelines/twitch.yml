@@ -1,6 +1,6 @@
 name: twitch
 commands:
-  - name: upload_csv 
+  - name: upload
     type: oneshot
     args:
       graph_name: sample_graph
