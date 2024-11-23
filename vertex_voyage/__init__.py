@@ -436,7 +436,7 @@ class Executor:
         return cfg.get_config_location()
     
     def get_config(self, key: str):
-        value = cfg.get_config(key, None)
+        value = cfg.get_config(key, None, "")
         if value is None:
             return "" 
         else:
