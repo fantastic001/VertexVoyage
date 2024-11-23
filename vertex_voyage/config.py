@@ -9,12 +9,16 @@ class VertexVoyageConfigurationError(Exception):
 class VertexVoyageConflictError(Exception):
     pass
 
+PROJECT_NAME = "vertex_voyage"
+PROJECT_VERSION = "0.1.0"
+PROJECT_ENVVAR_PREFIX = "VERTEX_VOYAGE"
+
 def get_config_location():
-    return os.environ.get("VERTEX_VOYAGE_CONFIG", os.path.join(os.path.expanduser("~"), ".vertex_voyage", "config.json"))
+    return os.environ.get(PROJECT_ENVVAR_PREFIX + "_CONFIG", os.path.join(os.path.expanduser("~"), ".vertex_voyage", "config.json"))
 
 def get_config(key: str, default, doc, expected_type=str):
     config = {} 
-    envvar = "VERTEX_VOYAGE_" + key.upper()
+    envvar = PROJECT_ENVVAR_PREFIX + "_" + key.upper()
     if envvar in os.environ:
         if expected_type == bool:
             return os.environ[envvar].lower() in ["true", "1", "yes", "y", "YES", "Y", "True", "TRUE"]
@@ -60,10 +64,18 @@ def set_config(key: str, value):
         json.dump(config, f)
 
 def load_plugins():
-    search_path = get_config_list("plugin_search_path", [], "List of plugin search paths")
+    search_path = get_config_list("plugin_search_path", [
+        "./vertex_voyage/plugins",
+        "/usr/local/share/vertex_voyage/plugins",
+        "/usr/share/vertex_voyage/plugins",
+        os.path.join(os.path.expanduser("~"), ".vertex_voyage", "plugins")
+    ], "List of plugin search paths")
+    
     oldpath = sys.path
     sys.path = search_path + sys.path
     plugins = get_config_list("plugins", [], "List of plugins to load")
+    disabled_plugins = get_config_list("disabled_plugins", [], "List of plugins to disable")
+    plugins = [plugin for plugin in plugins if plugin not in disabled_plugins]
     result = []
     for plugin in plugins:
         try:
