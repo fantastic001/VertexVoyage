@@ -103,10 +103,56 @@ def register_node():
     if t.is_alive():
         raise RuntimeError("Registering node is taking too long")
 
+def parse_slurm_nodelist_spec(nodelist):
+    nodes = []
+    # Example: n[03,10-12]
+    range_expr = re.compile(r'(\d+)-(\d+)')
+    spec_expr = re.compile(r'(\w+)\[([^\]]+)\]')
+    nodelist_ = []
+    state = 0 
+    current = ""
+    for c in nodelist:
+        if c == "[" and state == 0:
+            state = 1
+            current += c
+        elif c == "]" and state == 1:
+            current += c
+            state = 0
+            nodelist_.append(current)
+            current = ""
+        elif state == 1:
+            current += c
+        else:
+            current += c
+    if current != "":
+        nodelist_.append(current)
+    if len(nodelist_) == 0:
+        return nodelist
+    nodelist = nodelist_
+    for node in nodelist:
+        if spec_expr.match(node):
+            prefix = spec_expr.match(node).group(1)
+            suffix = spec_expr.match(node).group(2)
+            for s in suffix.split(','):
+                if range_expr.match(s):
+                    start_str = range_expr.match(s).group(1)
+                    end_str = range_expr.match(s).group(2)
+                    start = int(start_str)
+                    end = int(end_str)
+                    for i in range(start, end + 1):
+                        leading_zeros = len(start_str) - len(str(i))
+                        nodes.append(f"{prefix}{i:0{leading_zeros + len(end_str)}d}")
+                else:
+                    nodes.append(f"{prefix}{s}")
+        else:
+            nodes.append(node)
+    return nodes
+
 @cfg.pluggable
 def get_nodes():
     if USE_SLURM:
-        return os.getenv('SLURM_JOB_NODELIST').split(',')
+        nodelist = os.getenv('SLURM_JOB_NODELIST').split(',')
+        return parse_slurm_nodelist_spec(nodelist)
     if USE_MPI:
         return [f"node_{i}" for i in range(size)]
     if not USE_ZK:
