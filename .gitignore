@@ -324,3 +324,5 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+docker/vpn_tunnel/config/config_ai.sh
+docker/vpn_tunnel/install/anyconnect-linux64-4.10.05085-predeploy-k9.tar.gz
