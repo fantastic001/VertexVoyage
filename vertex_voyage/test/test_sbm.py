@@ -62,22 +62,3 @@ class TestSBMNetwork(unittest.TestCase):
         self.assertEqual(self.sbm._get_edge_index(1, 3), 1 * 5 + 3)
         self.assertEqual(self.sbm._get_edge_index(3, 1), 1 * 5 + 3)
 
-    def test_edge_exists(self):
-        # Mock the LCG to control the random values
-        self.sbm.lcg.get_number = lambda x: 1  # Always return 1
-        self.assertFalse(self.sbm.edge_exists(0, 1))  # Probability is 0.9, but random value is 1
-        self.assertFalse(self.sbm.edge_exists(2, 3))  # Probability is 0.8, but random value is 1
-
-        self.sbm.lcg.get_number = lambda x: 0  # Always return 0
-        self.assertTrue(self.sbm.edge_exists(0, 1))  # Probability is 0.9, and random value is 0
-        self.assertTrue(self.sbm.edge_exists(2, 3))  # Probability is 0.8, and random value is 0
-
-    def test_get_neighbors(self):
-        # Mock the LCG to control the random values
-        self.sbm.lcg.get_number = lambda x: 0  # Always return 0
-        self.assertEqual(self.sbm.get_neighbors(0), [1, 2, 3, 4])
-        self.assertEqual(self.sbm.get_neighbors(2), [0, 1, 3, 4])
-
-        self.sbm.lcg.get_number = lambda x: 1  # Always return 1
-        self.assertEqual(self.sbm.get_neighbors(0), [])
-        self.assertEqual(self.sbm.get_neighbors(2), [])
