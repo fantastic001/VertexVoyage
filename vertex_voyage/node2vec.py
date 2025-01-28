@@ -6,6 +6,7 @@ import random
 from vertex_voyage.word2vec import word2vec
 import vertex_voyage.config as cfg 
 import multiprocessing.pool as mpp
+import vertex_voyage_native
 
 @cfg.pluggable
 class Node2Vec:
@@ -20,7 +21,8 @@ class Node2Vec:
                  q = .5,
                  negative_sample_num = 50,
                  learning_rate = 0.01,
-                 seed = None 
+                 seed = None,
+                 use_threads = True
             ) -> None:
         self.dim = dim
         self.walk_size = walk_size 
@@ -32,6 +34,7 @@ class Node2Vec:
         self.q = q
         self.negative_sample_num = negative_sample_num
         self.seed = seed
+        self.use_threads = use_threads
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
@@ -39,7 +42,7 @@ class Node2Vec:
             np.random.seed()
             random.seed()
     
-    def _get_next(self, prev, current):
+    def _weighted__get_next(self, prev, current):
         neighbors = self.node_to_neightbours_map[current]
         neighbors = list(set(neighbors))
         r = random.random()
@@ -61,6 +64,15 @@ class Node2Vec:
         weights_cumsum = np.cumsum(weights)
         return neighbors[np.searchsorted(weights_cumsum, r)]
         # return np.random.choice(neighbors, p=weights / np.sum(weights))
+
+    def _get_next(self, prev, current):
+        # if self.is_weighted:
+        #     return self._weighted__get_next(prev, current)
+        # else:
+            neightbors = self.node_to_neightbours_map[current]
+            r = np.random.random()
+            prev_neightbors = self.node_to_neightbours_map[prev] if prev is not None else []
+            return vertex_voyage_native.get_next(r, prev_neightbors, neightbors, current, self.p, self.q, prev)
 
     def fit(self, G, nodes = None):
         self.G = G
@@ -95,9 +107,14 @@ class Node2Vec:
 
     def _random_walks(self):
         walks = []
-        starts = [np.random.choice(list(self.G.nodes())) for _ in range(self.n_walks)]
-        with mpp.ThreadPool(32) as pool:
-            walks = pool.map(self._random_walk, starts)
+        if self.use_threads:
+            starts = [np.random.choice(list(self.G.nodes())) for _ in range(self.n_walks)]
+            with mpp.ThreadPool() as pool:
+                walks = pool.map(self._random_walk, starts)
+        else:
+            for _ in range(self.n_walks):
+                start = np.random.choice(list(self.G.nodes()))
+                walks.append(self._random_walk(start))
         return walks
     
     def _random_walk(self, node):

@@ -11,3 +11,4 @@ lxml
 pyyaml
 gensim
 tabulate
+maturin
