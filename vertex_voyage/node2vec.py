@@ -5,6 +5,7 @@ import tensorflow as tf
 import random 
 from vertex_voyage.word2vec import word2vec
 import vertex_voyage.config as cfg 
+import multiprocessing.pool as mpp
 
 @cfg.pluggable
 class Node2Vec:
@@ -39,26 +40,32 @@ class Node2Vec:
             random.seed()
     
     def _get_next(self, prev, current):
-        neighbors = list(self.G.neighbors(current)) 
+        neighbors = self.node_to_neightbours_map[current]
         neighbors = list(set(neighbors))
+        r = random.random()
         if neighbors == []:
             return current
-        weights = []
-        for neighbor in neighbors:
-            weight = self.G[current][neighbor].get('weight', 1)
-            if neighbor == prev:
-                weights.append(1/self.p)
-            elif prev is not None and neighbor in self.G.neighbors(prev):
-                weights.append(1)
+        weights = np.zeros(len(neighbors), dtype=np.float32)
+        for i, neighbor in enumerate(neighbors):
+            if self.is_weighted:
+                weight = self.G[current][neighbor].get('weight', 1)
             else:
-                weights.append(1/self.q)
-            weights[-1] *= weight
-        weights = np.array(weights, dtype=np.float64)
-        weights /= weights.sum()
-        return np.random.choice(neighbors, p=weights)
+                weight = 1
+            if neighbor == prev:
+                weights[i] = weight/self.p
+            elif prev is not None and neighbor in self.node_to_neightbours_map[prev]:
+                weights[i] = weight
+            else:
+                weights[i] = weight/self.q
+        weights /= np.sum(weights)
+        weights_cumsum = np.cumsum(weights)
+        return neighbors[np.searchsorted(weights_cumsum, r)]
+        # return np.random.choice(neighbors, p=weights / np.sum(weights))
 
     def fit(self, G, nodes = None):
         self.G = G
+        self.is_weighted = any('weight' in data for u, v, data in self.G.edges(data=True))
+        self.node_to_neightbours_map = {node: list(self.G.neighbors(node)) for node in self.G.nodes()}
         if nodes is None:
             nodes = list(G.nodes())
         self.g_nodes = nodes
@@ -88,9 +95,9 @@ class Node2Vec:
 
     def _random_walks(self):
         walks = []
-        for i in range(self.n_walks):
-            node = np.random.choice(list(self.G.nodes()))
-            walks.append(self._random_walk(node))
+        starts = [np.random.choice(list(self.G.nodes())) for _ in range(self.n_walks)]
+        with mpp.ThreadPool(32) as pool:
+            walks = pool.map(self._random_walk, starts)
         return walks
     
     def _random_walk(self, node):
