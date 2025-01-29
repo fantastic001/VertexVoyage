@@ -34,6 +34,21 @@ class ConsistentHashing:
             index = 0
         return self.ring[self.sorted_keys[index]]
 
+    def add_shard(self, shard):
+        for replica in range(self.replicas):
+            key = f"{shard}:{replica}"
+            hashed_key = self._hash(key)
+            self.ring[hashed_key] = shard
+            bisect.insort(self.sorted_keys, hashed_key)
+
+    def remove_shard(self, shard):
+        for replica in range(self.replicas):
+            key = f"{shard}:{replica}"
+            hashed_key = self._hash(key)
+            self.ring.pop(hashed_key)
+            self.sorted_keys.remove(hashed_key)
+        self.sorted_keys.sort()
+
 
 class ShardMountManager:
     """Manages mounting and access to shards stored on remote or local filesystems."""
@@ -153,6 +168,19 @@ class ShardMountManager:
         file_path = os.path.join(local_mount_path, relative_path)
         return open(file_path, mode)
 
+    def add_shard(self, shard_name, shard_info):
+        self.shard_mapping[shard_name] = shard_info
+        self.mount(shard_name)
+
+    def remove_shard(self, shard_name):
+        if shard_name not in self.shard_mapping:
+            raise ValueError(f"Shard {shard_name} is not defined in the mapping.")
+
+        local_mount_path = os.path.join(self.local_mount_dir, shard_name)
+        if self.is_mounted(local_mount_path):
+            subprocess.run(["umount", local_mount_path], check=True)
+            print(f"Unmounted {local_mount_path}")
+        self.shard_mapping.pop(shard_name)
 
 class GraphStorageWithConsistentHashing:
     """Manages graph storage across shards using consistent hashing."""
@@ -186,7 +214,12 @@ class GraphStorageWithConsistentHashing:
         vertices_file = os.path.join(graph_path, "vertices.json")
         with open(vertices_file, "r") as f:
             vertices = json.load(f)
-            vertices[vertex_id] = data
+            vertices[vertex_id] = {
+                "data": data,
+                "graph": graph_name,
+                "id": vertex_id,
+                "key": key
+            }
             json.dump(vertices, f)
 
     def add_edge(self, graph_name, from_vertex, to_vertex, data):
@@ -200,7 +233,7 @@ class GraphStorageWithConsistentHashing:
 
         if from_vertex not in edges:
             edges[from_vertex] = []
-        edges[from_vertex].append({"to": to_vertex, "data": data})
+        edges[from_vertex].append({"to": to_vertex, "data": data, "graph": graph_name, "from": from_vertex, "key": key})
 
         with open(edges_file, "w") as f:
             json.dump(edges, f)
@@ -254,7 +287,30 @@ class GraphStorageWithConsistentHashing:
 
         with open(edges_file, "w") as f:
             json.dump(edges, f)
-
+    
+    def add_shard(self, shard_name, shard_info):
+        self.mount_manager.add_shard(shard_name, shard_info)
+        self.hashing.add_shard(shard_name)
+    
+    def remove_shard(self, shard_name):
+        self.hashing.remove_shard(shard_name)
+        # move data from this shard to other shards
+        shard_root = os.path.join(self.mount_manager.local_mount_dir, shard_name)
+        # read vertices 
+        for root, dirs, files in os.walk(shard_root):
+            for file in files:
+                if file == "vertices.json":
+                    with open(os.path.join(root, file), "r") as f:
+                        vertices = json.load(f)
+                        for vertex_id in vertices:
+                            self.add_vertex(vertices[vertex_id]["graph"], vertices[vertex_id]["id"], vertices[vertex_id]["data"])
+                elif file == "edges.json":
+                    with open(os.path.join(root, file), "r") as f:
+                        edges = json.load(f)
+                        for from_vertex in edges:
+                            for edge in edges[from_vertex]:
+                                self.add_edge(edge["graph"], edge["from"], edge["to"], edge["data"])
+        self.mount_manager.remove_shard(shard_name)
 
 # Example Usage
 if __name__ == "__main__":

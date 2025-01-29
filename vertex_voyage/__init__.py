@@ -12,6 +12,7 @@ from httplib2 import Http
 import concurrent.futures
 import time 
 import vertex_voyage.config as cfg 
+from vertex_voyage.storage.graph import GraphStorageWithConsistentHashing
 
 class ControlInterface:
 
@@ -59,9 +60,24 @@ def parallel_function_call(func, param_list, max_workers=None):
     return results
 
 
+def uses_distributed_storage() -> bool:
+    return cfg.get_config_bool*"use_distributed_storage", False)
+
+def get_distributed_graph_storage():
+    if uses_distributed_storage():
+        return GraphStorageWithConsistentHashing(
+            storage_dir=cfg.get_config_str("storage_dir", "/var/vertex_voyage/storage", "Directory to store graph data."), 
+            replicas=cfg.get_config_int("replicas", 3, "Number of replicas for each partition."),
+            shard_mapping=cfg.get_config_dict("shard_mapping", {}, "Shard mapping for each partition."),
+            shard_names=cfg.get_config_list("shard_names", [], "Names of the shards.")
+        )
+    else:
+        return None
+
 COMMAND_CLASSES = ["Executor"]
 class StorageGraph:
     GRAPH_STORE_PATH = os.environ.get("GRAPH_STORE_PATH", os.environ.get("HOME") + "/.vertex_voyage/graphs")
+
 
     def __init__(self, name: str):
         self.name = name
