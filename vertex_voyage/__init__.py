@@ -61,7 +61,7 @@ def parallel_function_call(func, param_list, max_workers=None):
 
 
 def uses_distributed_storage() -> bool:
-    return cfg.get_config_bool*"use_distributed_storage", False)
+    return cfg.get_config_bool("use_distributed_storage", False, "Whether to use distributed storage.")
 
 def get_distributed_graph_storage():
     if uses_distributed_storage():
