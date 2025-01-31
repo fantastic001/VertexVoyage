@@ -291,6 +291,24 @@ class GraphStorageWithConsistentHashing:
     def add_shard(self, shard_name, shard_info):
         self.mount_manager.add_shard(shard_name, shard_info)
         self.hashing.add_shard(shard_name)
+        # move vertices from shard before this newly added shard to this shard if they belong here
+        for root, dirs, files in os.walk(self.mount_manager.local_mount_dir):
+            for file in files:
+                if file == "vertices.json":
+                    with open(os.path.join(root, file), "r") as f:
+                        vertices = json.load(f)
+                        for vertex_id in vertices:
+                            if self.hashing.get_shard(vertices[vertex_id]["key"]) == shard_name:
+                                self.add_vertex(vertices[vertex_id]["graph"], vertices[vertex_id]["id"], vertices[vertex_id]["data"])
+                                del vertices[vertex_id]
+                elif file == "edges.json":
+                    with open(os.path.join(root, file), "r") as f:
+                        edges = json.load(f)
+                        for from_vertex in edges:
+                            for edge in edges[from_vertex]:
+                                if self.hashing.get_shard(edge["key"]) == shard_name:
+                                    self.add_edge(edge["graph"], edge["from"], edge["to"], edge["data"])
+                                    del edges[from_vertex]
     
     def remove_shard(self, shard_name):
         self.hashing.remove_shard(shard_name)
