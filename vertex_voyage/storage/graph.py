@@ -32,14 +32,17 @@ class ConsistentHashing:
         index = bisect.bisect(self.sorted_keys, hashed_key)
         if index == len(self.sorted_keys):  # Wrap around the ring
             index = 0
-        return self.ring[self.sorted_keys[index]]
+        result =  self.ring[self.sorted_keys[index]]
+        return result
 
     def add_shard(self, shard):
+        print(f"Adding shard {shard}")
         for replica in range(self.replicas):
             key = f"{shard}:{replica}"
             hashed_key = self._hash(key)
             self.ring[hashed_key] = shard
             bisect.insort(self.sorted_keys, hashed_key)
+
 
     def remove_shard(self, shard):
         for replica in range(self.replicas):
@@ -65,7 +68,6 @@ class ShardMountManager:
         """Mount the shard if not already mounted."""
         if shard_name not in self.shard_mapping:
             raise ValueError(f"Shard {shard_name} is not defined in the mapping.")
-
         shard_info = self.shard_mapping[shard_name]
         local_mount_path = os.path.join(self.local_mount_dir, shard_name)
 
@@ -73,9 +75,6 @@ class ShardMountManager:
         os.makedirs(local_mount_path, exist_ok=True)
 
         if shard_info["protocol"] == "local":
-            # Local shard, no need to mount
-            if not os.path.exists(shard_info["remote_path"]):
-                raise ValueError(f"Local path {shard_info['remote_path']} does not exist.")
             return
 
         # Check if already mounted
@@ -211,6 +210,7 @@ class GraphStorageWithConsistentHashing:
         graph_path = self._get_graph_path(graph_name, key)
         self._ensure_graph_files(graph_path)
 
+        vertices = {}
         vertices_file = os.path.join(graph_path, "vertices.json")
         with open(vertices_file, "r") as f:
             vertices = json.load(f)
@@ -220,6 +220,7 @@ class GraphStorageWithConsistentHashing:
                 "id": vertex_id,
                 "key": key
             }
+        with open(vertices_file, "w") as f:
             json.dump(vertices, f)
 
     def add_edge(self, graph_name, from_vertex, to_vertex, data):
@@ -288,28 +289,58 @@ class GraphStorageWithConsistentHashing:
         with open(edges_file, "w") as f:
             json.dump(edges, f)
     
+    def delete_edge(self, graph_name, from_vertex, to_vertex):
+        key = f"{graph_name}:{from_vertex}"
+        graph_path = self._get_graph_path(graph_name, key)
+        edges_file = os.path.join(graph_path, "edges.json")
+
+        if not os.path.exists(edges_file):
+            return
+
+        with open(edges_file, "r") as f:
+            edges: dict = json.load(f)
+
+        if from_vertex not in edges:
+            return
+
+        edges[from_vertex] = [edge for edge in edges[from_vertex] if edge["to"] != to_vertex]
+
+        with open(edges_file, "w") as f:
+            json.dump(edges, f)
+
     def add_shard(self, shard_name, shard_info):
         self.mount_manager.add_shard(shard_name, shard_info)
         self.hashing.add_shard(shard_name)
         # move vertices from shard before this newly added shard to this shard if they belong here
-        for root, dirs, files in os.walk(self.mount_manager.local_mount_dir):
-            for file in files:
-                if file == "vertices.json":
-                    with open(os.path.join(root, file), "r") as f:
-                        vertices = json.load(f)
-                        for vertex_id in vertices:
-                            if self.hashing.get_shard(vertices[vertex_id]["key"]) == shard_name:
-                                self.add_vertex(vertices[vertex_id]["graph"], vertices[vertex_id]["id"], vertices[vertex_id]["data"])
-                                del vertices[vertex_id]
-                elif file == "edges.json":
-                    with open(os.path.join(root, file), "r") as f:
-                        edges = json.load(f)
-                        for from_vertex in edges:
-                            for edge in edges[from_vertex]:
-                                if self.hashing.get_shard(edge["key"]) == shard_name:
-                                    self.add_edge(edge["graph"], edge["from"], edge["to"], edge["data"])
-                                    del edges[from_vertex]
-    
+        move_vertices = {} 
+        move_edges = {} 
+        for shard in os.listdir(self.mount_manager.local_mount_dir):
+            for graph in os.listdir(os.path.join(self.mount_manager.local_mount_dir, shard)):
+                graph_path = os.path.join(self.mount_manager.local_mount_dir, shard, graph)
+                vertices = {}
+                edges = {}
+                if os.path.exists(os.path.join(graph_path, "vertices.json")):
+                    vertices = json.load(open(os.path.join(graph_path, "vertices.json")))
+                if os.path.exists(os.path.join(graph_path, "edges.json")):
+                    edges = json.load(open(os.path.join(graph_path, "edges.json")))
+                current_move_vertices = {k: v for k,v in vertices.items() if self.hashing._hash(v["graph"] + ":" + k) != v["key"]}
+                current_move_edges = {k: v for k,v in edges.items() if self.hashing._hash(v[0]["graph"] + ":" + k) != v[0]["key"]}
+                move_vertices = {**move_vertices, **current_move_vertices}
+                move_edges = {**move_edges, **current_move_edges}
+                vertices = {k: v for k,v in vertices.items() if self.hashing._hash(v["graph"] + ":" + k) == v["key"]}
+                edges = {k: v for k,v in edges.items() if self.hashing._hash(v[0]["graph"] + ":" + k) == v[0]["key"]}
+                with open(os.path.join(graph_path, "vertices.json"), "w") as f:
+                    json.dump(vertices, f)
+                with open(os.path.join(graph_path, "edges.json"), "w") as f:
+                    json.dump(edges, f)
+        for vertex_id in move_vertices:
+            print(f"Moving vertex {vertex_id} to shard {shard_name}")
+            self.add_vertex(move_vertices[vertex_id]["graph"], move_vertices[vertex_id]["id"], move_vertices[vertex_id]["data"])
+        for from_vertex in move_edges:
+            print(f"Moving edge {from_vertex} to shard {shard_name}")
+            for edge in move_edges[from_vertex]:
+                self.add_edge(edge["graph"], edge["from"], edge["to"], edge["data"])
+                
     def remove_shard(self, shard_name):
         self.hashing.remove_shard(shard_name)
         # move data from this shard to other shards
@@ -333,8 +364,8 @@ class GraphStorageWithConsistentHashing:
 # Example Usage
 if __name__ == "__main__":
     shard_mapping = {
-        "shard1": {"hostname": "nfs1.example.com", "protocol": "nfs", "port": 2049, "remote_path": "/exports/shard1"},
-        "shard2": {"hostname": "nfs2.example.com", "protocol": "nfs", "port": 2049, "remote_path": "/exports/shard2"},
+        "shard1": {"hostname": "local", "protocol": "local", "remote_path": "/local/shard1"},
+        "shard2": {"hostname": "local", "protocol": "local", "remote_path": "/local/shard2"},
         "shard3": {"hostname": "local", "protocol": "local", "remote_path": "/local/shard3"}
     }
 
@@ -351,7 +382,9 @@ if __name__ == "__main__":
 
     # Add edges
     storage.add_edge("graph1", "v1", "v2", {"weight": 10})
-
+    storage.add_shard("shard4", {"hostname": "local", "protocol": "local", "remote_path": "/local/shard4"})
+    for i in range(5, 20):
+        storage.add_shard(f"shard{i}", {"hostname": "local", "protocol": "local", "remote_path": f"/local/shard{i}"})
     # Retrieve data
     print(storage.get_vertex("graph1", "v1"))  # Output: {'name': 'Vertex1'}
     print(storage.get_edges("graph1", "v1"))  # Output: [{'to': 'v2', 'data': {'weight': 10}}]
