@@ -10,13 +10,13 @@ class ConfigurationError(Exception):
 class ConflictError(Exception):
     pass
 
-# Use snake-case (.e.g. "my_project") for the project name
-PROJECT_NAME = "mila"
+PROJECT_NAME = "vertex_voyage"
 PROJECT_VERSION = "0.1.0"
-PROJECT_ENVVAR_PREFIX = PROJECT_NAME.upper()
-CONFIG_FILE_NAME = PROJECT_NAME + ".json"
+PROJECT_ENVVAR_PREFIX = "VERTEX_VOYAGE"
 DEFAULT_PLUGINS = [
-    
+    "vertex_voyage.plugins.greeting",
+    "vertex_voyage.plugins.config_commands",
+    "vertex_voyage.plugins.plugin_manager",
 ]
 
 def get_config_location():
