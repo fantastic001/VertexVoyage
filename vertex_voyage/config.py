@@ -18,6 +18,7 @@ DEFAULT_PLUGINS = [
     "vertex_voyage.plugins.config_commands",
     "vertex_voyage.plugins.plugin_manager",
 ]
+CONFIG_FILE_NAME = PROJECT_NAME + ".json"
 
 def get_config_location():
     return os.environ.get(PROJECT_ENVVAR_PREFIX + "_CONFIG", os.path.join(os.path.expanduser("~"), ".config", CONFIG_FILE_NAME))
