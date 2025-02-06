@@ -394,3 +394,53 @@ class RemappedTable(Table):
                 return Not(remap_query(query.expression))
             return query
         return RemappedTable(self.table.query(remap_query(query)), self.column_map)
+    
+
+class PandasTable(Table):
+    def __init__(self, df: pd.DataFrame):
+        self.df = df
+    
+    def columns(self) -> Dict[str, Any]:
+        return {col: self.df[col].dtype.type for col in self.df.columns}
+    
+    def column(self, name: str) -> np.ndarray:
+        return self.df[name].values
+    
+    def apply(self, column: str, func: callable) -> "Table":
+        self.df[column] = func(self.df[column])
+        return self
+    
+    def select(self, *columns: str) -> "Table":
+        return PandasTable(self.df[list(columns)])
+    
+    def filter(self, func: callable) -> "Table":
+        return PandasTable(self.df[func(self.df)])
+    
+    def update(self, column: str, values: np.ndarray) -> "Table":
+        self.df[column] = values
+        return self
+    
+    def concat(self, other: "Table") -> "Table":
+        if isinstance(other, PandasTable):
+            return PandasTable(pd.concat([self.df, other.df], axis=0))
+        else:
+            raise ValueError("Only PandasTable concatenation is supported")
+    
+    def query(self, query: "QueryExpression") -> "Table":
+        def apply_query(df: pd.DataFrame, query: QueryExpression) -> pd.DataFrame:
+            if isinstance(query, Equal):
+                return df[df[query.column] == query.value]
+            if isinstance(query, GreaterThan):
+                return df[df[query.column] > query.value]
+            if isinstance(query, LessThan):
+                return df[df[query.column] < query.value]
+            if isinstance(query, And):
+                return apply_query(apply_query(df, query.expressions[0]), query.expressions[1])
+            if isinstance(query, Or):
+                return pd.concat([apply_query(df, query.expressions[0]), apply_query(df, query.expressions[1])], axis=0)
+            if isinstance(query, Not):
+                return df[~apply_query(df, query.expression)]
+            return df
+        return PandasTable(apply_query(self.df, query))
+    
+    
