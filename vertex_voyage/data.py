@@ -1,6 +1,6 @@
 import pandas as pd
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 from typing import Any, Tuple
 import inspect
 import numpy as np 
@@ -255,6 +255,13 @@ class SchemaCheck(ABC):
         Enable chaining checks with the | (OR) operator.
         """
         return _OrCheck(self, other)
+    
+    @abstractmethod
+    def get_expected_columns(self) -> Set[str]:
+        pass
+
+    def diff(self, schema: Schema) -> Set[str]:
+        return self.get_expected_columns() - set(schema.columns.keys())
 
 
 class _AndCheck(SchemaCheck):
@@ -268,7 +275,8 @@ class _AndCheck(SchemaCheck):
     def check(self, df) -> bool:
         return self.left.check(df) and self.right.check(df)
 
-
+    def get_expected_columns(self) -> List[str]:
+        return self.left.get_expected_columns() | self.right.get_expected_columns()
 class _OrCheck(SchemaCheck):
     """
     Helper class to combine two checks with a logical OR.
@@ -280,6 +288,8 @@ class _OrCheck(SchemaCheck):
     def check(self, df) -> bool:
         return self.left.check(df) or self.right.check(df)
 
+    def get_expected_columns(self) -> List[str]:
+        return self.left.get_expected_columns() | self.right.get_expected_columns()
 
 class SatisfiesAll(SchemaCheck):
     """
@@ -291,6 +301,9 @@ class SatisfiesAll(SchemaCheck):
     def check(self, df) -> bool:
         return all(check.check(df) for check in self.checks)
     
+    def get_expected_columns(self) -> List[str]:
+        return set.union(*[check.get_expected_columns() for check in self.checks])
+    
 class SatisfiesAny(SchemaCheck):
     """
     Checks if the DataFrame satisfies any of the given checks.
@@ -300,6 +313,9 @@ class SatisfiesAny(SchemaCheck):
 
     def check(self, df) -> bool:
         return any(check.check(df) for check in self.checks)
+    
+    def get_expected_columns(self) -> List[str]:
+        return set.union(*[check.get_expected_columns() for check in self.checks])
     
 
 class HasColumn(SchemaCheck):
@@ -315,6 +331,8 @@ class HasColumn(SchemaCheck):
     def with_type(self, col_type: Any) -> 'HasColumnWithType':
         return HasColumnWithType(self.col_name, col_type)
 
+    def get_expected_columns(self) -> List[str]:
+        return {self.col_name}
 
 class HasColumnWithType(SchemaCheck):
     """
@@ -329,4 +347,50 @@ class HasColumnWithType(SchemaCheck):
             return False
         return issubclass(df.columns()[self.col_name], self.col_type)
 
-
+    def get_expected_columns(self) -> List[str]:
+        return {self.col_name}
+    
+class RemappedTable(Table):
+    def __init__(self, table: Table, column_map: Dict[str, str]):
+        self.table = table
+        self.column_map = column_map
+    
+    def columns(self) -> Dict[str, Any]:
+        return {self.column_map[col]: dtype for col, dtype in self.table.columns().items()}
+    
+    def column(self, name: str) -> np.ndarray:
+        return self.table.column(self.column_map.get(name, name))
+    
+    def apply(self, column: str, func: callable) -> "Table":
+        return RemappedTable(self.table.apply(self.column_map.get(column, column), func), self.column_map)
+    
+    def select(self, *columns: str) -> "Table":
+        return RemappedTable(self.table.select(*[self.column_map.get(col, col) for col in columns]), self.column_map)
+    
+    def filter(self, func: callable) -> "Table":
+        return RemappedTable(self.table.filter(lambda x: {
+            self.column_map.get(col, col): value for col, value in x.items()
+        }), self.column_map)
+    
+    def update(self, column: str, values: np.ndarray) -> "Table":
+        return RemappedTable(self.table.update(self.column_map.get(column, column), values), self.column_map)
+    
+    def concat(self, other: "Table") -> "Table":
+        return RemappedTable(self.table.concat(other), self.column_map)
+    
+    def query(self, query: "QueryExpression") -> "Table":
+        def remap_query(query: QueryExpression) -> QueryExpression:
+            if isinstance(query, Equal):
+                return Equal(self.column_map.get(query.column, query.column), query.value)
+            if isinstance(query, GreaterThan):
+                return GreaterThan(self.column_map.get(query.column, query.column), query.value)
+            if isinstance(query, LessThan):
+                return LessThan(self.column_map.get(query.column, query.column), query.value)
+            if isinstance(query, And):
+                return And(*[remap_query(expr) for expr in query.expressions])
+            if isinstance(query, Or):
+                return Or(*[remap_query(expr) for expr in query.expressions])
+            if isinstance(query, Not):
+                return Not(remap_query(query.expression))
+            return query
+        return RemappedTable(self.table.query(remap_query(query)), self.column_map)

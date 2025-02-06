@@ -1,5 +1,5 @@
-from vertex_voyage.model import BaseModel, get_model_info, construct_model
-from typing import List, Dict
+from vertex_voyage.model import BaseModel, Remapping, get_model_info, construct_model
+from typing import List, Dict, Set, Tuple
 from vertex_voyage.data_source import DataSource, load_data_source
 from vertex_voyage.command_executor import command_executor_main
 from vertex_voyage.config import get_classes_inheriting
@@ -49,6 +49,14 @@ class Simulation:
     def run(self):
         return self.run_until(len(self.steps))
 
+    def find_noncompatible_step(self) -> Tuple[int, Set[str]]:
+        input_schema = self.input.get_schema()
+        for i, step in enumerate(self.steps):
+            if not step.expects().check(input_schema):
+                return i, step.expects().diff(input_schema)
+            input_schema = step.produces().produce(input_schema)
+        return None
+            
 
 def get_simulation_info(simulation: Simulation):
     return {

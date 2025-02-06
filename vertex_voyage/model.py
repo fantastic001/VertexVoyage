@@ -3,7 +3,9 @@ import inspect
 import os
 from vertex_voyage.config import get_classes_inheriting
 import yaml 
-from vertex_voyage.data import Product, SchemaCheck, Table
+from vertex_voyage.data import NewColumns, Product, SatisfiesAll, SchemaCheck, Table, RemappedTable
+from hashlib import sha256
+import json 
 class BaseModel:
     def __init__(self):
         pass
@@ -25,10 +27,13 @@ class BaseModel:
         return Product()
 
     def get_data(self):
-        return None
+        return None 
     
     def key(self):
-        return None
+        return sha256(json.dumps({
+            "class": self.__class__.__name__,
+            "data": self.get_data()
+        }).encode()).hexdigest()
 
 def is_estimable(model: BaseModel):
     return isinstance(model, BaseModel) and hasattr(model, 'fit') and model.valid() and not model.ready()
@@ -106,3 +111,22 @@ def get_model_classes():
 
 def get_model_names():
     return [cls.__name__ for cls in get_model_classes()]
+
+class Remapping(BaseModel):
+    def __init__(self, mapping = {}):
+        self.mapping = mapping
+    
+    def map(self, column: str, new_column:str) -> 'Remapping':
+        return Remapping(mapping={**self.mapping, column: new_column})
+
+    def run(self, input: Table) -> Table:
+        return RemappedTable(input, self.mapping)
+
+    def produces(self) -> Product:
+        return NewColumns(columns=self.mapping)
+
+    def expects(self) -> SchemaCheck:
+        return SatisfiesAll([HasColumn(c) for c in self.mapping.keys()])
+
+    def get_data(self):
+        return self.mapping
