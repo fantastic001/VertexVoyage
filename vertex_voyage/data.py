@@ -65,6 +65,9 @@ class Table(ABC):
     def column(self, name: str) -> np.ndarray:
         pass
 
+    def matrix(self, names: List[str]) -> np.ndarray:
+        return np.column_stack([self.column(name) for name in names])
+
     @abstractmethod
     def apply(self, column: str, func: callable) -> "Table":
         pass
@@ -77,7 +80,113 @@ class Table(ABC):
     def filter(self, func: callable) -> "Table":
         pass
 
+    @abstractmethod
+    def update(self, column: str, values: np.ndarray):
+        pass
+
+    @abstractmethod
+    def concat(self, other: "Table") -> "Table":
+        pass
+
+    def query(self, query: "QueryExpression") -> "Table":
+        return query.apply(self)
+
+    def __getitem__(self, query) -> "Table":
+        if isinstance(query, str):
+            return self.column(query)
+        if isinstance(query, tuple):
+            return self.select(*query)
+        if isinstance(query, QueryExpression):
+            return self.query(query)
+        raise ValueError("Invalid query type")
     
+    def __call__(self, func: callable) -> "Table":
+        return self.apply(func)
+    
+    def __or__(self, other: "Table") -> "Table":
+        return self.concat(other)
+    
+    def __setitem__(self, column: str, values: np.ndarray):
+        return self.update(column, values)
+    
+
+
+
+class QueryExpression(ABC):
+    @abstractmethod
+    def apply(self, table: Table) -> Table:
+        pass
+
+        
+    def __and__(self, other: "QueryExpression") -> "QueryExpression":
+        return And(self.expression, other)
+    
+    def __or__(self, other: "QueryExpression") -> "QueryExpression":
+        return Or(self.expression, other)
+    
+    def __invert__(self) -> "QueryExpression":
+        return Not(self.expression)
+    
+
+class Select(QueryExpression):
+    def __init__(self, *columns: str):
+        self.columns = columns
+    
+    def apply(self, table: Table) -> Table:
+        return table.select(*self.columns)
+    
+class Equal(QueryExpression):
+    def __init__(self, column: str, value: Any):
+        self.column = column
+        self.value = value
+    
+    def apply(self, table: Table) -> Table:
+        return table.filter(lambda x: x[self.column] == self.value)
+
+class GreaterThan(QueryExpression):
+    def __init__(self, column: str, value: Any):
+        self.column = column
+        self.value = value
+    
+    def apply(self, table: Table) -> Table:
+        return table.filter(lambda x: x[self.column] > self.value)
+
+class LessThan(QueryExpression):
+    def __init__(self, column: str, value: Any):
+        self.column = column
+        self.value = value
+    
+    def apply(self, table: Table) -> Table:
+        return table.filter(lambda x: x[self.column] < self.value)
+
+class And(QueryExpression):
+    def __init__(self, *expressions: QueryExpression):
+        self.expressions = expressions
+    
+    def apply(self, table: Table) -> Table:
+        for expr in self.expressions:
+            table = expr.apply(table)
+        return table
+
+class Or(QueryExpression):
+    def __init__(self, *expressions: QueryExpression):
+        self.expressions = expressions
+    
+    def apply(self, table: Table) -> Table:
+        accumulator = self.expressions[0].apply(table)
+        for expr in self.expressions[1:]:
+            accumulator = accumulator.concat(expr.apply(table))
+        return accumulator
+    
+class Not(QueryExpression):
+    def __init__(self, expression: QueryExpression):
+        self.expression = expression
+    
+    def apply(self, table: Table) -> Table:
+        return table.filter(lambda x: not self.expression.apply(x))
+
+
+
 class Schema:
     """
     Schema class that holds a mapping of column names to expected Python (or NumPy) types.
