@@ -9,8 +9,6 @@ from vertex_voyage.model import (
     get_parameters,
     get_return_type,
     get_actions,
-    get_input_type,
-    get_output_type,
     get_model_info,
     get_model_names,
     get_model_classes,

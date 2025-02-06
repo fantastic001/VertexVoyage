@@ -3,10 +3,13 @@ import inspect
 import os
 from vertex_voyage.config import get_classes_inheriting
 import yaml 
-from vertex_voyage.data import Product
+from vertex_voyage.data import Product, SchemaCheck, Table
 class BaseModel:
     def __init__(self):
         pass
+
+    def create(self) -> 'BaseModel':
+        return None 
 
     def valid(self):
         return False 
@@ -14,7 +17,9 @@ class BaseModel:
         pass
     def ready(self):
         return False 
-    def run(self, input):
+    def expects(self) -> SchemaCheck:
+        return SchemaCheck()
+    def run(self, input: Table) -> Table:
         return None 
     def produces(self) -> Product:
         return Product()
@@ -48,30 +53,24 @@ def get_actions(model: BaseModel):
     for method, _ in inspect.getmembers(model, predicate=inspect.ismethod):
         if method.startswith("__"):
             continue
-        if method not in ["valid", "fit", "ready", "run", "key", "get_data", "produces"]:
+        if method not in ["create", "valid", "fit", "ready", "run", "key", "get_data", "produces", "expects"]:
             actions[method] = {
                 "parameters": get_parameters(model, method),
             }
     return actions
 
-def get_input_type(model: BaseModel):
-    parameters =  get_parameters(model, "run")
-    if len(parameters) == 0:
-        return None
-    return list(parameters.values())[0]
 
-def get_output_type(model: BaseModel):
-    return get_return_type(model, "run")
 
 def get_model_info(model: BaseModel):
     return {
-        "input": get_input_type(model),
-        "output": get_output_type(model),
+        "input": model.expects(),
+        "output": model.produces(),
         "actions": get_actions(model),
         "key": model.key(),
         "class": model.__class__.__name__,
         "parameters": get_parameters(model, "fit"),
-        "data": model.get_data()
+        "data": model.get_data(),
+        "constructor": get_parameters(model, "create"),
     }
 
 def apply_actions(model: BaseModel, actions: list):

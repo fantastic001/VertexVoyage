@@ -4,7 +4,10 @@ from vertex_voyage.data import *
 from vertex_voyage.model import get_return_type
 class DataSource:
     
-    def get_data(self):
+    def get_data(self) -> Table:
+        return None
+    
+    def get_schema(self) -> Schema:
         return None
     
     def key(self):
@@ -24,7 +27,7 @@ def load_data_source(class_name, params):
 
 def get_data_source_info(data_source: DataSource):
     return {
-        "data_type": get_return_type(data_source, "get_data"),
+        "schema": data_source.get_schema().columns,
         "key": data_source.key(),
         "params": data_source.to_dict(),
         "class": data_source.__class__.__name__
