@@ -130,3 +130,34 @@ class Remapping(BaseModel):
 
     def get_data(self):
         return self.mapping
+
+class ModelSpec(BaseModel):
+    def __init__(self, path: str = None):
+        self.path = path
+        if path is not None:
+            self.model = construct_from_yml(path)
+        else:
+            self.model = None
+
+    def create(self, path: str) -> 'BaseModel':
+        return ModelSpec(path)
+
+    def valid(self):
+        return self.model is not None and self.model.valid()
+    def fit(self, data: Table):
+        if self.model is not None:
+            self.model.fit(data)
+    def ready(self):
+        return self.model is not None and self.model.ready()
+    def expects(self) -> SchemaCheck:
+        return self.model.expects()
+    def run(self, input: Table) -> Table:
+        return self.model.run(input)
+    def produces(self) -> Product:
+        return self.model.produces()
+
+    def get_data(self):
+        return {
+            "path": self.path
+        }
+    

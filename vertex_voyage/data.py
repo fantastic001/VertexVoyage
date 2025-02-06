@@ -443,4 +443,7 @@ class PandasTable(Table):
             return df
         return PandasTable(apply_query(self.df, query))
     
-    
+    def __str__(self):
+        return str(self.df)
+    def __repr__(self) -> str:
+        return repr(self.df)

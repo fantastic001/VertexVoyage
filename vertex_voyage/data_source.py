@@ -43,3 +43,25 @@ def load_data_source_from_yaml(path):
     with open(path, "r") as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
         return load_data_source(data["class"], data["params"])
+
+class DataSourceSpec(DataSource):
+    def __init__(self, path: str):
+        self.path = path
+        self.data_source = load_data_source_from_yaml(path)
+    
+    def get_data(self) -> Table:
+        return self.data_source.get_data()
+    
+    def get_schema(self) -> Schema:
+        return self.data_source.get_schema()
+    
+    def key(self):
+        return self.data_source.key()
+    
+    def to_dict(self):
+        return {
+            "path": self.path
+        }
+    
+    def __str__(self):
+        return f"DataSourceSpec({self.path})"

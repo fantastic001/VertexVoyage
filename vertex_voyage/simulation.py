@@ -1,3 +1,4 @@
+from vertex_voyage.data import Table
 from vertex_voyage.model import BaseModel, Remapping, get_model_info, construct_model
 from typing import List, Dict, Set, Tuple
 from vertex_voyage.data_source import DataSource, load_data_source
@@ -18,8 +19,9 @@ class Simulation:
         self.params = params
         self.input = input
     
-    def add_step(self, step: BaseModel):
+    def add_step(self, step: BaseModel, params: Dict[str, any] = {}):
         self.steps.append(step)
+        self.params.append(params)
 
     def add_data_source(self, name: str, data_source: DataSource):
         self.data_sources[name] = data_source
@@ -32,9 +34,20 @@ class Simulation:
     
     def runnable(self):
         return len(self.get_non_ready_steps()) == 0
-    
+
     def run_until(self, step_index: int):
-        x = self.input
+        print("Data sources:")
+        for name, data_source in self.data_sources.items():
+            print(f"  {name}: {data_source.get_data()}")
+        print("Steps:")
+        for i, step in enumerate(self.steps):
+            print(f"  Step {i}: {step}")
+        print("Params:")
+        for i, params in enumerate(self.params):
+            print(f"  Step {i}: {params}")
+        print("Input:")
+        print(f"  {self.input.get_data()}")
+        x = self.input.get_data()
         for i, step in enumerate(self.steps):
             if i == step_index:
                 break
@@ -43,7 +56,13 @@ class Simulation:
                 if x is None:
                     raise ValueError(f"Step {i} did not return anything.")
             else:
-                raise ValueError(f"Step {i} is not ready to run.")
+                params = get_model_info(step)["parameters"].items()
+                data_source_params = [(x,y) for x,y in params if y == Table]
+                params = {
+                    param: self.data_sources[self.params[i][param]].get_data() for param, _ in data_source_params
+                }
+                step.fit(**params)
+                x = step.run(x)
         return x
     
     def run(self):
