@@ -1,6 +1,9 @@
 from vertex_voyage.model import BaseModel, get_model_info, construct_model
 from typing import List, Dict
 from vertex_voyage.data_source import DataSource, load_data_source
+from vertex_voyage.command_executor import command_executor_main
+from vertex_voyage.config import get_classes_inheriting
+
 class Simulation:
     def __init__(self, name: str = None, steps: List[BaseModel] = None, data_sources: Dict[str, DataSource] = None, params: List[Dict[str, any]] = None, input: DataSource = None):
         if steps is None:

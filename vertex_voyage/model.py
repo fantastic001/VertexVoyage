@@ -41,9 +41,11 @@ def get_return_type(model: BaseModel, method='run'):
 def get_actions(model: BaseModel):
     actions = {} 
     for method, _ in inspect.getmembers(model, predicate=inspect.ismethod):
+        if method.startswith("__"):
+            continue
         if method not in ["valid", "fit", "ready", "run", "key"]:
             actions[method] = {
-                "parameters": get_parameters(getattr(model, method)),
+                "parameters": get_parameters(model, method),
             }
     return actions
 
@@ -91,5 +93,8 @@ def construct_model(name: str, actions: list):
             return apply_actions(cls(), actions)
     return None
 
+def get_model_classes():
+    return get_classes_inheriting(BaseModel)
+
 def get_model_names():
-    return [cls.__name__ for cls in get_classes_inheriting(BaseModel)]
+    return [cls.__name__ for cls in get_model_classes()]
