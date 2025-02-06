@@ -1,9 +1,8 @@
 
 from vertex_voyage.config import get_classes_inheriting
 from vertex_voyage.data import * 
+from vertex_voyage.model import get_return_type
 class DataSource:
-    def get_data_type(self) -> DataType:
-        return None
     
     def get_data(self):
         return None
@@ -25,7 +24,7 @@ def load_data_source(class_name, params):
 
 def get_data_source_info(data_source: DataSource):
     return {
-        "data_type": data_source.get_data_type(),
+        "data_type": get_return_type(data_source, "get_data"),
         "key": data_source.key(),
         "params": data_source.to_dict(),
         "class": data_source.__class__.__name__

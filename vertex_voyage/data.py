@@ -1,70 +1,37 @@
+from typing import Any, Tuple
 
-import pandas as pd 
-import numpy as np 
-class DataType:
+class TableColumnsMeta(type):
+    def __getitem__(cls, columns: Any):
+        if not isinstance(columns, tuple):
+            columns = (columns,)
+        columns = tuple(str(col) for col in columns)
+        name = f"{cls.__name__}_[{','.join(columns)}]"
+        return type(name, (cls,), {"__columns__": columns})
+
+class TableColumns(metaclass=TableColumnsMeta):
+    __columns__: Tuple[str, ...] = ()
+
+import inspect
+
+def discover_required_columns(func):
+    sig = inspect.signature(func)
+    for name, param in sig.parameters.items():
+        annotation = param.annotation
+        if hasattr(annotation, "__columns__"):
+            return annotation.__columns__
+        
+class Product:
     pass 
 
-class Data:
-    def get_type(self) -> DataType:
-        return None
-
-class TableData(DataType):
-    def __init__(self, columns) -> None:
-        super().__init__()
+class NewColumns(Product):
+    def __init__(self, columns):
         self.columns = columns
 
-class PanelData(DataType):
-    def __init__(self, columns, index) -> None:
-        super().__init__()
+class UpdatedColumns(Product):
+    def __init__(self, columns):
         self.columns = columns
-        self.index = index
 
-class TimeSeriesData(DataType):
-    def __init__(self, index) -> None:
-        super().__init__()
-        self.index = index
+class DeletedColumns(Product):
+    def __init__(self, columns):
+        self.columns = columns
 
-class GraphData(DataType):
-    def __init__(self, node_attrs, edge_attrs) -> None:
-        super().__init__()
-        self.node_attrs = node_attrs
-        self.edge_attrs = edge_attrs
-
-class ImageData(DataType):
-    def __init__(self, width, height) -> None:
-        super().__init__()
-        self.width = width
-        self.height = height
-
-class ArrayData(DataType):
-    def __init__(self, shape) -> None:
-        super().__init__()
-        self.shape = shape
-
-
-
-class DataFrameData(Data):
-    def __init__(self, data: pd.DataFrame):
-        self.data = data
-
-    def get_type(self) -> DataType:
-        return TableData(self.data.columns)
-    
-    def __getattr__(self, name):
-        return getattr(self.data, name)
-    
-    def __getitem__(self, key):
-        return self.data[key]
-
-class NumpyArrayData(Data):
-    def __init__(self, data: np.ndarray):
-        self.data = data
-
-    def get_type(self) -> DataType:
-        return ArrayData(self.data.shape)
-    
-    def __getattr__(self, name):
-        return getattr(self.data, name)
-    
-    def __getitem__(self, key):
-        return self.data[key]

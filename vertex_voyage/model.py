@@ -2,7 +2,8 @@
 import inspect 
 import os
 from vertex_voyage.config import get_classes_inheriting
-
+import yaml 
+from vertex_voyage.data import Product
 class BaseModel:
     def __init__(self):
         pass
@@ -15,7 +16,11 @@ class BaseModel:
         return False 
     def run(self, input):
         return None 
+    def produces(self) -> Product:
+        return Product()
 
+    def get_data(self):
+        return None
     
     def key(self):
         return None
@@ -43,7 +48,7 @@ def get_actions(model: BaseModel):
     for method, _ in inspect.getmembers(model, predicate=inspect.ismethod):
         if method.startswith("__"):
             continue
-        if method not in ["valid", "fit", "ready", "run", "key"]:
+        if method not in ["valid", "fit", "ready", "run", "key", "get_data", "produces"]:
             actions[method] = {
                 "parameters": get_parameters(model, method),
             }
@@ -66,13 +71,13 @@ def get_model_info(model: BaseModel):
         "key": model.key(),
         "class": model.__class__.__name__,
         "parameters": get_parameters(model, "fit"),
+        "data": model.get_data()
     }
 
 def apply_actions(model: BaseModel, actions: list):
     for action in actions:
-        method = action['method']
-        parameters = action['parameters']
-        model = getattr(model, method)(**parameters)
+        method = action.pop('method')
+        model = getattr(model, method)(**action)
     return model
 
 
@@ -92,6 +97,10 @@ def construct_model(name: str, actions: list):
         if cls.__name__ == name:
             return apply_actions(cls(), actions)
     return None
+
+def construct_from_yml(path: str):
+    data = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
+    return construct_model(data["model"], data.get("actions", []))
 
 def get_model_classes():
     return get_classes_inheriting(BaseModel)
