@@ -32,10 +32,10 @@ class LinearRegressionModel(BaseModel):
     def expects(self):
         return SatisfiesAll([HasColumn(s) for s in self.sources])
 
-    def run(self, data):
+    def run(self, data: Table):
         X = data.matrix(self.sources)
-        data[self.target] = X @ self.coef_
-        return data
+        return data.update(self.target,X @ self.coef_)
+        
     
     def produces(self):
         return NewColumns(columns={self.target: float})

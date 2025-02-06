@@ -81,7 +81,7 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def update(self, column: str, values: np.ndarray):
+    def update(self, column: str, values: np.ndarray) -> "Table":
         pass
 
     @abstractmethod
@@ -105,10 +105,7 @@ class Table(ABC):
     
     def __or__(self, other: "Table") -> "Table":
         return self.concat(other)
-    
-    def __setitem__(self, column: str, values: np.ndarray):
-        return self.update(column, values)
-    
+
 
 
 
