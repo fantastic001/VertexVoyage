@@ -7,7 +7,7 @@ from binpacking import to_constant_bin_number
 import random 
 import vertex_voyage.config as cfg 
 
-def modified__lfm(G: nx.Graph, alpha: float = 1, threshold: float = 0.5) -> list:
+def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5) -> list:
     communities = []
     node_not_include = list(G.nodes.keys())[:]
     node_num = len(node_not_include)
@@ -42,8 +42,9 @@ def modified__lfm(G: nx.Graph, alpha: float = 1, threshold: float = 0.5) -> list
             if node in node_not_include:
                 node_not_include.remove(node)
         communities.append(list(c.nodes))
-    if len(communities) == 0:
-        communities.append([])
+    if len(communities) < partition_count:
+        for _ in range(partition_count - len(communities)):
+            communities.append(list())
     for node in node_not_include:
         random_comm = random.choice(communities)
         random_comm.append(node)
@@ -57,7 +58,7 @@ def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = Fa
     # create a LFM object
     communities = None 
     if use_modified_lfm:
-        communities = modified__lfm(G, alpha=alpha, threshold=threshold)
+        communities = modified__lfm(G, partition_num, alpha=alpha, threshold=threshold)
     else:
         communities = lfm(G, alpha=alpha).communities
     # partition the graph into a given number of partitions
@@ -93,78 +94,6 @@ def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm =
     corruption = calculate_partitioning_corruption(G, partitions)
     return corruption
 
-def generate_and_evaluate_sbm_partition(
-    n, 
-    k, 
-    intra_prob, 
-    inter_prob, 
-    partitions, 
-    seed=None
-):
-    """
-    1) Generates a stochastic block model (SBM) graph with:
-       - n nodes
-       - k blocks
-       - 'intra_prob' for edges within the same block
-       - 'inter_prob' for edges between different blocks
-    2) Extracts the ground-truth block assignment for each node.
-    3) Evaluates the given 'partitions' of the nodes by counting:
-       - same_comm_diff_part: # edges in same true block but put in different partitions.
-       - diff_comm_diff_part: # edges in different true blocks and also put in different partitions.
-
-    Parameters
-    ----------
-    n : int
-        Total number of nodes in the SBM graph.
-    k : int
-        Number of blocks (communities).
-    intra_prob : float
-        Probability of edges within the same community.
-    inter_prob : float
-        Probability of edges across different communities.
-    partitions : list of lists
-        A list of partitions; each partition is a list of node IDs.
-    seed : int, optional
-        Random seed for reproducible generation.
-
-    Returns
-    -------
-    same_comm_diff_part : int
-        Number of edges in the same ground-truth block but separated into different partitions.
-    diff_comm_diff_part : int
-        Number of edges in different ground-truth blocks that are also separated into different partitions.
-    """
-
-    # -------------------------------------------------------------------------
-    # 1) Construct the SBM graph using NetworkX's stochastic_block_model.
-    #    We define the sizes of each block and the probability matrix p.
-    # -------------------------------------------------------------------------
-
-    # Distribute n nodes as evenly as possible among k blocks:
-    # (e.g. if n=10, k=3 => sizes might be [4, 3, 3]).
-    sizes = [n // k + (1 if i < (n % k) else 0) for i in range(k)]
-
-    # Probability matrix p: 
-    # on-diagonal entries = intra_prob, off-diagonal = inter_prob
-    p = [[inter_prob] * k for _ in range(k)]
-    for i in range(k):
-        p[i][i] = intra_prob
-
-    # Generate the SBM graph
-    G = nx.stochastic_block_model(sizes, p, seed=seed)
-
-    # The ground-truth block assignment is stored by NetworkX in G.graph["partition"].
-    # For node i, G.graph["partition"][i] = block_index_of_that_node.
-    ground_truth = {}
-    for node, block_label in enumerate(G.graph["partition"]):
-        ground_truth[node] = block_label
-
-    # -------------------------------------------------------------------------
-    # 2) Evaluate the given partition using the ground-truth assignment.
-    # -------------------------------------------------------------------------
-    same_comm_diff_part, diff_comm_diff_part = evaluate_partition(G, ground_truth, partitions)
-
-    return same_comm_diff_part, diff_comm_diff_part
 
 def evaluate_partition_sbm(G, partitions):
     """
@@ -198,7 +127,6 @@ def evaluate_partition_sbm(G, partitions):
     for partition_index, part_nodes in enumerate(partitions):
         for n in part_nodes:
             node_to_partition[n] = partition_index
-
     # 2) Counters for edges
     same_comm_diff_part = 0  # # of intra-community edges in different partitions
     diff_comm_diff_part = 0  # # of inter-community edges in different partitions
@@ -223,7 +151,10 @@ def evaluate_partition_sbm(G, partitions):
             total_inter_edges += 1
             if not same_partition:
                 diff_comm_diff_part += 1  # Correctly separated (different partitions)
-
+    print("Intra-community edges: ", total_intra_edges)
+    print("Same community different partition: ", same_comm_diff_part)
+    print("Inter-community edges: ", total_inter_edges)
+    print("Different community different partition: ", diff_comm_diff_part)
     # 4) Compute ratios (handling possible division by zero)
     ratio_intra_lost = (
         same_comm_diff_part / total_intra_edges if total_intra_edges > 0 else 0
@@ -231,7 +162,6 @@ def evaluate_partition_sbm(G, partitions):
     ratio_inter_separated = (
         diff_comm_diff_part / total_inter_edges if total_inter_edges > 0 else 0
     )
-
     return ratio_intra_lost, ratio_inter_separated
 
 def get_performance_profile(solvers, problems):
@@ -300,6 +230,7 @@ if __name__ == "__main__":
     import networkx as nx
     stage = cfg.get_config_int("pm_stage", 0, "Stage in main partitioning measurement script")
     be_fast = cfg.get_config_bool("pm_be_fast", False, "Whether to be fast in main partitioning measurement script")
+    fast_factor = cfg.get_config_int("pm_fast_factor", 100, "Fast factor in main partitioning measurement script")
     G = nx.karate_club_graph()
     problems = []
     def solver_corruptability(alpha, threshold):
@@ -350,7 +281,7 @@ if __name__ == "__main__":
     #         for p in range(1, 10):
     #             problems.append(lambda: nx.planted_partition_graph(n, k, 0.1*p, 0.1*p))
     if stage == 0 or stage == 1:
-        df = get_performance_profile(solvers, random.sample(problems, 100) if be_fast else problems)
+        df = get_performance_profile(solvers, random.sample(problems, fast_factor) if be_fast else problems)
         print(df)
     problems = [] 
     solvers = [
@@ -363,32 +294,38 @@ if __name__ == "__main__":
         for k in range(1,10):
             for p in range(5, 10):
                 for q in range(1, 5):
-                    problems.append(lambda: nx.planted_partition_graph(n, k, 0.1*p, 0.1*q))
+                    problems.append(lambda: nx.planted_partition_graph(n, k, 0.1*p, 0.01*q))
     if stage == 0 or stage == 2:
-        df = get_performance_profile(solvers, random.sample(problems, 100) if be_fast else problems)
+        df = get_performance_profile(solvers, random.sample(problems, fast_factor) if be_fast else problems)
         print(df)
     solvers = [
         solver_inter_loss(1, 0, random_partitioning),
         solver_inter_loss(1, 0.5)
     ]
     if stage == 0 or stage == 3:
-        df = get_performance_profile(solvers, random.sample(problems, 100) if be_fast else problems)
+        df = get_performance_profile(solvers, random.sample(problems, fast_factor) if be_fast else problems)
     if stage == 0 or stage == 4:
         threshold_values = [] 
         inter_community_loss = []
         intra_community_loss = []
+        data = []
         for threshold in range(0, 11):
             threshold_values.append(threshold/10)
             inter = [] 
             intra = []
-            for problem in (random.sample(problems, 100) if be_fast else problems):
+            for problem in (random.sample(problems, fast_factor) if be_fast else problems):
                 G = problem()
-                partitions = partition_graph(G, 10, use_modified_lfm=True, threshold=threshold/10, alpha=1)
+                partitions = partition_graph(G, 5, use_modified_lfm=True, threshold=threshold/10, alpha=1)
                 x,y = evaluate_partition_sbm(G, partitions)
-                inter.append(x)
-                intra.append(y)
+                intra.append(x)
+                inter.append(y)
             inter_community_loss.append(np.mean(inter))
             intra_community_loss.append(np.mean(intra))
+            data.append({
+                "threshold": threshold/10,
+                "inter_community_loss": np.mean(inter),
+                "intra_community_loss": np.mean(intra)
+            })
         import matplotlib.pyplot as plt
         plt.plot(threshold_values, inter_community_loss, label="Inter-community loss")
         plt.plot(threshold_values, intra_community_loss, label="Intra-community loss")
@@ -396,3 +333,5 @@ if __name__ == "__main__":
         plt.ylabel("Loss")
         plt.legend()
         plt.show()
+        import pandas as pd
+        print(pd.DataFrame(data))
