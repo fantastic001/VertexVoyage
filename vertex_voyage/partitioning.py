@@ -272,6 +272,13 @@ def get_node2vec_embedding(dim,
         return {node: node2vec.embed_node(node) for node in G.nodes()}
     return f
 
+class CSVFileProblem:
+    def __init__(self, filename, separator = ","):
+        self.filename = filename
+        self.separator = separator
+    def __call__(self):
+        return nx.read_edgelist(self.filename, delimiter=self.separator)
+
 if __name__ == "__main__":
     import vertex_voyage.config as cfg
     import numpy as np
@@ -279,6 +286,7 @@ if __name__ == "__main__":
     stage = cfg.get_config_int("pm_stage", 0, "Stage in main partitioning measurement script")
     be_fast = cfg.get_config_bool("pm_be_fast", False, "Whether to be fast in main partitioning measurement script")
     fast_factor = cfg.get_config_int("pm_fast_factor", 100, "Fast factor in main partitioning measurement script")
+    real_networks = cfg.get_config_list("pm_real_networks", [], "Paths to real networks to use in main partitioning measurement script")
     G = nx.karate_club_graph()
     problems = []
     def solver_corruptability(alpha, threshold):
@@ -337,12 +345,22 @@ if __name__ == "__main__":
         solver_inter_loss(1, 0.5),
         solver_inter_loss(1, 1),
     ]
-
-    for n in range(2, 11):
-        for k in range(1,10):
-            for p in range(5, 10):
-                for q in range(1, 5):
-                    problems.append(lambda: nx.planted_partition_graph(n, k, 0.1*p, 0.01*q))
+    if len(real_networks) > 0:
+        import os
+        lists = []
+        for rn in real_networks:
+            if os.path.isdir(rn):
+                files = [os.path.join(root, name) for root, dirs, files in os.walk(rn) for name in files]
+                lists += files
+            else:
+                lists.append(rn)
+        problems += [CSVFileProblem(filename) for filename in lists]
+    else:
+        for n in range(2, 11):
+            for k in range(1,100):
+                for p in range(5, 10):
+                    for q in range(1, 5):
+                        problems.append(lambda: nx.planted_partition_graph(n, k, 0.1*p, 0.01*q))
     if stage == 0 or stage == 2:
         df = get_performance_profile(solvers, random.sample(problems, fast_factor) if be_fast else problems)
         print(df)
