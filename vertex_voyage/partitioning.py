@@ -11,7 +11,11 @@ def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: floa
     communities = []
     node_not_include = list(G.nodes.keys())[:]
     node_num = len(node_not_include)
-    while len(node_not_include) > node_num * threshold:
+    k = cfg.get_config_int("pm_k", 10, "Multiple of partition count to limit number of communities to")
+    # sometimes, we end up in infinite loop and increase number of communities to inf 
+    # This is caused because there is no convergence when adding/removing nodes. 
+    # We limit number of communities to hardcoded value of k*partition_count
+    while len(node_not_include) > node_num * threshold and len(communities) < k * partition_count:
         c = Community(G, alpha)
         # randomly select a seed node
         seed = random.choice(node_not_include)
@@ -224,6 +228,50 @@ def random_partitioning(G: nx.Graph, partition_num: int):
     partitions = to_constant_bin_number(nodes, partition_num, key= lambda x: 1)
     return partitions
 
+def get_partitioning_score(G: nx.Graph, partitioner, scoring, partition_num: int):
+    """
+    Get the score of a partitioner on a graph.
+    """
+    partitions = partitioner(G, partition_num)
+    return scoring(G, partitions)
+
+def get_f1_reconstruction_score(embedding_func):
+    from vertex_voyage.reconstruction import reconstruct, get_f1_score
+    def f(G: nx.Graph, partitions):
+        embeddings = {}
+        node_count = {} 
+        for part in partitions:
+            embedding = embedding_func(G.subgraph(part))
+            for k,v in embedding.items():
+                if k not in embeddings:
+                    embeddings[k] = v
+                    node_count[k] = 1
+                else:
+                    embeddings[k] += v
+                    node_count[k] += 1
+        for k in embeddings:
+            embeddings[k] /= node_count[k]
+        reconstructed_graph = reconstruct(G.number_of_edges(), list(embeddings.values()), list(embeddings.keys()))
+        return get_f1_score(G, reconstructed_graph)
+    return f
+def get_node2vec_embedding(dim,
+                           walk_size,
+                           n_walks,
+                           window_size,
+                           epochs,
+                           p = .5, 
+                           q = .5,
+                           negative_sample_num = 50,
+                           learning_rate = 0.01,
+                           seed = None,
+                           use_threads = True):
+    from vertex_voyage.node2vec import Node2Vec
+    def f(G):
+        node2vec = Node2Vec(dim, walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
+        node2vec.fit(G)
+        return {node: node2vec.embed_node(node) for node in G.nodes()}
+    return f
+
 if __name__ == "__main__":
     import vertex_voyage.config as cfg
     import numpy as np
@@ -335,3 +383,35 @@ if __name__ == "__main__":
         plt.show()
         import pandas as pd
         print(pd.DataFrame(data))
+    if stage == 0 or stage == 5:
+        x = [] 
+        y = [] 
+        P = random.sample(problems, fast_factor) if be_fast else problems
+        thresholds = range(0, 11)
+        progress = 0
+        for threshold in thresholds:
+            scores = [] 
+            for problem in P:
+                progress += 1
+                print(f"Progress: {progress}/{len(P)*len(thresholds)}" + 5*" ", end="")
+                G = problem()
+                print(f"Partitioning graph of size {G.number_of_nodes()} with threshold {threshold/10}", end=20*" " + "\r")
+                partitions = partition_graph(G, 5, use_modified_lfm=True, threshold=threshold/10, alpha=1)
+                print(f"Progress: {progress}/{len(P)*len(thresholds)}" + 5*" ", end="")
+                print(f"Scoring graph of size {G.number_of_nodes()} with threshold {threshold/10} and {len(partitions)} partitions", end="\r")
+                score = get_partitioning_score(
+                    G, 
+                    lambda G, partition_num: partition_graph(G, partition_num, use_modified_lfm=True, threshold=threshold/10, alpha=1),
+                    get_f1_reconstruction_score(get_node2vec_embedding(128, 10, 20, 10, 10)), 
+                    5
+                )
+                scores.append(score)
+            score = np.mean(scores)
+            x.append(threshold/10)
+            y.append(score)
+        print()
+        import matplotlib.pyplot as plt
+        plt.plot(x, y)
+        plt.xlabel("Threshold")
+        plt.ylabel("F1 Score")
+        plt.show()
