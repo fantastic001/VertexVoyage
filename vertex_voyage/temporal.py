@@ -88,6 +88,10 @@ class CSVEventSequence(EventSequence):
     def empty(self) -> bool:
         try:
             next(self.file)
+            self.file = open(self.file.name, "r")
+            next(self.file) # Skip header
+            for _ in range(self.row):
+                next(self.file) # Skip rows
             return False
         except StopIteration:
             return True
