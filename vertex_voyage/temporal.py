@@ -100,35 +100,30 @@ class CSVEventSequence(EventSequence):
         self.file.close()
 
 class FileEventSequence(EventSequence):
-    def __init__(self, file: str, row: int = 0):
-        self.file = open(file, "r")
-        for _ in range(row):
-            next(self.file)
-        self.row = row
+    def __init__(self, file: str, fileptr = None):
+        if fileptr:
+            self.file = fileptr
+        else:
+            self.file = open(file, "r")
+        self.is_empty = False 
+        try:
+            self.h = next(self.file).strip()
+        except StopIteration:
+            self.is_empty = True
 
     def head(self) -> Event:
-        line = next(self.file).strip()
+        line = self.h
         src, dest, timestamp = line.split(" ")
         return Event(src, dest, int(timestamp))
     
     def tail(self) -> "FileEventSequence":
-        return FileEventSequence(self.file.name, self.row + 1)
+        return FileEventSequence(self.file.name, self.file)
     
     def append(self, event: Event) -> "FileEventSequence":
         raise NotImplementedError("Cannot append to file")
     
     def empty(self) -> bool:
-        try:
-            next(self.file)
-            self.file = open(self.file.name, "r")
-            for _ in range(self.row):
-                next(self.file)
-            return False
-        except StopIteration:
-            return True
-        
-    def __del__(self):
-        self.file.close()
+        return self.is_empty
 
 class EventStream:
     def __init__(self, sequence: EventSequence):
