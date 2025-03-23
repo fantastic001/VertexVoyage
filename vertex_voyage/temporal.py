@@ -1,6 +1,7 @@
 
 from enum import Enum
 from random import random as rand
+from random import shuffle
 
 class EventType(Enum):
     ADD = 1
@@ -205,6 +206,47 @@ class BarabasiAlbertEventSequence(EventSequence):
     def empty(self) -> bool:
         return False
 
+class ShuffledSequence(EventSequence):
+    def __init__(self, sequence: EventSequence, window: int, buffer: list[Event] = None):
+        if isinstance(sequence, EventStream):
+            self.sequence = sequence
+        else:
+            self.sequence = EventStream(sequence)
+        self.window = window
+        if buffer is None:
+            self.buffer = []
+        else:
+            self.buffer = list(buffer).copy() 
+        shuffle(self.buffer)
+        if len(self.buffer) < self.window:
+            i = len(self.buffer)
+            for event in self.sequence:
+                self.buffer.append(event)
+                i += 1
+                if i == self.window:
+                    break
+        earliest_event_index = self.buffer.index(min(self.buffer, key=lambda x: x.timestamp))
+        earliest_timestamp = self.buffer[earliest_event_index].timestamp
+        first_timestamp = self.buffer[0].timestamp
+        if earliest_timestamp != first_timestamp:
+            self.buffer[0].timestamp = earliest_timestamp
+            self.buffer[earliest_event_index].timestamp = first_timestamp
+    
+    def head(self) -> Event:
+        return self.buffer[0]
+        
+    
+    def tail(self) -> "ShuffledSequence":
+        return ShuffledSequence(self.sequence, self.window, self.buffer[1:])
+    
+    def append(self, event: Event) -> "ShuffledSequence":
+        raise NotImplementedError("Cannot append to ShuffledSequence")
+    
+    def empty(self) -> bool:
+        return self.sequence.empty() and len(self.buffer) == 0
+    
+
+
 class EventStream:
     def __init__(self, sequence: EventSequence):
         self.sequence = sequence
@@ -228,10 +270,14 @@ class EventStream:
         self.sequence = self.advance().sequence
         return event
 
+
+
 if __name__ == "__main__":
-    sequence = FileEventSequence("data/wiki-talks/wiki.txt")
+    # sequence = ShuffledSequence(FileEventSequence("data/wiki-talks/wiki.txt"), 2)
+    sequence = ShuffledSequence(BarabasiAlbertEventSequence(), 10)
     i = 0
     for event in sequence:
+        i += 1
         if i == 10:
             break
-        print(event.timestamp)
+        print(event)
