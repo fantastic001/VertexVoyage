@@ -1,6 +1,6 @@
 
 from enum import Enum
-from random import random as rand
+from random import random as rand, randint
 from random import shuffle
 
 class EventType(Enum):
@@ -246,6 +246,66 @@ class ShuffledSequence(EventSequence):
         return self.sequence.empty() and len(self.buffer) == 0
     
 
+class FromIterable(EventSequence):
+
+    def __init__(self, iterable):
+        self.iterable = iterable
+        self._head = next(iterable, None)
+
+    def head(self) -> Event:
+        return self._head
+    
+    def tail(self) -> "FromIterable":
+        return FromIterable(self.iterable)
+    
+    def append(self, event: Event) -> "FromIterable":
+        raise NotImplementedError("Cannot append to FromIterable")
+    
+    def empty(self) -> bool:
+        return self._head is None
+
+
+class SBMSequence(FromIterable):
+    def __init__(self, community_probs: list[float], p: list[list[float]]):
+        self.community_probs = community_probs
+        self.p = p
+        assert len(p) == len(community_probs)
+        for row in p:
+            assert len(row) == len(community_probs)
+            assert all([0 <= p_ij <= 1 for p_ij in row])
+        self.cum_probs = [community_probs[0]]
+        for i in range(1, len(community_probs)):
+            self.cum_probs.append(self.cum_probs[-1] + community_probs[i])
+        self.node_membership = {}
+        self.total_nodes = 0
+        super().__init__(self._sbm_iter())
+        
+    
+    def _node_membership(self, node: int) -> int:
+        if node in self.node_membership:
+            return self.node_membership[node]
+        else:
+            r = rand()
+            for i in range(len(self.cum_probs)):
+                if r <= self.cum_probs[i]:
+                    self.node_membership[node] = i
+                    return i
+    
+
+    def _sbm_iter(self):
+        iter = 0
+        while True:
+                i = self.total_nodes
+                for j in range(self.total_nodes):
+                    bi = self._node_membership(i)
+                    bj = self._node_membership(j)
+                    if rand() < self.p[bi][bj]:
+                        iter += 1
+                        yield Event(i, j, iter, EventType.ADD, {
+                            "community_src": bi,
+                            "community_dst": bj
+                        })
+                self.total_nodes += 1
 
 class EventStream:
     def __init__(self, sequence: EventSequence):
@@ -271,6 +331,56 @@ class EventStream:
         return event
 
 
+class FirstN(FromIterable):
+    def _draw_first(self, sequence: EventSequence, n: int):
+        i = 0
+        for event in sequence:
+            if i == n:
+                break
+            i += 1
+            yield event
+
+    def __init__(self, sequence: EventSequence, n: int):
+        self.sequence = sequence
+        self.n = n
+        super().__init__(self._draw_first(sequence, n))
+
+def to_nx_graph(tg: EventSequence):
+    """
+    Returns a networkx graph from an event sequence
+    """
+    import networkx as nx
+    G = nx.Graph()
+    for event in tg:
+        if event.type == EventType.ADD:
+            G.add_edge(event.src, event.dest)
+        elif event.type == EventType.REMOVE:
+            G.remove_edge(event.src, event.dest)
+    return G
+
+
+def draw_graph(tg: EventSequence):
+    """
+    Draws a graph from an event sequence
+    """
+    import networkx as nx
+    G = to_nx_graph(tg)
+    nx.draw(G)
+
+def animate_graph(tg: EventSequence):
+    """
+    Animates a graph from an event sequence
+    """
+    import networkx as nx
+    import matplotlib.pyplot as plt
+    G = nx.Graph()
+    fig, ax = plt.subplots()
+    for event in tg:
+        if event.type == EventType.ADD:
+            G.add_edge(event.src, event.dest)
+            nx.draw(G, ax=ax)
+            plt.pause(0.1)
+            ax.clear()
 
 if __name__ == "__main__":
     # sequence = ShuffledSequence(FileEventSequence("data/wiki-talks/wiki.txt"), 2)
@@ -281,3 +391,23 @@ if __name__ == "__main__":
         if i == 10:
             break
         print(event)
+    
+    def my_iter():
+        for i in range(10):
+            yield Event("a", "b", i)
+    print("FromIterable")
+    sequence = FromIterable(my_iter())
+    for event in sequence:
+        print(event)
+    
+    print("SBMSequence")
+    sequence = SBMSequence([.5, .5], [[.5, .1], [.1, .5]])
+    for event in FirstN(sequence, 10):
+        print(event)
+    
+    import matplotlib.pyplot as plt
+    print("Drawing graph")
+    animate_graph(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]))
+    # draw_graph(FirstN(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]), 10))
+    # plt.show()
+
