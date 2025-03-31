@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 
-use rand::{thread_rng, Rng};
+use rand::{rngs::{StdRng, ThreadRng}, thread_rng, Rng, SeedableRng};
 
 use pyo3::{prelude::*, types::PyList};
 use rand::random_range;
@@ -166,6 +166,53 @@ impl<'a, G: Graph> Community<'a, G> {
     }
 }
 
+struct PyGraph <'a> {
+    pyobj: &'a Bound<'a, PyAny>,
+}
+
+impl<'a> Graph for PyGraph<'a> {
+    fn neighbors(&self, node: usize) -> Vec<usize> {
+        let myresult = self.pyobj.call_method1("neighbors", (node,));
+        match myresult {
+            Err(e) => {
+                println!("Error: {:?}", e);
+                Vec::new()
+            },
+            Ok(result) => {
+                match result.extract() {
+                    Err(e) => {
+                        println!("Error: {:?}", e);
+                        Vec::new()
+                    },
+                    Ok(neighbors) => {
+                        neighbors
+                    }
+                }
+            }
+        }
+    }
+
+    fn nodes(&self) -> Vec<usize> {
+        match self.pyobj.call_method0("nodes") {
+            Err(e) => {
+                println!("Error: {:?}", e);
+                Vec::new()
+            },
+            Ok(result) => {
+                match result.extract() {
+                    Err(e) => {
+                        println!("Error: {:?}", e);
+                        Vec::new()
+                    },
+                    Ok(nodes) => {
+                        nodes
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Translates the `modified__lfm` function from Python into Rust.
 /// Returns a vector of communities, each being a vector of node IDs.
 pub fn modified_lfm<G: Graph>(
@@ -173,8 +220,10 @@ pub fn modified_lfm<G: Graph>(
     partition_count: usize,
     alpha: f64,
     threshold: f64,
+    pm_k: usize,
+    seed: Option<u64>,
 ) -> Vec<Vec<usize>> {
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or_else(|| random_range(0..u64::MAX)));
 
     // Stores the final list of communities
     let mut communities: Vec<Vec<usize>> = Vec::new();
@@ -183,12 +232,9 @@ pub fn modified_lfm<G: Graph>(
     let mut node_not_include = graph.nodes();
     let node_num = node_not_include.len();
 
-    // Retrieve the configuration integer (placeholder)
-    let k = cfg_get_config_int("pm_k", 10, "Multiple of partition count to limit communities");
-
     // Main loop
     while (node_not_include.len() as f64) > (node_num as f64 * threshold)
-        && (communities.len() < (k as usize * partition_count))
+        && (communities.len() < (pm_k as usize * partition_count))
     {
         // Create a new community
         let mut c = Community::new(graph, alpha);
@@ -266,9 +312,28 @@ pub fn modified_lfm<G: Graph>(
 }
 
 
+#[pyfunction]
+fn lfm<'a>(py: Python<'a>, graph: Bound<'a, PyAny>, partition_count: usize, alpha: f64, threshold: f64, pm_k: usize, seed: Option<u64>) -> PyResult<Bound<'a, PyList>> {
+    let graph = PyGraph { pyobj: &graph };
+
+    let communities = modified_lfm(&graph, partition_count, alpha, threshold, pm_k, seed);
+
+    let py_communities = PyList::empty(py);
+    for community in communities {
+        let py_community = PyList::empty(py);
+        for node in community {
+            py_community.append(node)?;
+        }
+        py_communities.append(py_community)?;
+    }
+
+    Ok(py_communities)
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn vertex_voyage_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_next, m)?)?;
+    m.add_function(wrap_pyfunction!(lfm, m)?)?;
     Ok(())
 }
