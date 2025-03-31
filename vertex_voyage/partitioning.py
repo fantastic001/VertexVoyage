@@ -6,6 +6,17 @@ from cdlib.algorithms.internal.lfm import Community
 from binpacking import to_constant_bin_number
 import random 
 import vertex_voyage.config as cfg 
+import vertex_voyage_native as vvn 
+
+
+class __NativeGraph:
+    def __init__(self, G):
+        self.G = G
+    def neighbors(self, node):
+        return list(self.G.neighbors(node))
+    def nodes(self):
+        return list(self.G.nodes())
+    
 
 def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int | None = None, pm_k: int | None = None) -> list:
     if seed is not None:
@@ -438,3 +449,11 @@ if __name__ == "__main__":
         plt.xlabel("Threshold")
         plt.ylabel("F1 Score")
         plt.show()
+    if stage == 0 or stage == 6:
+        g = nx.planted_partition_graph(100, 20, .5, .1)
+        communities = modified__lfm(g, 5, alpha=1, threshold=0.5)
+        print(communities)
+    if stage == 0 or stage == 7:
+        g = __NativeGraph(nx.planted_partition_graph(100, 20, .5, .1))
+        communities = vvn.lfm(g, 5, 1, 0.5, 10)
+        print(communities)
