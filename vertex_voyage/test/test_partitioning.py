@@ -1,12 +1,12 @@
 
 
 import unittest
-from vertex_voyage.partitioning import calculate_corruptability, calculate_partitioning_corruption, partition_graph
+from vertex_voyage.partitioning import calculate_corruptability, calculate_partitioning_corruption, partition_graph, modified__lfm
 import networkx as nx
 from vertex_voyage.node2vec import Node2Vec
 import numpy as np 
 from vertex_voyage.reconstruction import reconstruct
-
+import vertex_voyage_native as vvn 
 
 class TestPartitioning(unittest.TestCase):
     
@@ -118,3 +118,103 @@ class TestPartitioning(unittest.TestCase):
         reg = LinearRegression().fit(x, y)
         self.assertGreaterEqual(reg.coef_[0][0], 0)
         print(reg.coef_)
+    
+    def test_modified_lfm(self):
+        n = 100
+        p = 0.1
+        q = 0.01
+        G = nx.planted_partition_graph(2, n, p, q, seed=42)
+        partition_num = 2
+        communities = modified__lfm(G, partition_num, seed=42, pm_k=10)
+        self.assertEqual(len(communities), partition_num)
+    
+    def test_modified_lfm_two_node_graph(self):
+        G = nx.Graph()
+        G.add_node(0)
+        G.add_node(1)
+        G.add_edge(0, 1)
+        partition_num = 2
+        communities = modified__lfm(G, partition_num, seed=42, pm_k=10)
+        self.assertEqual(len(communities), partition_num)
+        self.assertEqual(len(communities[0]), 2)
+
+    def test_modified_lfm_complete_graph(self):
+        G = nx.complete_graph(10)
+        partition_num = 2
+        communities = modified__lfm(G, partition_num, seed=42, pm_k=10)
+        self.assertEqual(len(communities), partition_num)
+        self.assertEqual(len(communities[0]), 10)
+        self.assertEqual(len(communities[1]), 0)
+    
+    def test_lfm_native_two_nodes(self):
+        G = nx.Graph()
+        G.add_node(0)
+        G.add_node(1)
+        G.add_edge(0, 1)
+        class MyGraph:
+            def __init__(self, G: nx.Graph) -> None:
+                self.G = G
+            
+            def neighbors(self, node):
+                return list(self.G.neighbors(node))
+            def nodes(self):
+                return list(self.G.nodes())
+        G = MyGraph(G)
+        partition_num = 2
+        communities = vvn.lfm(G, partition_num, 1, 0.5, partition_num, 42)
+        self.assertEqual(len(communities), partition_num)
+        self.assertEqual(len(communities[0]), 2)
+    
+    def test_native_lfm(self):
+        n = 100
+        p = 0.1
+        q = 0.01
+        G = nx.planted_partition_graph(2, n, p, q, seed=42)
+        class MyGraph:
+            def __init__(self, G: nx.Graph) -> None:
+                self.G = G
+            
+            def neighbors(self, node):
+                return list(self.G.neighbors(node))
+            def nodes(self):
+                return list(self.G.nodes())
+        G = MyGraph(G)
+        partition_num = 2
+        communities = vvn.lfm(G, partition_num, 1, 0.5, partition_num, 42)
+        self.assertEqual(len(communities), partition_num)
+    
+    def test_lfm_native_complete_graph(self):
+        print("test_lfm_native_complete_graph")
+        G = nx.complete_graph(10)
+        class MyGraph:
+            def __init__(self, G: nx.Graph) -> None:
+                self.G = G
+            
+            def neighbors(self, node):
+                return list(self.G.neighbors(node))
+            def nodes(self):
+                return list(self.G.nodes())
+        G = MyGraph(G)
+        partition_num = 2
+        communities = vvn.lfm(G, partition_num, 1, 0.5, 10, 42)
+        self.assertEqual(len(communities), 2)
+        self.assertEqual(len(communities[0]), 10)
+        self.assertEqual(len(communities[1]), 0)
+    
+    def test_lfm_native_big_graph(self):
+        n = 10000
+        p = 0.1
+        q = 0.01
+        G = nx.planted_partition_graph(2, n, p, q, seed=42)
+        class MyGraph:
+            def __init__(self, G: nx.Graph) -> None:
+                self.G = G
+            
+            def neighbors(self, node):
+                return list(self.G.neighbors(node))
+            def nodes(self):
+                return list(self.G.nodes())
+        G = MyGraph(G)
+        partition_num = 2
+        communities = vvn.lfm(G, partition_num, 1, 0.5, 10, 42)
+        self.assertEqual(len(communities), partition_num)
