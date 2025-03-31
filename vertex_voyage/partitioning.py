@@ -7,11 +7,16 @@ from binpacking import to_constant_bin_number
 import random 
 import vertex_voyage.config as cfg 
 
-def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5) -> list:
+def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int | None = None, pm_k: int | None = None) -> list:
+    if seed is not None:
+        random.seed(seed)
     communities = []
     node_not_include = list(G.nodes.keys())[:]
     node_num = len(node_not_include)
-    k = cfg.get_config_int("pm_k", 10, "Multiple of partition count to limit number of communities to")
+    if pm_k is not None:
+        k = pm_k
+    else:
+        k = cfg.get_config_int("pm_k", 10, "Multiple of partition count to limit number of communities to")
     # sometimes, we end up in infinite loop and increase number of communities to inf 
     # This is caused because there is no convergence when adding/removing nodes. 
     # We limit number of communities to hardcoded value of k*partition_count
