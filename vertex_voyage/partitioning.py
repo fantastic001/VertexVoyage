@@ -18,7 +18,7 @@ class __NativeGraph:
         return list(self.G.nodes())
     
 
-def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int | None = None, pm_k: int | None = None) -> list:
+def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int = None, pm_k: int  = None) -> list:
     if seed is not None:
         random.seed(seed)
     communities = []
