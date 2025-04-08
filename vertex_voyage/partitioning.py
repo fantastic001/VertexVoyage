@@ -71,14 +71,14 @@ def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: floa
     return list(communities)
 
 @cfg.pluggable
-def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = False, threshold: float = 0.5, alpha: float = 1) -> list:
+def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = True, threshold: float = 0.5, alpha: float = 1, seed = None) -> list:
     """
     Partition the graph into a given number of partitions using LFM algorithm.
     """
     # create a LFM object
     communities = None 
     if use_modified_lfm:
-        communities = modified__lfm(G, partition_num, alpha=alpha, threshold=threshold)
+        communities = modified__lfm(G, partition_num, alpha=alpha, threshold=threshold, seed=seed)
     else:
         communities = lfm(G, alpha=alpha).communities
     # partition the graph into a given number of partitions
