@@ -2,7 +2,8 @@ cdlib
 networkx
 numpy
 scikit-learn 
-tensorflow
+tensorflow==2.16.1
+tensorflow-keras
 zookeeper
 kazoo
 binpacking
