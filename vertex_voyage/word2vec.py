@@ -142,14 +142,64 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
     contexts = tf.constant(contexts, dtype=tf.int64)
     labels = tf.constant(labels, dtype=tf.int64)
     dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
-    dataset = dataset.shuffle(buffer_size=10000, seed=seed)
+    dataset = dataset.shuffle(buffer_size=10000, seed=seed).batch(1024, drop_remainder=True)
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     return dataset
 
+class Word2Vec(tf.keras.Model):
+  def __init__(self, vocab_size, embedding_dim):
+    super(Word2Vec, self).__init__()
+    self.target_embedding = layers.Embedding(vocab_size,
+                                      embedding_dim,
+                                      name="w2v_embedding")
+    self.context_embedding = layers.Embedding(vocab_size,
+                                       embedding_dim)
 
+  def call(self, pair):
+    target, context = pair
+    print("Call of Word2Vec")
+    print("target shape", target.shape)
+    print("context shape", context.shape)
+    # target: (batch,)
+    word_emb = self.target_embedding(target)
+    # word_emb: (batch, embed)
+    context_emb = self.context_embedding(context)
+    # context_emb: (batch, context, embed)
+    dots = tf.einsum('be,bce->bc', word_emb, context_emb)
+    # dots: (batch, context)
+    return dots
 
-
-def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed):
+def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate, epochs):
     """
+    Train a Word2Vec model using the skip-gram approach.
+
+    Parameters:
+    training_data: tf.data.Dataset object containing (target, context) pairs
+    vocab_size: size of the vocabulary
+    embedding_dim: dimensionality of word embeddings
+    learning_rate: learning rate for optimizer
+    epochs: number of training epochs
+
+    Returns:
+    model: trained Word2Vec model
+    """
+    model = Word2Vec(vocab_size, embedding_dim)
+    loss_fn = loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+    model.compile(optimizer=optimizer, loss=loss_fn)
+    
+    model.fit(training_data, epochs=epochs, verbose=0)
+    
+    return model
+
+
+
+
+def __legacy_word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed):
+    """
+    DEPRECATED 
+
     Word2Vec implementation using a simple neural network with one hidden layer.
 
     Parameters:
@@ -174,12 +224,23 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     )
     return m.wv
 
+def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed = None):
+    """
+    Word2Vec implementation using a simple neural network with one hidden layer.
 
-def generate_training(sequences, window_size, num_ns, vocab_size, seed):
-  result = [] 
-  for seq in sequences:
-    training = generate_skip_grams(seq, window_size, num_ns, vocab_size, seed)
-  return result
+    Parameters:
+    training_data: list of tuples (center_word, context_word, label)
+    vocab_size: size of the vocabulary
+    embedding_dim: dimensionality of word embeddings
+    learning_rate: learning rate for gradient descent
+    epochs: number of training epochs
+    """
+    if seed is None:
+        seed = random.randint(0, 10e6)
+    walks = training_data
+    training = generate_skip_grams(walks, window_size, num_ns, vocab_size+1, seed)
+    model = train_word2vec_model(training, vocab_size, embedding_dim, learning_rate, epochs)
+    return model.target_embedding.weights[0].numpy()
 
 if __name__ == "__main__":
   from vertex_voyage.node2vec import Node2Vec
@@ -193,7 +254,15 @@ if __name__ == "__main__":
   n.G = G
   walks = n._random_walks()
   vocab_size = len(n.nodes)
-  training = generate_skip_grams(walks, 5, 5, vocab_size, SEED)
-  # print(len(training))
-  # for i in training:
-  #   print(i)
+  w = word2vec(
+      walks,
+      vocab_size,
+      embedding_dim=64,
+      learning_rate=0.01,
+      epochs=10,
+      window_size=5,
+      num_ns=5,
+  )
+  print(len(G.nodes()))
+  print("Word2Vec embeddings shape:", w.shape)
+  print("Word2Vec embeddings:", w)
