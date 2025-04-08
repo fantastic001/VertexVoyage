@@ -129,7 +129,6 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
                 seed=seed,  # seed for reproducibility
                 name="negative_sampling"  # name of this operation
             )
-        print("Negative sampling candidates", negative_sampling_candidates)
         context = tf.concat([tf.squeeze(context_class,1), negative_sampling_candidates], 0)
         label = tf.constant([1] + [0]*len(negative_sampling_candidates), dtype="int64")
         targets.append(target)
@@ -138,9 +137,6 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
     targets = np.array(targets)
     contexts = np.array(contexts)
     labels = np.array(labels)
-    print("targets shape", targets.shape)
-    print("contexts shape", contexts.shape)
-    print("labels shape", labels.shape)
     targets = tf.constant(targets, dtype=tf.int64)
     contexts = tf.constant(contexts, dtype=tf.int64)
     labels = tf.constant(labels, dtype=tf.int64)
@@ -162,9 +158,6 @@ class Word2Vec(tf.keras.Model):
 
   def call(self, pair):
     target, context = pair
-    print("Call of Word2Vec")
-    print("target shape", target.shape)
-    print("context shape", context.shape)
     # target: (batch,)
     word_emb = self.target_embedding(target)
     # word_emb: (batch, embed)
@@ -240,7 +233,6 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
     """
-    print(f"Negative sampling with num_ns={num_ns} and vocab_size={vocab_size}")
     if seed is None:
         seed = random.randint(0, 10e6)
     walks = training_data
@@ -271,6 +263,3 @@ if __name__ == "__main__":
       window_size=5,
       num_ns=5,
   )
-  print(len(G.nodes()))
-  print("Word2Vec embeddings shape:", w.shape)
-  print("Word2Vec embeddings:", w)
