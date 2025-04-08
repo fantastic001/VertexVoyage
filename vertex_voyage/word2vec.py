@@ -3,7 +3,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, preprocessing
 import random 
-SEED = 42
 
 def skipgrams(
     sequence,
@@ -118,17 +117,21 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
         context_class = tf.expand_dims(
             tf.constant([context_word], dtype="int64"), 1)
         # context_class = tf.reshape(tf.constant(context_class, dtype="int64"), (1, 1))
-        negative_sampling_candidates, _, _ = tf.random.log_uniform_candidate_sampler(
-          true_classes=context_class,  # class that should be sampled as 'positive'
-          num_true=1,  # each positive skip-gram has 1 positive context class
-          num_sampled=num_ns,  # number of negative context words to sample
-          unique=True,  # all the negative samples should be unique
-          range_max=vocab_size,  # pick index of the samples from [0, vocab_size]
-          seed=SEED,  # seed for reproducibility
-          name="negative_sampling"  # name of this operation
-        )
+        if vocab_size < 10 or num_ns > vocab_size:
+            negative_sampling_candidates = [] 
+        else:
+            negative_sampling_candidates, _, _ = tf.random.log_uniform_candidate_sampler(
+                true_classes=context_class,  # class that should be sampled as 'positive'
+                num_true=1,  # each positive skip-gram has 1 positive context class
+                num_sampled=num_ns,  # number of negative context words to sample
+                unique=True,  # all the negative samples should be unique
+                range_max=vocab_size,  # pick index of the samples from [0, vocab_size]
+                seed=seed,  # seed for reproducibility
+                name="negative_sampling"  # name of this operation
+            )
+        print("Negative sampling candidates", negative_sampling_candidates)
         context = tf.concat([tf.squeeze(context_class,1), negative_sampling_candidates], 0)
-        label = tf.constant([1] + [0]*num_ns, dtype="int64")
+        label = tf.constant([1] + [0]*len(negative_sampling_candidates), dtype="int64")
         targets.append(target)
         contexts.append(context)
         labels.append(label)
@@ -141,6 +144,8 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
     targets = tf.constant(targets, dtype=tf.int64)
     contexts = tf.constant(contexts, dtype=tf.int64)
     labels = tf.constant(labels, dtype=tf.int64)
+    buffer_size = int(0.1 * len(targets))
+    batch_size = min(1024, buffer_size // 2)
     dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
     dataset = dataset.shuffle(buffer_size=10000, seed=seed).batch(1024, drop_remainder=True)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
@@ -235,13 +240,15 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
     """
+    print(f"Negative sampling with num_ns={num_ns} and vocab_size={vocab_size}")
     if seed is None:
         seed = random.randint(0, 10e6)
     walks = training_data
     walks = [[w + 1 for w in walk] for walk in walks]
     training = generate_skip_grams(walks, window_size, num_ns, vocab_size+1, seed)
     model = train_word2vec_model(training, vocab_size+1, embedding_dim, learning_rate, epochs)
-    return model.target_embedding.weights[0].numpy()
+    weights = model.get_layer('w2v_embedding').get_weights()[0]
+    return weights[1:]  # Skip the first row (non-word)
 
 if __name__ == "__main__":
   from vertex_voyage.node2vec import Node2Vec

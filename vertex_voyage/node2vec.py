@@ -15,7 +15,7 @@ class Node2Vec:
                  dim, 
                  walk_size, 
                  n_walks, 
-                 window_size, 
+                 window_size,
                  epochs=10, 
                  p = .5, 
                  q = .5,
@@ -136,7 +136,7 @@ class Node2Vec:
         ]
         return word2vec(
             training_data=walks,
-            vocab_size=len(self.G.nodes()),
+            vocab_size=len(self.g_nodes),
             embedding_dim=self.dim,
             learning_rate=self.learning_rate,
             epochs=self.epochs,
