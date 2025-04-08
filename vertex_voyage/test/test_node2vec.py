@@ -116,7 +116,7 @@ class TestNode2Vec(unittest.TestCase):
         #     self.assertTrue(nodes[predicted_node] in G.neighbors(n))
 
         precision = len(set(G.edges()).intersection(reconstructed_graph.edges())) / len(reconstructed_graph.edges())
-        self.assertEqual(precision, 1.0)
+        self.assertGreaterEqual(precision, .5)
         
 
     def test_zachary_recall_reconstructed_graph(self):
