@@ -87,7 +87,19 @@ class TestNode2Vec(unittest.TestCase):
         G.add_edge(nodes[0], nodes[1], weight=1.0)
         G.add_edge(nodes[2], nodes[3], weight=1.0)
         # fit node2vec model
-        node2vec = Node2Vec(dim=4, walk_size=10, n_walks=100, window_size=5, seed=42, epochs=10, p=.25, q=4)
+        node2vec = Node2Vec(
+            dim=4, 
+            walk_size=20, 
+            n_walks=100, 
+            window_size=10, 
+            seed=42, 
+            epochs=10, 
+            p=.25, 
+            q=4,
+            negative_sample_num=1, # in practice, should be 500
+            learning_rate=0.01,
+            use_threads=False
+        )
         node2vec.fit(G)
         # calculate embeddings
         embeddings = node2vec.embed_nodes(nodes)
