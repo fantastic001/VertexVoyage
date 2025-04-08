@@ -4,6 +4,7 @@ import numpy as np
 from vertex_voyage.node2vec import Node2Vec
 from sklearn.cluster import KMeans
 from vertex_voyage.reconstruction import reconstruct
+from vertex_voyage.word2vec import word2vec
 
 class TestNode2Vec(unittest.TestCase):
 
@@ -147,3 +148,11 @@ class TestNode2Vec(unittest.TestCase):
         precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
         f1 = 2 * (precision * recall) / (precision + recall)
         self.assertGreaterEqual(f1, 0.57)
+    
+    def test_callbacks(self):
+        called = 0 
+        def mycallback(*args, **kwargs):
+            nonlocal called
+            called += 1
+        word2vec([[1,2,3], [4,5,6]], 6, 2, .1, 10, 2, 1, 1, [mycallback])
+        self.assertEqual(called, 10)

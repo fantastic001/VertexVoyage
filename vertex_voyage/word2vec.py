@@ -167,7 +167,7 @@ class Word2Vec(tf.keras.Model):
     # dots: (batch, context)
     return dots
 
-def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate, epochs):
+def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks):
     """
     Train a Word2Vec model using the skip-gram approach.
 
@@ -187,7 +187,7 @@ def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate
 
     model.compile(optimizer=optimizer, loss=loss_fn)
     
-    model.fit(training_data, epochs=epochs, verbose=0)
+    model.fit(training_data, epochs=epochs, verbose=0, callbacks=[CustomCallback(epoch_callbacks)])
     
     return model
 
@@ -222,7 +222,16 @@ def __legacy_word2vec(training_data, vocab_size, embedding_dim, learning_rate, e
     )
     return m.wv
 
-def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed = None):
+class CustomCallback(tf.keras.callbacks.Callback):
+    def __init__(self, epoch_callbacks):
+        super(CustomCallback, self).__init__()
+        self.epoch_callbacks = epoch_callbacks
+
+    def on_epoch_end(self, epoch, logs=None):
+        for callback in self.epoch_callbacks:
+            callback(epoch, logs, self.model)
+
+def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed = None, epoch_callbacks = None):
     """
     Word2Vec implementation using a simple neural network with one hidden layer.
 
@@ -233,12 +242,16 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
     """
+    if epoch_callbacks is None:
+        epoch_callbacks = []
+    
+    
     if seed is None:
         seed = random.randint(0, 10e6)
     walks = training_data
     walks = [[w + 1 for w in walk] for walk in walks]
     training = generate_skip_grams(walks, window_size, num_ns, vocab_size+1, seed)
-    model = train_word2vec_model(training, vocab_size+1, embedding_dim, learning_rate, epochs)
+    model = train_word2vec_model(training, vocab_size+1, embedding_dim, learning_rate, epochs, epoch_callbacks)
     weights = model.get_layer('w2v_embedding').get_weights()[0]
     return weights[1:]  # Skip the first row (non-word)
 
