@@ -10,8 +10,8 @@ class EventType(Enum):
 class Event:
     def __init__(
             self, 
-            src: str | int, 
-            dest: str | int, 
+            src: str, 
+            dest: str, 
             timestamp: int,
             type: EventType = EventType.ADD,
             attrs: dict = None
