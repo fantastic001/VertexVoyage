@@ -167,7 +167,7 @@ class BarabasiAlbertEventSequence(EventSequence):
                     EventType.ADD,
                     {}
                 )
-            else:
+            else:               
                self.current = self.nodes[self.nodes.index(self.current) + 1]
                self.iter += 1
                return self.head()
@@ -382,15 +382,30 @@ def animate_graph(tg: EventSequence):
             plt.pause(0.1)
             ax.clear()
 
+
+def write_to_file(sequence: EventSequence, file: str):
+    """
+    Writes an event sequence to a file
+    """
+    with open(file, "w") as f:
+        first_line = True
+        for event in sequence:
+            if first_line:
+                first_line = False
+            else:
+                f.write("\n")
+            f.write("%s %s %d" % (event.src, event.dest, event.timestamp))
+
+
 if __name__ == "__main__":
     # sequence = ShuffledSequence(FileEventSequence("data/wiki-talks/wiki.txt"), 2)
-    sequence = ShuffledSequence(BarabasiAlbertEventSequence(), 10)
-    i = 0
-    for event in sequence:
-        i += 1
-        if i == 10:
-            break
-        print(event)
+    # sequence = ShuffledSequence(BarabasiAlbertEventSequence(), 10)
+    # i = 0
+    # for event in sequence:
+    #     i += 1
+    #     if i == 10:
+    #         break
+    #     print(event)
     
     def my_iter():
         for i in range(10):
@@ -405,9 +420,15 @@ if __name__ == "__main__":
     for event in FirstN(sequence, 10):
         print(event)
     
-    import matplotlib.pyplot as plt
-    print("Drawing graph")
-    animate_graph(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]))
+    # import matplotlib.pyplot as plt
+    # print("Drawing graph")
+    # animate_graph(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]))
     # draw_graph(FirstN(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]), 10))
     # plt.show()
+    write_to_file(FirstN(SBMSequence([.5, .5], [
+        [.5, .1], 
+        [.1, .5]
+    ]), 10**10), "test.txt")
+    graph = to_nx_graph(FileEventSequence("test.txt"))
+    print("Graph of %d nodes" % graph.number_of_nodes())
 
