@@ -2,6 +2,7 @@
 from enum import Enum
 from random import random as rand, randint
 from random import shuffle
+from struct import pack, unpack
 
 class EventType(Enum):
     ADD = 1
@@ -307,6 +308,41 @@ class SBMSequence(FromIterable):
                         })
                 self.total_nodes += 1
 
+class BinaryEventSequence(EventSequence):
+    """
+    Binary event sequence in a file. Same as FileEventSequence, but
+    stores events in binary format. Each event is stored as a tuple of
+    (src, dest, timestamp) in a binary file. All elements of tuple are
+    stored as 4 byte integers. The file is opened in binary mode.
+
+    """
+    def __init__(self, path: str, fileptr = None):
+        self.path = path
+        if fileptr:
+            self.file = fileptr
+        else:
+            self.file = open(path, "rb")
+        self.is_empty = False
+        self.h = self.file.read(12)
+        if len(self.h) == 0:
+            self.is_empty = True
+        elif len(self.h) != 12:
+            raise ValueError("Invalid event header. Event header must be 12 bytes long")
+        else:
+            self.h = unpack("iii", self.h)
+            if len(self.h) != 3:
+                raise ValueError("Invalid event header. Event header must be 12 bytes long")
+            
+    def head(self) -> Event:
+        src, dest, timestamp = self.h
+        return Event(src, dest, timestamp, EventType.ADD, {})
+    def tail(self) -> "BinaryEventSequence":
+        return BinaryEventSequence(self.path, self.file)
+    def append(self, event: Event) -> "BinaryEventSequence":
+        raise NotImplementedError("Cannot append to BinaryEventSequence")
+    def empty(self) -> bool:
+        return self.is_empty
+    
 class EventStream:
     def __init__(self, sequence: EventSequence):
         self.sequence = sequence
@@ -396,7 +432,14 @@ def write_to_file(sequence: EventSequence, file: str):
                 f.write("\n")
             f.write("%s %s %d" % (event.src, event.dest, event.timestamp))
 
-
+def write_to_binary_file(sequence: EventSequence, file: str):
+    """
+    Writes an event sequence to a binary file
+    """
+    with open(file, "wb") as f:
+        for event in sequence:
+            f.write(pack("iii", int(event.src), int(event.dest), event.timestamp))
+            
 if __name__ == "__main__":
     # sequence = ShuffledSequence(FileEventSequence("data/wiki-talks/wiki.txt"), 2)
     # sequence = ShuffledSequence(BarabasiAlbertEventSequence(), 10)
@@ -419,16 +462,23 @@ if __name__ == "__main__":
     sequence = SBMSequence([.5, .5], [[.5, .1], [.1, .5]])
     for event in FirstN(sequence, 10):
         print(event)
-    
+    sequence = SBMSequence([.5, .5], [[.5, .1], [.1, .5]])
+    write_to_binary_file(FirstN(sequence, 10), "test.bin")
+
+    print("BinaryEventSequence")
+    for event in BinaryEventSequence("test.bin"):
+        print(event)
+
     # import matplotlib.pyplot as plt
     # print("Drawing graph")
     # animate_graph(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]))
     # draw_graph(FirstN(SBMSequence([.5, .5], [[.5, .1], [.1, .5]]), 10))
     # plt.show()
-    write_to_file(FirstN(SBMSequence([.5, .5], [
-        [.5, .1], 
-        [.1, .5]
-    ]), 10**10), "test.txt")
-    graph = to_nx_graph(FileEventSequence("test.txt"))
-    print("Graph of %d nodes" % graph.number_of_nodes())
+
+    # write_to_file(FirstN(SBMSequence([.5, .5], [
+    #     [.5, .1], 
+    #     [.1, .5]
+    # ]), 10**10), "test.txt")
+    # graph = to_nx_graph(FileEventSequence("test.txt"))
+    # print("Graph of %d nodes" % graph.number_of_nodes())
 
