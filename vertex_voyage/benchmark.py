@@ -2,7 +2,9 @@ import sys
 from types import SimpleNamespace
 import pandas as pd
 from typing import Callable, List, Dict
-
+from vertex_voyage.config import get_classes_inheriting, get_config_str
+import os.path
+from vertex_voyage.benchmark_base import Benchmark
 class SimplePatch:
     def __init__(self, target_path, new_value=None):
         self.target_path = target_path
@@ -80,14 +82,83 @@ def data_profile(solvers: dict[str, callable], focus_function: List[str], proble
     return pd.DataFrame(data)
    
 
+def get_benchmark_name(benchmark_class):
+    """
+    Get the name of the benchmark class.
+    
+    :param benchmark_class: The benchmark class.
+    :return: The name of the benchmark class.
+    """
+    return benchmark_class.NAME if hasattr(benchmark_class, 'NAME') else benchmark_class.__name__
+def get_benchmark_classes():
+    """
+    Get all benchmark classes in the currently loaded plugins.
+    :return: A list of benchmark classes.
+    """
+    return get_classes_inheriting(Benchmark)
+def get_benchmark_class(name: str):
+    """
+    Get a benchmark class by name.
+    return: The benchmark class.
+    """
+    classes = get_benchmark_classes()
+    for cls in classes:
+        if get_benchmark_name(cls) == name:
+            return cls
+    raise ValueError(f"Benchmark class {name} not found.")
+
+
+
+def run_benchmark(name: str):
+    """
+    Run a benchmark by name.
+    
+    :param name: The name of the benchmark class.
+    :return: The result of the benchmark.
+    """
+    cls = get_benchmark_class(name)
+    benchmark = cls()
+    results_folder = get_config_str("results_folder", "results/", "Path to the results folder.")
+    results_folder = os.path.join(results_folder, name)
+    if not os.path.exists(results_folder):
+        os.makedirs(results_folder)
+        benchmark.run(results_folder)
+    benchmark.display(results_folder)
+
+def get_benchmark_names():
+    """
+    Get all benchmark names.
+    
+    :return: A list of benchmark names.
+    """
+    classes = get_benchmark_classes()
+    return [get_benchmark_name(cls) for cls in classes]
+
+
 
 if __name__ == "__main__":
     import sys
-    import math
+    import argparse
 
-    # count number of calls to math.pow
-    mock = CallCountingMock("math.pow")
+    parser = argparse.ArgumentParser(description="Run a benchmarks")
+    parser.add_argument("benchmark", type=str, help="The name of the benchmark to run.", default=None, nargs="?")
+    parser.add_argument("--list", action="store_true", help="List all available benchmarks.")
+    
+    args = parser.parse_args()
+    if args.list:
+        print("Available benchmarks:")
+        for name in get_benchmark_names():
+            print(f" - {name}")
+        sys.exit(0)
+    if args.benchmark:
+        print(f"Running benchmark {args.benchmark}...")
+        result = run_benchmark(args.benchmark)
+        print(result)
+    else:
+        print("Running all benchmarks...")
+        for name in get_benchmark_names():
+            print(f"Running benchmark {name}...")
+            result = run_benchmark(name)
+            print(result)
+    
 
-    my_solver = lambda x: math.pow(x, 2)
-    problems = [lambda: 2, lambda: 3]
-    print(data_profile({"my_solver": my_solver}, "math.pow", problems))
