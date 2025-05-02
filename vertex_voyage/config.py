@@ -17,6 +17,7 @@ DEFAULT_PLUGINS = [
     "vertex_voyage.plugins.greeting",
     "vertex_voyage.plugins.config_commands",
     "vertex_voyage.plugins.plugin_manager",
+    "experiments.*",
 ]
 CONFIG_FILE_NAME = PROJECT_NAME + ".json"
 
