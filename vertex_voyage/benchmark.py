@@ -56,12 +56,12 @@ class CallCountingMock:
         self.call_args.append((args, kwargs))
         return self.original_func(*args, **kwargs)
 
-def data_profile(solvers: dict[str, callable], focus_function: List[str], problems: List[callable], benchmark: Benchmark = None):
+def data_profile(solvers: dict[str, callable], focus_function, problems: List[callable], benchmark: Benchmark = None):
     """
     This function performs Wild and More data profile. 
     
     :param solvers: Dict of solvers to profile. Solver is a callable with one parameter - problem.
-    :param focus_function: Name of the function to focus on. This function will be patched.
+    :param focus_function: Name of the function to focus on. This function will be patched. Otherwise, tuple of class and attr name can be passed.
     :param problems: List of problems to solve. Problem is a callable with no parameters.
     :param benchmark: The benchmark object. This is used to report the progress.
     
@@ -76,14 +76,26 @@ def data_profile(solvers: dict[str, callable], focus_function: List[str], proble
     for problem in problems:
         for solver_name, solver in solvers.items():
             current += 1
-            mock = CallCountingMock(focus_function)
-            with SimplePatch(focus_function, mock):
+            if isinstance(focus_function, str):
+                mock = CallCountingMock(focus_function)
+                with SimplePatch(focus_function, mock):
+                    solver(problem())
+                data.append({
+                    'problem': problem.__name__,
+                    'solver': solver_name,
+                    'call_count': mock.call_count
+                })
+            else:
+                old_func = getattr(focus_function[0], focus_function[1])
+                mock = CallCountingMock(old_func)
+                setattr(focus_function[0], focus_function[1], mock)
                 solver(problem())
-            data.append({
-                'problem': problem.__name__,
-                'solver': solver_name,
-                'call_count': mock.call_count
-            })
+                setattr(focus_function[0], focus_function[1], old_func)
+                data.append({
+                    'problem': problem.__name__,
+                    'solver': solver_name,
+                    'call_count': mock.call_count
+                })
             if benchmark:
                 benchmark.report_progress(current, total)
     return pd.DataFrame(data)
