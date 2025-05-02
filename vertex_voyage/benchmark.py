@@ -5,6 +5,7 @@ from typing import Callable, List, Dict
 from vertex_voyage.config import get_classes_inheriting, get_config_str
 import os.path
 from vertex_voyage.benchmark_base import Benchmark
+import matplotlib.pyplot as plt
 class SimplePatch:
     def __init__(self, target_path, new_value=None):
         self.target_path = target_path
@@ -55,13 +56,14 @@ class CallCountingMock:
         self.call_args.append((args, kwargs))
         return self.original_func(*args, **kwargs)
 
-def data_profile(solvers: dict[str, callable], focus_function: List[str], problems: List[callable]):
+def data_profile(solvers: dict[str, callable], focus_function: List[str], problems: List[callable], benchmark: Benchmark = None):
     """
     This function performs Wild and More data profile. 
     
     :param solvers: Dict of solvers to profile. Solver is a callable with one parameter - problem.
     :param focus_function: Name of the function to focus on. This function will be patched.
     :param problems: List of problems to solve. Problem is a callable with no parameters.
+    :param benchmark: The benchmark object. This is used to report the progress.
     
     :return: panda.DataFrame with the following columns:
         - problem: The problem that was solved.
@@ -69,8 +71,11 @@ def data_profile(solvers: dict[str, callable], focus_function: List[str], proble
         - call_count: The number of calls to the function.
     """
     data = []
+    total = len(problems) * len(solvers)
+    current = 0
     for problem in problems:
         for solver_name, solver in solvers.items():
+            current += 1
             mock = CallCountingMock(focus_function)
             with SimplePatch(focus_function, mock):
                 solver(problem())
@@ -79,8 +84,33 @@ def data_profile(solvers: dict[str, callable], focus_function: List[str], proble
                 'solver': solver_name,
                 'call_count': mock.call_count
             })
+            if benchmark:
+                benchmark.report_progress(current, total)
     return pd.DataFrame(data)
-   
+
+def display_data_profile(df: pd.DataFrame):
+    """
+    Display the data profile results.
+    
+    :param df: The data profile DataFrame.
+    """
+    solvers = df['solver'].unique()
+    alpha_values = range(0, df['call_count'].max() + 1)
+    for solver in solvers:
+        subset = df[df['solver'] == solver]
+        fractions = [] 
+        total_problems = len(subset)
+        for alpha in alpha_values:
+            solved = subset[subset['call_count'] <= alpha]
+            fraction = len(solved) / total_problems
+            fractions.append(fraction)
+        plt.plot(alpha_values, fractions, label=solver)
+    plt.xlabel('Alpha')
+    plt.ylabel('Fraction of Problems Solved')
+    plt.title('Fraction of Problems Solved vs Alpha')
+    plt.legend()
+    plt.grid()
+    plt.show()   
 
 def get_benchmark_name(benchmark_class):
     """
