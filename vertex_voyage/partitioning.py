@@ -18,6 +18,9 @@ class __NativeGraph:
         return list(self.G.nodes())
     
 
+def remove_vertex_from_community(c: Community, v):
+    return c.remove_vertex(v)
+
 def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int = None, pm_k: int  = None) -> list:
     if seed is not None:
         random.seed(seed)
@@ -53,7 +56,7 @@ def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: floa
 
             to_be_remove = c.recalculate()
             while to_be_remove is not None:
-                c.remove_vertex(to_be_remove)
+                remove_vertex_from_community(c, to_be_remove)
                 to_be_remove = c.recalculate()
 
             to_be_examined = c.get_neighbors()
