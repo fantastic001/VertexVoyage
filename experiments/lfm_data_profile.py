@@ -19,7 +19,7 @@ class LFMDataProfile(Benchmark):
             result =  modified__lfm(graph, 5, pm_k=1000)
             return result
         problems = []
-        for l in range(10, 60, 20):
+        for l in range(10, 100, 20):
             for k in range(2, 10, 2):
                 for p in np.arange(0.1, 1.1, 0.1):
                     for q in np.arange(.1, .5, 0.1):
