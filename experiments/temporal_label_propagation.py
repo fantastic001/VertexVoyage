@@ -19,7 +19,7 @@ class TemporalLabelPropagationBasic(Benchmark):
         for _ in range(repetitions):
             for i, part_num in enumerate(partition_candidates):
                 graph = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), 100), 1000)
-                partitioner = LabelPropagationTemporalGraphPartitioner(part_num, 1)
+                partitioner = LabelPropagationTemporalGraphPartitioner(part_num, .5)
                 partitions = partition_temporal_graph(graph, partitioner)
                 vertices = set()
                 for partition in partitions:
