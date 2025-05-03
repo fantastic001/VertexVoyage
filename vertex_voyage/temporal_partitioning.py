@@ -1,6 +1,6 @@
 
 from vertex_voyage.temporal import Event, EventSequence
-from random import randint
+from random import randint, random
 
 class TemporalGraphPartitioner:
     def partition(self, event: Event):
@@ -44,10 +44,16 @@ def partition_temporal_graph(tg: EventSequence, partitioner: TemporalGraphPartit
     return partitions.values()
 
 class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
-    def __init__(self, num_partitions: int):
+    def __init__(self, num_partitions: int, p: float = 0.5):
+        """
+        Initializes the LabelPropagationTemporalGraphPartitioner.
+        :param num_partitions: Number of partitions
+        :param p: Probability of reassigning a vertex to a random partition
+        """
         self.num_partitions = num_partitions
         self.partition_map = dict()
         self.neighbor_map = dict()
+        self.p = p
 
     def partition(self, event: Event):
         if event.src not in self.partition_map:
@@ -60,6 +66,9 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
             self.neighbor_map[event.dest] = set()
         self.neighbor_map[event.src].add(event.dest)
         self.neighbor_map[event.dest].add(event.src)
+        if random() < self.p:
+            self.partition_map[event.src] = randint(0, self.num_partitions - 1)
+            self.partition_map[event.dest] = randint(0, self.num_partitions - 1)
         freq = dict()
         for neighbor in self.neighbor_map[event.src]:
             if neighbor in self.partition_map:
