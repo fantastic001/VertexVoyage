@@ -174,10 +174,10 @@ def evaluate_partition_sbm(G, partitions):
             total_inter_edges += 1
             if not same_partition:
                 diff_comm_diff_part += 1  # Correctly separated (different partitions)
-    print("Intra-community edges: ", total_intra_edges)
-    print("Same community different partition: ", same_comm_diff_part)
-    print("Inter-community edges: ", total_inter_edges)
-    print("Different community different partition: ", diff_comm_diff_part)
+    # print("Intra-community edges: ", total_intra_edges)
+    # print("Same community different partition: ", same_comm_diff_part)
+    # print("Inter-community edges: ", total_inter_edges)
+    # print("Different community different partition: ", diff_comm_diff_part)
     # 4) Compute ratios (handling possible division by zero)
     ratio_intra_lost = (
         same_comm_diff_part / total_intra_edges if total_intra_edges > 0 else 0
@@ -297,6 +297,18 @@ class CSVFileProblem:
         self.separator = separator
     def __call__(self):
         return nx.read_edgelist(self.filename, delimiter=self.separator)
+
+def label_propagation_partitioner(G: nx.Graph, partition_num: int):
+    """
+    Partition the graph using label propagation algorithm.
+    """
+    partitions = {i: [] for i in range(partition_num)}
+    labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, weight="weight", seed=None)
+    partitions =  to_constant_bin_number(list(labels), partition_num, key=len)
+    partitions = [[list(label) for label in p] for p in partitions]
+    partitions = [list(sum(part, [])) for part in partitions]
+    return partitions
+
 
 if __name__ == "__main__":
     import vertex_voyage.config as cfg
@@ -460,3 +472,4 @@ if __name__ == "__main__":
         g = __NativeGraph(nx.planted_partition_graph(100, 20, .5, .1))
         communities = vvn.lfm(g, 5, 1, 0.5, 10)
         print(communities)
+
