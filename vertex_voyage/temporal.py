@@ -209,6 +209,16 @@ class BarabasiAlbertEventSequence(EventSequence):
 
 class ShuffledSequence(EventSequence):
     def __init__(self, sequence: EventSequence, window: int, buffer: list[Event] = None):
+        """
+        Shuffles a sequence of events. The first window events are shuffled
+        and the rest are appended to the buffer. The buffer is shuffled
+        and the first window events are returned. The rest of the events
+        are returned in the order they were added to the buffer. The
+        buffer is shuffled again after each window.
+        :param sequence: Sequence of events
+        :param window: Window size
+        :param buffer: Buffer of events
+        """
         if isinstance(sequence, EventStream):
             self.sequence = sequence
         else:
