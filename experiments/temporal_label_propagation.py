@@ -14,24 +14,26 @@ class TemporalLabelPropagationBasic(Benchmark):
 
     def run(self, results_path):
         data = [] 
+        repetitions = 30
         partition_candidates = [2, 4, 8, 16]
-        for i, part_num in enumerate(partition_candidates):
-            graph = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), 100), 1000)
-            partitioner = LabelPropagationTemporalGraphPartitioner(part_num)
-            partitions = partition_temporal_graph(graph, partitioner)
-            vertices = set()
-            for partition in partitions:
-                for vertex in partition:
-                    vertices.add(vertex)
-            for i, partition in enumerate(partitions):
-                data.append({
-                    "partition": i,
-                    "part_num": part_num,
-                    "size": len(partition),
-                    "graph_size": len(vertices),
-                    "expected_part_size": len(vertices) / part_num,
-                })
-            self.report_progress(i+1, len(partition_candidates))
+        for _ in range(repetitions):
+            for i, part_num in enumerate(partition_candidates):
+                graph = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), 100), 1000)
+                partitioner = LabelPropagationTemporalGraphPartitioner(part_num, 1)
+                partitions = partition_temporal_graph(graph, partitioner)
+                vertices = set()
+                for partition in partitions:
+                    for vertex in partition:
+                        vertices.add(vertex)
+                for i, partition in enumerate(partitions):
+                    data.append({
+                        "partition": i,
+                        "part_num": part_num,
+                        "size": len(partition),
+                        "graph_size": len(vertices),
+                        "expected_part_size": len(vertices) / part_num,
+                    })
+                self.report_progress(i+1, len(partition_candidates) * repetitions)
     
         df = pd.DataFrame(data)
         df.to_csv(os.path.join(results_path, "results.csv"), index=False)
