@@ -1,7 +1,7 @@
 
 from vertex_voyage.temporal import Event, EventSequence
 from random import randint, random
-
+import numpy as np 
 class TemporalGraphPartitioner:
     def partition(self, event: Event):
         """
@@ -96,4 +96,64 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
         return f"LabelPropagationTemporalGraphPartitioner(num_partitions={self.num_partitions})"
     def __repr__(self):
         return f"LabelPropagationTemporalGraphPartitioner(num_partitions={self.num_partitions})"
-    
+
+def edge_cut_matrix(tg: EventSequence, partitioner: TemporalGraphPartitioner):
+    """
+    Computes the edge cut matrix of a temporal graph.
+
+    :param tg: Temporal graph
+    :param partitioner: Partitioner
+    :return: Edge cut matrix
+    """
+    matrix = np.zeros((partitioner.get_partition_num(), partitioner.get_partition_num()), dtype=int)
+    neighbor_map = dict()
+    old_partition = dict()
+    for event in tg:
+        if event.src not in old_partition:
+            old_partition[event.src] = -1 
+            neighbor_map[event.src] = set()
+        if event.dest not in old_partition:
+            old_partition[event.dest] = -1
+            neighbor_map[event.dest] = set()
+        partitioner.partition(event)
+        if old_partition[event.src] != partitioner.get_partition(event.src):
+            # source vertex changed its partition, update the matrix for its neighbors 
+            for neighbor in neighbor_map[event.src]:
+                if old_partition[neighbor] == old_partition[event.src]:
+                    matrix[old_partition[event.src]][old_partition[neighbor]] -= 1
+                matrix[partitioner.get_partition(event.src)][partitioner.get_partition(neighbor)] += 1
+                if partitioner.get_partition(event.src) != partitioner.get_partition(neighbor):
+                    matrix[partitioner.get_partition(neighbor)][partitioner.get_partition(event.src)] += 1
+        if old_partition[event.dest] != partitioner.get_partition(event.dest):
+            # destination vertex changed its partition, update the matrix for its neighbors
+            for neighbor in neighbor_map[event.dest]:
+                if old_partition[neighbor] == old_partition[event.dest]:
+                    matrix[old_partition[event.dest]][old_partition[neighbor]] -= 1
+                matrix[partitioner.get_partition(event.dest)][partitioner.get_partition(neighbor)] += 1
+                if partitioner.get_partition(event.dest) != partitioner.get_partition(neighbor):
+                    matrix[partitioner.get_partition(neighbor)][partitioner.get_partition(event.dest)] += 1
+        old_partition[event.src] = partitioner.get_partition(event.src)
+        old_partition[event.dest] = partitioner.get_partition(event.dest)
+        matrix[old_partition[event.src]][old_partition[event.dest]] += 1
+        if old_partition[event.src] != old_partition[event.dest]:
+            matrix[old_partition[event.dest]][old_partition[event.src]] += 1
+        # update the neighbor map
+        neighbor_map[event.src].add(event.dest)
+        neighbor_map[event.dest].add(event.src)
+        
+        yield matrix
+
+class DummyPartitioner(TemporalGraphPartitioner):
+    def __init__(self, num_partitions: int):
+        self.num_partitions = num_partitions
+
+    def partition(self, event: Event):
+        pass 
+
+    def get_partition(self, vertex):
+        return vertex % self.num_partitions
+
+    def get_partition_num(self):
+        return self.num_partitions
+
+
