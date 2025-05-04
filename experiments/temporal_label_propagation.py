@@ -5,6 +5,7 @@ from vertex_voyage.temporal import SBMSequence, FirstN, ShuffledSequence
 import pandas as pd 
 import os 
 import matplotlib.pyplot as plt
+import numpy as np 
 class TemporalLabelPropagationBasic(Benchmark):
     """
     A basic benchmark for the Label Propagation algorithm on temporal graphs.
@@ -16,30 +17,37 @@ class TemporalLabelPropagationBasic(Benchmark):
         data = [] 
         repetitions = 30
         partition_candidates = [2, 4, 8, 16]
-        for _ in range(repetitions):
-            for i, part_num in enumerate(partition_candidates):
-                graph = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), 100), 1000)
-                partitioner = LabelPropagationTemporalGraphPartitioner(part_num, .5)
-                partitions = partition_temporal_graph(graph, partitioner)
-                vertices = set()
-                for partition in partitions:
-                    for vertex in partition:
-                        vertices.add(vertex)
-                for i, partition in enumerate(partitions):
-                    data.append({
-                        "partition": i,
-                        "part_num": part_num,
-                        "size": len(partition),
-                        "graph_size": len(vertices),
-                        "expected_part_size": len(vertices) / part_num,
-                    })
-                self.report_progress(i+1, len(partition_candidates) * repetitions)
+        for iteration in range(repetitions):
+            for part_num in partition_candidates:
+                for random_assignment_prob in np.arange(0, 1.1, 0.1):
+                    graph = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), 100), 1000)
+                    partitioner = LabelPropagationTemporalGraphPartitioner(part_num, random_assignment_prob)
+                    partitions = partition_temporal_graph(graph, partitioner)
+                    vertices = set()
+                    for partition in partitions:
+                        for vertex in partition:
+                            vertices.add(vertex)
+                    for i, partition in enumerate(partitions):
+                        data.append({
+                            "partition": i,
+                            "part_num": part_num,
+                            "size": len(partition),
+                            "graph_size": len(vertices),
+                            "expected_part_size": len(vertices) / part_num,
+                            "random_assignment_prob": random_assignment_prob,
+                        })
+            self.report_progress(iteration+1, repetitions)
     
         df = pd.DataFrame(data)
         df.to_csv(os.path.join(results_path, "results.csv"), index=False)
     
     def display(self, results_path):
-        df = pd.read_csv(os.path.join(results_path, "results.csv"))
+        try:
+            df = pd.read_csv(os.path.join(results_path, "results.csv"))
+        except FileNotFoundError:
+            self.run(results_path)
+            return self.display(results_path)
+        df = df[df["random_assignment_prob"] == 0.5]
         # plot average partition size / total graph size depending of the number of partitions 
         fig, ax = plt.subplots()
         balance = df["size"] / df["expected_part_size"]
@@ -49,4 +57,20 @@ class TemporalLabelPropagationBasic(Benchmark):
         ax.set_xlabel("Number of Partitions")
         ax.set_ylabel("Average Partition Size")
         ax.set_title("Average Partition Size depending of the Number of Partitions")
+        plt.show()
+        df = pd.read_csv(os.path.join(results_path, "results.csv"))
+        balance = df["size"] / df["expected_part_size"]
+        df["balance"] = balance
+        for part_num in df["part_num"].unique():
+            df_part = df[df["part_num"] == part_num]
+            x = [] 
+            y = []
+            for p in df_part["random_assignment_prob"].unique():
+                x.append(p)
+                y.append(df_part[df_part["random_assignment_prob"] == p]["balance"].mean())
+            plt.plot(x, y, label=f"Number of Partitions: {part_num}")
+        plt.legend()
+        plt.xlabel("Random Assignment Probability")
+        plt.ylabel("Average Partition Balance")
+        plt.title("Average Partition Balance depending of the Random Assignment Probability")
         plt.show()
