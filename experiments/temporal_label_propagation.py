@@ -1,11 +1,16 @@
 
 from vertex_voyage.benchmark_base import Benchmark
-from vertex_voyage.temporal_partitioning import LabelPropagationTemporalGraphPartitioner, partition_temporal_graph
+from vertex_voyage.temporal_partitioning import (
+    LabelPropagationTemporalGraphPartitioner, 
+    partition_temporal_graph,
+    edge_cut_matrix
+)
 from vertex_voyage.temporal import SBMSequence, FirstN, ShuffledSequence
 import pandas as pd 
 import os 
 import matplotlib.pyplot as plt
 import numpy as np 
+
 class TemporalLabelPropagationBasic(Benchmark):
     """
     A basic benchmark for the Label Propagation algorithm on temporal graphs.
@@ -74,3 +79,54 @@ class TemporalLabelPropagationBasic(Benchmark):
         plt.ylabel("Average Partition Balance")
         plt.title("Average Partition Balance depending of the Random Assignment Probability")
         plt.show()
+
+
+
+class TemporalLabelPropagationEdgeCut(Benchmark):
+    """
+    A benchmark for the Label Propagation algorithm on temporal graphs.
+    It shows how edge cut progresses on SBM graph with shuffled events over time.
+    """
+
+    NAME = "Temporal Label Propagation Partitioning Benchmark - Edge Cut"
+
+    def run(self, results_path):
+        data = [] 
+        precision = 5
+        g = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), 100), 100000)
+        events = list(g)
+        for i, p in enumerate(np.linspace(0, 1, precision)):
+            partitioner = LabelPropagationTemporalGraphPartitioner(16, p)
+            for t, matrix in enumerate(edge_cut_matrix(events, partitioner)):
+                same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))
+                edge_cut = (sum(sum(row) for row in matrix) - same_partition) / 2
+                total_edges = same_partition + edge_cut
+                if total_edges == 0:
+                    edge_cut = 0
+                else:
+                    edge_cut = edge_cut / total_edges
+                data.append({
+                    "Random Assignment Probability": p,
+                    "Edge Cut": edge_cut,
+                    "Partition number": matrix.shape[0],
+                    "Time": t,
+                })
+            self.report_progress(i+1, precision)
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(results_path, "results.csv"), index=False)
+    
+    def display(self, results_path):
+        try:
+            df = pd.read_csv(os.path.join(results_path, "results.csv"))
+            for p in df["Random Assignment Probability"].unique():
+                df_part = df[df["Random Assignment Probability"] == p]
+                plt.plot(df_part["Time"], df_part["Edge Cut"], label=f"Random Assignment Probability: {p}")
+            plt.legend()
+            plt.xlabel("Time")
+            plt.ylabel("Edge Cut")
+            plt.title("Edge Cut over time")
+            plt.show()
+        except FileNotFoundError:
+            self.run(results_path)
+            return self.display(results_path)
+        
