@@ -69,6 +69,7 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
         if random() < self.p:
             self.partition_map[event.src] = randint(0, self.num_partitions - 1)
             self.partition_map[event.dest] = randint(0, self.num_partitions - 1)
+            return 
         freq = dict()
         for neighbor in self.neighbor_map[event.src]:
             if neighbor in self.partition_map:
