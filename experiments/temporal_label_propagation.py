@@ -216,3 +216,53 @@ class DifferentShuffleParams(Benchmark):
         except FileNotFoundError:
             self.run(results_path)
             return self.display(results_path)
+
+class DifferentSBMParams(Benchmark):
+    """
+    A benchmark for the Label Propagation algorithm on temporal graphs.
+    It shows how edge cut progresses based on different SBM parameters.
+    """
+
+    NAME = "Temporal Label Propagation Partitioning Benchmark - Different SBM Parameters"
+
+    def run(self, results_path):
+        data = [] 
+        community_num = [2, 4, 8]
+        same_community_prob = [0.7, 0.8, 0.9]
+        for ci, communitties in enumerate(community_num):
+            for prob in same_community_prob:
+                comm_prob = [1 / communitties] * communitties
+                connection_prob = [[prob if i == j else (1 - prob) / (communitties - 1) for j in range(communitties)] for i in range(communitties)]
+                g = FirstN(ShuffledSequence(SBMSequence(comm_prob, connection_prob), 100), 1000)
+                partitioner = LabelPropagationTemporalGraphPartitioner(16, 0)
+                for t, matrix in enumerate(edge_cut_matrix(g, partitioner)):
+                    same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))
+                    edge_cut = (sum(sum(row) for row in matrix) - same_partition) / 2
+                    total_edges = same_partition + edge_cut
+                    if total_edges == 0:
+                        edge_cut = 0
+                    else:
+                        edge_cut = edge_cut / total_edges
+                    data.append({
+                        "Edge Cut": edge_cut,
+                        "Partition number": matrix.shape[0],
+                        "Time": t,
+                        "Community Number": communitties,
+                        "Same Community Probability": prob,
+                    })
+            self.report_progress(ci+1, len(community_num))
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(results_path, "results.csv"), index=False)
+    def display(self, results_path):
+        try:
+            df = pd.read_csv(os.path.join(results_path, "results.csv"))
+            for comm_num in df["Community Number"].unique():
+                df_part = df[df["Community Number"] == comm_num]
+                df_part.groupby("Same Community Probability").mean().reset_index().plot.bar(x="Same Community Probability", y="Edge Cut", label=f"Community Number: {comm_num}")
+            
+            plt.title("Average Edge Cut depending of the Same Community Probability")
+            plt.legend()
+            plt.show()
+        except FileNotFoundError:
+            self.run(results_path)
+            return self.display(results_path)
