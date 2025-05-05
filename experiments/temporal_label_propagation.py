@@ -10,6 +10,7 @@ import pandas as pd
 import os 
 import matplotlib.pyplot as plt
 import numpy as np 
+from vertex_voyage.temporal import FileEventSequence
 
 class TemporalLabelPropagationBasic(Benchmark):
     """
@@ -130,3 +131,42 @@ class TemporalLabelPropagationEdgeCut(Benchmark):
             self.run(results_path)
             return self.display(results_path)
         
+class TemporalTwitchLabelPropagationBenchmark(Benchmark):
+    """
+    Twitch Label Propagation Benchmark
+    """
+
+    NAME = "Temporal Twitch Label Propagation Benchmark"
+
+    def run(self, results_path):
+        data = [] 
+        g = list(FileEventSequence("data/twitch.txt"))
+        partitioner = LabelPropagationTemporalGraphPartitioner(16, 0.5)
+        for i, matrix in enumerate(edge_cut_matrix(g, partitioner)):
+            same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))
+            edge_cut = (sum(sum(row) for row in matrix) - same_partition) / 2
+            total_edges = same_partition + edge_cut
+            if total_edges == 0:
+                edge_cut = 0
+            else:
+                edge_cut = edge_cut / total_edges
+            data.append({
+                "Edge Cut": edge_cut,
+                "Partition number": matrix.shape[0],
+                "Time": i,
+            })
+            self.report_progress(i+1, len(g))
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(results_path, "results.csv"), index=False)
+
+    def display(self, results_path):
+        try:
+            df = pd.read_csv(os.path.join(results_path, "results.csv"))
+            plt.plot(df["Time"], df["Edge Cut"])
+            plt.xlabel("Time")
+            plt.ylabel("Edge Cut")
+            plt.title("Edge Cut over time")
+            plt.show()
+        except FileNotFoundError:
+            self.run(results_path)
+            return self.display(results_path)
