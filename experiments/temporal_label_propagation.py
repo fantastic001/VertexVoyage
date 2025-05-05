@@ -140,7 +140,7 @@ class TemporalTwitchLabelPropagationBenchmark(Benchmark):
 
     def run(self, results_path):
         data = [] 
-        g = list(FileEventSequence("data/twitch.txt"))
+        g = list(FirstN(FileEventSequence("data/twitch.txt"), 10000))
         partitioner = LabelPropagationTemporalGraphPartitioner(16, 0.5)
         for i, matrix in enumerate(edge_cut_matrix(g, partitioner)):
             same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))
