@@ -206,8 +206,10 @@ def save_benchmark_hash(benchmark_class):
         start_line = benchmark_class.run.__code__.co_firstlineno
         end_line = start_line
         lines = code.splitlines()
+        count_tabs = lambda line: len(line) - len(line.lstrip("\t").lstrip(" "))
+        indentation = count_tabs(lines[start_line])
         for line in lines[start_line:]:
-            if not line.startswith(" ") and not  line.startswith("\t"):
+            if count_tabs(line) < indentation:
                 break
             end_line += 1
         code = lines[start_line:end_line]
