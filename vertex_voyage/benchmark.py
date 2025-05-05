@@ -6,6 +6,9 @@ from vertex_voyage.config import get_classes_inheriting, get_config_str
 import os.path
 from vertex_voyage.benchmark_base import Benchmark
 import matplotlib.pyplot as plt
+from hashlib import sha256
+import inspect 
+
 class SimplePatch:
     def __init__(self, target_path, new_value=None):
         self.target_path = target_path
@@ -149,7 +152,78 @@ def get_benchmark_class(name: str):
             return cls
     raise ValueError(f"Benchmark class {name} not found.")
 
+def get_benchmark_results_folder(name: str):
+    """
+    Get the results folder for a benchmark class.
+    
+    :param name: The name of the benchmark class.
+    :return: The results folder for the benchmark class.
+    """
+    results_folder = get_config_str("results_folder", "results/", "Path to the results folder.")
+    return os.path.join(results_folder, name)
 
+def benchmark_changed(benchmark_class):
+    """
+    Checks if benchmark run method has been changed by checking hash file in results folder.
+    
+    :param benchmark_class: The benchmark class.
+    :return: True if the benchmark run method has been changed, False otherwise.
+    """
+    name = get_benchmark_name(benchmark_class)
+    results_folder = get_benchmark_results_folder(name)
+    hash_file = os.path.join(results_folder, "hash.txt")
+    if not os.path.exists(results_folder):
+        os.makedirs(results_folder)
+        save_benchmark_hash(benchmark_class)
+        return True
+    if not os.path.exists(hash_file):
+        save_benchmark_hash(benchmark_class)
+        return False 
+    with open(hash_file, "r") as f:
+        hash_value = f.read()
+    new_hash_value = save_benchmark_hash(benchmark_class)
+    if hash_value != new_hash_value:
+        return True
+    return False
+
+def save_benchmark_hash(benchmark_class):
+    """
+    Save the hash of the benchmark class to a file.
+    
+    :param benchmark_class: The benchmark class.
+    """
+    name = get_benchmark_name(benchmark_class)
+    results_folder = get_benchmark_results_folder(name)
+    hash_file = os.path.join(results_folder, "hash.txt")
+    if not os.path.exists(results_folder):
+        os.makedirs(results_folder)
+    # if source code exists, use it to create hash
+    source = inspect.getsourcefile(benchmark_class.run)
+    if source:
+        with open(source, "r") as f:
+            code = f.read()
+        # get the line number of the run method
+        start_line = benchmark_class.run.__code__.co_firstlineno
+        end_line = start_line
+        lines = code.splitlines()
+        for line in lines[start_line:]:
+            if not line.startswith(" ") and not  line.startswith("\t"):
+                break
+            end_line += 1
+        code = lines[start_line:end_line]
+        code = "\n".join(code)
+        code = code.encode('utf-8')
+    else:
+        code = benchmark_class.run.__code__.co_code
+        vars = benchmark_class.run.__code__.co_varnames
+        vats = list(sorted(vars))
+        vars = " ".join(vats)    
+        code = str(code) + str(vars)
+        code = code.encode('utf-8')
+    hash_value = sha256(code).hexdigest()
+    with open(hash_file, "w") as f:
+        f.write(hash_value)
+    return hash_value
 
 def run_benchmark(name: str):
     """
@@ -161,9 +235,8 @@ def run_benchmark(name: str):
     cls = get_benchmark_class(name)
     benchmark = cls()
     results_folder = get_config_str("results_folder", "results/", "Path to the results folder.")
-    results_folder = os.path.join(results_folder, name)
-    if not os.path.exists(results_folder):
-        os.makedirs(results_folder)
+    results_folder = get_benchmark_results_folder(name)
+    if benchmark_changed(cls):
         benchmark.run(results_folder)
     benchmark.display(results_folder)
 
