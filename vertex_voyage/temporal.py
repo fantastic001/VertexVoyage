@@ -1,6 +1,6 @@
 
 from enum import Enum
-from random import random as rand, randint
+from random import choice, random as rand, randint, sample
 from random import shuffle
 from struct import pack, unpack
 
@@ -207,6 +207,7 @@ class BarabasiAlbertEventSequence(EventSequence):
     def empty(self) -> bool:
         return False
 
+
 class ShuffledSequence(EventSequence):
     def __init__(self, sequence: EventSequence, window: int, buffer: list[Event] = None):
         """
@@ -275,7 +276,47 @@ class FromIterable(EventSequence):
     def empty(self) -> bool:
         return self._head is None
 
-
+class ForestFireEventSequence(FromIterable):
+    def __forest_fire_iter(self):
+        """
+        Generates a forest fire event sequence. The probability of
+        generating an edge is p. The probability of generating a
+        node is 1 - p.
+        """
+        vertices = [0]
+        i = 1 
+        time = 0
+        while True:
+            vertices.append(i)
+            ambassador = choice(vertices[:-1])
+            visited = set()
+            to_visit = [ambassador]
+            while to_visit:
+                current = to_visit.pop()
+                if current in visited:
+                    continue
+                visited.add(current)
+                yield Event(
+                    current,
+                    i,
+                    time,
+                    EventType.ADD,
+                    {}
+                )
+                time += 1
+                burn_fwd = sample(vertices, int(self.p * len(vertices)))
+                to_visit.extend(burn_fwd)
+            i += 1
+    def __init__(self, p: float):
+        """
+        Generates a forest fire event sequence. The probability of
+        generating an edge is p. The probability of generating a
+        node is 1 - p.
+        
+        :param p: Probability of generating an edge
+        """
+        self.p = p
+        super().__init__(self.__forest_fire_iter())
 class SBMSequence(FromIterable):
     def __init__(self, community_probs: list[float], p: list[list[float]]):
         self.community_probs = community_probs
