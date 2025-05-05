@@ -170,3 +170,49 @@ class TemporalTwitchLabelPropagationBenchmark(Benchmark):
         except FileNotFoundError:
             self.run(results_path)
             return self.display(results_path)
+
+class DifferentShuffleParams(Benchmark):
+    """
+    A benchmark for the Label Propagation algorithm on temporal graphs.
+    It shows how edge cut progresses on SBM graph with shuffled events over time.
+    """
+
+    NAME = "Temporal Label Propagation Partitioning Benchmark - Different Shuffle Parameters"
+
+    def run(self, results_path):
+        data = [] 
+        max_window_size = 1000
+        for window_size in range(1,max_window_size+1):
+            g = FirstN(ShuffledSequence(SBMSequence([.5, .5], [[.7, .3], [.3, .7]]), window_size), 10*window_size)
+            partitioner = LabelPropagationTemporalGraphPartitioner(16, 0)
+            for t, matrix in enumerate(edge_cut_matrix(g, partitioner)):
+                same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))
+                edge_cut = (sum(sum(row) for row in matrix) - same_partition) / 2
+                total_edges = same_partition + edge_cut
+                if total_edges == 0:
+                    edge_cut = 0
+                else:
+                    edge_cut = edge_cut / total_edges
+                data.append({
+                    "Edge Cut": edge_cut,
+                    "Partition number": matrix.shape[0],
+                    "Time": t,
+                    "Window Size": window_size,
+                })
+            self.report_progress(window_size, max_window_size)
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(results_path, "results.csv"), index=False)
+
+    def display(self, results_path):
+        try:
+            df = pd.read_csv(os.path.join(results_path, "results.csv"))
+            # plot average edge cut depending of the window size 
+            df.groupby("Window Size").mean().reset_index().plot(x="Window Size", y="Edge Cut")
+            plt.xlabel("Window Size")
+            plt.ylabel("Average Edge Cut")
+            plt.title("Average Edge Cut depending of the Window Size")
+            plt.show()
+            
+        except FileNotFoundError:
+            self.run(results_path)
+            return self.display(results_path)
