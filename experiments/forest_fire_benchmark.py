@@ -1,6 +1,10 @@
 
 from vertex_voyage.temporal import to_nx_graph, ForestFireEventSequence, FirstN, animate_graph
 from vertex_voyage.benchmark_base import Benchmark
+from vertex_voyage.temporal_partitioning import (
+    LabelPropagationTemporalGraphPartitioner,
+    edge_cut_matrix
+)
 import matplotlib.pyplot as plt
 import pandas as pd 
 import os 
@@ -46,6 +50,59 @@ class ForestFireBenchmark(Benchmark):
             plt.show()
 
             
+        except FileNotFoundError:
+            self.run(results_path)
+            self.display(results_path)
+
+class LabelPropagationBenchmarkWithForestFire(Benchmark):
+    """
+    Label Propagation Benchmark for evaluating temporal graph algorithms.
+    """
+    NAME = "Label Propagation with Forest Fire"
+
+    def run(self, results_path):
+        """
+        Run the Label Propagation benchmark and save the results.
+        """
+        # Generate a forest fire event sequence
+        event_sequence = FirstN(ForestFireEventSequence(.1), 1000)
+        events = list(event_sequence)
+        data = [] 
+        partitioner = LabelPropagationTemporalGraphPartitioner(16, .5)
+        for t, matrix in enumerate(edge_cut_matrix(events, partitioner)):
+            same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))
+            edge_cut = (sum(sum(row) for row in matrix) - same_partition) / 2
+            total_edges = same_partition + edge_cut
+            if total_edges == 0:
+                edge_cut = 0
+            else:
+                edge_cut = edge_cut / total_edges
+            data.append({
+                "edge_cut": edge_cut,
+                "total_edges": total_edges,
+                "time": t
+            })
+            self.report_progress(t+1, len(events))
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(results_path, "label_propagation_forest_fire.csv"), index=False)
+
+    def display(self, results_path):
+        """
+        Display the results of the Label Propagation benchmark.
+        """
+        try:
+            # Load the label propagation data
+            df = pd.read_csv(os.path.join(results_path, "label_propagation_forest_fire.csv"))
+            # Plot the edge cut over time
+            plt.figure(figsize=(10, 6))
+            plt.plot(df["time"], df["edge_cut"], label="Edge Cut", color='blue')
+            plt.xlabel("Time")
+            plt.ylabel("Edge Cut")
+            plt.title("Label Propagation Edge Cut Over Time")
+            plt.grid(True)
+            plt.legend()
+            plt.show()
+
         except FileNotFoundError:
             self.run(results_path)
             self.display(results_path)
