@@ -315,10 +315,13 @@ def get_partition_average_balance(partition_sizes: dict, partition_num: int):
     
     Partition size is defined as P[i] = (1 + balance_factor) * avg_partition_size
     """
+    for i in range(partition_num):
+        if i not in partition_sizes:
+            partition_sizes[i] = 0
     avg_partition_size = sum(partition_sizes.values()) / partition_num
     balance_factor = 0
     for partition_size in partition_sizes.values():
-        balance_factor += (partition_size - avg_partition_size) / avg_partition_size
+        balance_factor += abs(partition_size - avg_partition_size) / avg_partition_size
     return balance_factor / partition_num
 
 if __name__ == "__main__":
