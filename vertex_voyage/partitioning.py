@@ -309,6 +309,17 @@ def label_propagation_partitioner(G: nx.Graph, partition_num: int):
     partitions = [list(sum(part, [])) for part in partitions]
     return partitions
 
+def get_partition_average_balance(partition_sizes: dict, partition_num: int):
+    """
+    Gets average balance factor of partition.
+    
+    Partition size is defined as P[i] = (1 + balance_factor) * avg_partition_size
+    """
+    avg_partition_size = sum(partition_sizes.values()) / partition_num
+    balance_factor = 0
+    for partition_size in partition_sizes.values():
+        balance_factor += (partition_size - avg_partition_size) / avg_partition_size
+    return balance_factor / partition_num
 
 if __name__ == "__main__":
     import vertex_voyage.config as cfg
