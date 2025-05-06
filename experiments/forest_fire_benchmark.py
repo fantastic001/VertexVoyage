@@ -3,8 +3,10 @@ from vertex_voyage.temporal import to_nx_graph, ForestFireEventSequence, FirstN,
 from vertex_voyage.benchmark_base import Benchmark
 from vertex_voyage.temporal_partitioning import (
     LabelPropagationTemporalGraphPartitioner,
-    edge_cut_matrix
+    edge_cut_matrix,
+    partition_sizes
 )
+from vertex_voyage.partitioning import get_partition_average_balance
 import matplotlib.pyplot as plt
 import pandas as pd 
 import os 
@@ -80,10 +82,13 @@ class LabelPropagationBenchmarkWithForestFire(Benchmark):
             data.append({
                 "edge_cut": edge_cut,
                 "total_edges": total_edges,
-                "time": t
+                "time": t,
             })
             self.report_progress(t+1, len(events))
-        df = pd.DataFrame(data)
+        partitioner = LabelPropagationTemporalGraphPartitioner(16, .5)
+        for i, partition_sizes_ in enumerate(partition_sizes(events, partitioner)):
+            data[i]["balance"] = get_partition_average_balance(partition_sizes_, 16)
+        df = pd.DataFrame(data)    
         df.to_csv(os.path.join(results_path, "label_propagation_forest_fire.csv"), index=False)
 
     def display(self, results_path):
@@ -96,6 +101,7 @@ class LabelPropagationBenchmarkWithForestFire(Benchmark):
             # Plot the edge cut over time
             plt.figure(figsize=(10, 6))
             plt.plot(df["time"], df["edge_cut"], label="Edge Cut", color='blue')
+            plt.plot(df["time"], df["balance"], label="Balance", color='orange')
             plt.xlabel("Time")
             plt.ylabel("Edge Cut")
             plt.title("Label Propagation Edge Cut Over Time")
