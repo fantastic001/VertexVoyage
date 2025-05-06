@@ -67,8 +67,9 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
         self.neighbor_map[event.src].add(event.dest)
         self.neighbor_map[event.dest].add(event.src)
         if random() < self.p:
-            self.partition_map[event.src] = randint(0, self.num_partitions - 1)
-            self.partition_map[event.dest] = randint(0, self.num_partitions - 1)
+            random_partition = randint(0, self.num_partitions - 1)
+            self.partition_map[event.src] = random_partition
+            self.partition_map[event.dest] = random_partition
             return 
         freq = dict()
         for neighbor in self.neighbor_map[event.src]:
@@ -142,6 +143,28 @@ def edge_cut_matrix(tg: EventSequence, partitioner: TemporalGraphPartitioner):
         neighbor_map[event.dest].add(event.src)
         
         yield matrix
+
+def partition_sizes(tg: EventSequence, partitioner: TemporalGraphPartitioner):
+    """
+    Computes the partition sizes of a temporal graph.
+
+    :param tg: Temporal graph
+    :param partitioner: Partitioner
+    :return: Partition sizes
+    """
+    partition_sizes = dict()
+    vertices = set()
+    for event in tg:
+        partitioner.partition(event)
+        vertices.add(event.src)
+        vertices.add(event.dest)
+        for vertex in vertices:
+            partition = partitioner.get_partition(vertex)
+            if partition not in partition_sizes:
+                partition_sizes[partition] = 0
+            partition_sizes[partition] += 1
+        yield partition_sizes
+
 
 class DummyPartitioner(TemporalGraphPartitioner):
     def __init__(self, num_partitions: int):
