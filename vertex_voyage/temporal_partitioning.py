@@ -243,3 +243,42 @@ class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner)
     def get_partition_num(self):
         return self.num_partitions
     
+class CommonNeighborsPartitioner(TemporalGraphPartitioner):
+    def __init__(self, num_partitions: int, threshold: int):
+        """
+        Initializes the WindowedLabelPropagationTemporalGraphPartitioner.
+        :param num_partitions: Number of partitions
+        :param threshold: Threshold for common neighbors
+        """
+        self.num_partitions = num_partitions
+        self.threshold = threshold
+        self.partition_map = dict()
+        self.neighbor_map = dict()
+
+    def partition_vertex(self, vertex):
+        if vertex not in self.partition_map:
+            self.partition_map[vertex] = randint(0, self.num_partitions - 1)
+        else:
+            if len(self.neighbor_map[vertex]) > self.threshold:
+                # vertex has more than threshold neighbors, reassign to most common partition
+                self.partition_map[vertex] = get_most_common_partition(vertex, self.partition_map, self.neighbor_map)
+    
+    def partition(self, event: Event):
+        if event.src not in self.neighbor_map:
+            self.neighbor_map[event.src] = set()
+        if event.dest not in self.neighbor_map:
+            self.neighbor_map[event.dest] = set()
+        self.neighbor_map[event.src].add(event.dest)
+        self.neighbor_map[event.dest].add(event.src)
+        self.partition_vertex(event.src)
+        self.partition_vertex(event.dest)
+        
+
+    def get_partition(self, vertex):
+        if vertex not in self.partition_map:
+            return 0
+        return self.partition_map[vertex] 
+
+    def get_partition_num(self):
+        return self.num_partitions
+    
