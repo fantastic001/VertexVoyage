@@ -43,6 +43,23 @@ def partition_temporal_graph(tg: EventSequence, partitioner: TemporalGraphPartit
         partitions[partition].append(vertex)
     return partitions.values()
 
+def get_most_common_partition(vertex, partition_map: dict, neighbor_map: dict):
+    """
+    Returns the most common partition of the neighbors of a vertex.
+    :param vertex: Vertex
+    :param partition_map: Partition map
+    :param neighbor_map: Neighbor map
+    :return: Most common partition
+    """       
+    freq = dict()
+    for neighbor in neighbor_map[vertex]:
+        if neighbor in partition_map:
+            partition = partition_map[neighbor]
+            if partition not in freq:
+                freq[partition] = 0
+            freq[partition] += 1
+    return max(freq, key=freq.get) if freq else partition_map[vertex]
+
 class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
     def __init__(self, num_partitions: int, p: float = 0.5):
         """
@@ -71,22 +88,8 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
             self.partition_map[event.src] = random_partition
             self.partition_map[event.dest] = random_partition
             return 
-        freq = dict()
-        for neighbor in self.neighbor_map[event.src]:
-            if neighbor in self.partition_map:
-                partition = self.partition_map[neighbor]
-                if partition not in freq:
-                    freq[partition] = 0
-                freq[partition] += 1
-        self.partition_map[event.src] = max(freq, key=freq.get) if freq else self.partition_map[event.src]
-        freq = dict()
-        for neighbor in self.neighbor_map[event.dest]:
-            if neighbor in self.partition_map:
-                partition = self.partition_map[neighbor]
-                if partition not in freq:
-                    freq[partition] = 0
-                freq[partition] += 1
-        self.partition_map[event.dest] = max(freq, key=freq.get) if freq else self.partition_map[event.dest]
+        self.partition_map[event.src] = get_most_common_partition(event.src, self.partition_map, self.neighbor_map)
+        self.partition_map[event.dest] = get_most_common_partition(event.dest, self.partition_map, self.neighbor_map)
     def get_partition(self, vertex):
         if vertex not in self.partition_map:
             return 0 
@@ -179,4 +182,64 @@ class DummyPartitioner(TemporalGraphPartitioner):
     def get_partition_num(self):
         return self.num_partitions
 
+class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
+    def __init__(self, num_partitions: int, window_size: int):
+        """
+        Initializes the WindowedLabelPropagationTemporalGraphPartitioner.
+        :param num_partitions: Number of partitions
+        :param window_size: Size of the window
+        """
+        self.num_partitions = num_partitions
+        self.window_size = window_size
+        self.partition_map = dict()
+        self.neighbor_map = dict()
+        self.window = [] 
 
+    def partition_vertex(self, vertex):
+        if vertex not in self.partition_map:
+            if vertex in self.window and len(self.window) >= self.window_size:
+                self.window.remove(vertex)
+                self.partition_map[vertex] = get_most_common_partition(vertex, self.partition_map, self.neighbor_map)
+            elif vertex not in self.window and len(self.window) < self.window_size:
+                self.window.append(vertex)
+                self.partition_map[vertex] = randint(0, self.num_partitions - 1)
+            elif vertex not in self.window and len(self.window) >= self.window_size:
+                # remove random element in window and add new element
+                random_index = randint(0, len(self.window) - 1)
+                self.partition_map[self.window[random_index]] = get_most_common_partition(self.window[random_index], self.partition_map, self.neighbor_map)
+                self.window[random_index] = vertex
+                self.partition_map[vertex] = randint(0, self.num_partitions - 1)
+            else:
+                # no need to update anything 
+                pass 
+        else:
+            # vertex is already in the partition map
+            if vertex in self.window and len(self.window) >= self.window_size:
+                # vertex is in the window and the window is full
+                self.window.remove(vertex)
+                self.partition_map[vertex] = get_most_common_partition(vertex, self.partition_map, self.neighbor_map)
+
+    
+    def partition(self, event: Event):
+        self.partition_vertex(event.src)
+        self.partition_vertex(event.dest)
+        if event.src not in self.neighbor_map:
+            self.neighbor_map[event.src] = set()
+        if event.dest not in self.neighbor_map:
+            self.neighbor_map[event.dest] = set()
+        self.neighbor_map[event.src].add(event.dest)
+        self.neighbor_map[event.dest].add(event.src)
+        if event.src not in self.partition_map:
+            self.partition_map[event.src] = randint(0, self.num_partitions - 1)
+        if event.dest not in self.partition_map:
+            self.partition_map[event.dest] = randint(0, self.num_partitions - 1)
+
+
+    def get_partition(self, vertex):
+        if vertex not in self.partition_map:
+            return 0
+        return self.partition_map[vertex] 
+
+    def get_partition_num(self):
+        return self.num_partitions
+    
