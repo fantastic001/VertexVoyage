@@ -227,11 +227,12 @@ def save_benchmark_hash(benchmark_class):
         f.write(hash_value)
     return hash_value
 
-def run_benchmark(name: str):
+def run_benchmark(name: str, display: bool = True):
     """
     Run a benchmark by name.
     
     :param name: The name of the benchmark class.
+    :param display: Whether to display the benchmark results.
     :return: The result of the benchmark.
     """
     cls = get_benchmark_class(name)
@@ -240,7 +241,8 @@ def run_benchmark(name: str):
     results_folder = get_benchmark_results_folder(name)
     if benchmark_changed(cls):
         benchmark.run(results_folder)
-    benchmark.display(results_folder)
+    if display:
+        benchmark.display(results_folder)
 
 def get_benchmark_names():
     """
@@ -261,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument("benchmark", type=str, help="The name of the benchmark to run.", default=None, nargs="?")
     parser.add_argument("--list", action="store_true", help="List all available benchmarks.")
     parser.add_argument("--interactive", "-i", action="store_true", help="Interactively select benchmark")
-    
+    parser.add_argument("--no-display", action="store_true", help="Do not display the benchmark results.")
     args = parser.parse_args()
     if args.list:
         print("Available benchmarks:")
@@ -274,11 +276,11 @@ if __name__ == "__main__":
         for i, b in enumerate(benchmarks):
             print(f"{i+1}: {get_benchmark_name(b)}")
         i = int(input("> "))
-        run_benchmark(get_benchmark_name(benchmarks[i-1])) 
+        run_benchmark(get_benchmark_name(benchmarks[i-1]), not args.no_display) 
         sys.exit(0)
     if args.benchmark:
         print(f"Running benchmark {args.benchmark}...")
-        result = run_benchmark(args.benchmark)
+        result = run_benchmark(args.benchmark, not args.no_display)
         print(result)
     else:
         print("Running all benchmarks...")
