@@ -5,7 +5,8 @@ from vertex_voyage.temporal_partitioning import (
     LabelPropagationTemporalGraphPartitioner,
     edge_cut_matrix,
     partition_sizes,
-    WindowedLabelPropagationTemporalGraphPartitioner
+    WindowedLabelPropagationTemporalGraphPartitioner,
+    CommonNeighborsPartitioner
 )
 from vertex_voyage.partitioning import get_partition_average_balance
 import matplotlib.pyplot as plt
@@ -97,3 +98,22 @@ class WindowedLPSBM(Benchmark):
     def display(self, results_folder):
         df = pd.read_csv(os.path.join(results_folder, "windowed_label_propagation.csv"))
         display_benchmark_results(df, "window_size", ["edge_cut", "balance"])
+
+class CommonNeighborsBenchmark(Benchmark):
+    
+    NAME = "CN Partitioner SBM over time"
+
+    def run(self, results_folder):
+        threshold = 5
+        df = benchmark_partitioner(
+            self, 
+            16, 
+            CommonNeighborsPartitioner,
+            threshold
+        )
+        df.to_csv(os.path.join(results_folder, "cn.csv"), index=False)
+    
+    def display(self, results_folder):
+        df = pd.read_csv(os.path.join(results_folder, "cn.csv"))
+        display_benchmark_results(df, "time", ["edge_cut", "balance"])
+
