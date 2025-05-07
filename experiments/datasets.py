@@ -6,7 +6,10 @@ import pandas as pd
 import os 
 import matplotlib.pyplot as plt 
 
-from vertex_voyage.temporal_partitioning import CommonNeighborsPartitioner
+from vertex_voyage.temporal_partitioning import (
+    CommonNeighborsPartitioner,
+    WindowedLabelPropagationTemporalGraphPartitioner
+)
 
 datasets = {
     "Live Journal": lambda: FileEventSequence("data/LiveJournal.txt"),
@@ -22,6 +25,7 @@ def create_benchmark_class(partitioner_class, *args):
         NAME = "Benchmark for partitioner " + partitioner_class.__name__ + " on large datasets"
 
         def run(self, results_folder):
+            N = 1000
             data = [] 
             for name, generator in datasets.items():
                 print("Dataset: " + name + " " * 70)
@@ -30,12 +34,12 @@ def create_benchmark_class(partitioner_class, *args):
                     16,
                     partitioner_class,
                     *args,
-                    graph_generator=lambda: FirstN(generator(), 10000)
+                    graph_generator=lambda: FirstN(generator(), N)
                 )
                 data.append({
                     "dataset": name,
-                    "balance": df["balance"].mean(),
-                    "edge_cut": df["edge_cut"].mean(),
+                    "balance": df[df.time == N-1]["balance"].mean(),
+                    "edge_cut": df[df.time == N-1]["edge_cut"].mean(),
                 })
             df = pd.DataFrame(data)
             df.to_csv(os.path.join(results_folder, "results.csv"))
@@ -62,3 +66,7 @@ def create_benchmark_class(partitioner_class, *args):
 
 
 CNBenchmark = create_benchmark_class(CommonNeighborsPartitioner, 10)
+WinBenchmark = create_benchmark_class(
+    WindowedLabelPropagationTemporalGraphPartitioner,
+    1000
+)
