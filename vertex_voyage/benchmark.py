@@ -260,12 +260,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a benchmarks")
     parser.add_argument("benchmark", type=str, help="The name of the benchmark to run.", default=None, nargs="?")
     parser.add_argument("--list", action="store_true", help="List all available benchmarks.")
+    parser.add_argument("--interactive", "-i", action="store_true", help="Interactively select benchmark")
     
     args = parser.parse_args()
     if args.list:
         print("Available benchmarks:")
         for name in get_benchmark_names():
             print(f" - {name}")
+        sys.exit(0)
+    if args.interactive:
+        print("Available benchmarks:")
+        benchmarks = get_benchmark_classes()
+        for i, b in enumerate(benchmarks):
+            print(f"{i+1}: {get_benchmark_name(b)}")
+        i = int(input("> "))
+        run_benchmark(get_benchmark_name(benchmarks[i-1])) 
         sys.exit(0)
     if args.benchmark:
         print(f"Running benchmark {args.benchmark}...")
