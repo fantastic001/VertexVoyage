@@ -9,7 +9,8 @@ from vertex_voyage.partitioning import (
     get_partition_average_balance,
     get_node2vec_embedding,
     modified__lfm,
-    random_partitioning
+    random_partitioning,
+    label_propagation_partitioner
 )
 from vertex_voyage.temporal_partitioning import (
     CommonNeighborsPartitioner,
@@ -171,4 +172,41 @@ RandomDistGERBenchmark = create_benchmark_class(
         window_size=20,
     ),
     random_partitioning
+)
+
+LPANode2VecBenchmark = create_benchmark_class(
+    "Node2Vec",
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    label_propagation_partitioner
+)
+
+LPADistGERBenchmark = create_benchmark_class(
+    "DistGER",
+    get_distger_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        max_walk_size=80,
+        min_walk_size=20,
+        window_size=20,
+    ),
+    label_propagation_partitioner
 )
