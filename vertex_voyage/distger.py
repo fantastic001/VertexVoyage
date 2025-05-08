@@ -150,5 +150,6 @@ class DistGER(Node2Vec):
     def _random_walk(self, node):
         walker = Walker(node)
         graph = Graph(self.G)
-        return list(self.nodes[n] for n in walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
+        walk_ = list(self.nodes[n] for n in walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
+        return walk_
         
