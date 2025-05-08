@@ -113,6 +113,8 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
           window_size=window_size,
           negative_samples=0
       )
+      if not positive_skip_grams:
+            continue
       for target, context_word in positive_skip_grams:
         context_class = tf.expand_dims(
             tf.constant([context_word], dtype="int64"), 1)
@@ -134,6 +136,8 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
         targets.append(target)
         contexts.append(context)
         labels.append(label)
+    if not targets:
+        return None
     targets = np.array(targets)
     contexts = np.array(contexts)
     labels = np.array(labels)
@@ -252,6 +256,9 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     if min(min(walk) for walk in walks) == 0:
         walks = [[w + 1 for w in walk] for walk in walks]
     training = generate_skip_grams(walks, window_size, num_ns, vocab_size+1, seed)
+    # if training is None, then return zero weights
+    if training is None:
+        return np.zeros((vocab_size+1, embedding_dim))
     model = train_word2vec_model(training, vocab_size+1, embedding_dim, learning_rate, epochs, epoch_callbacks)
     weights = model.get_layer('w2v_embedding').get_weights()[0]
     return weights[1:]  # Skip the first row (non-word)
