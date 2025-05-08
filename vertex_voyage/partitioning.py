@@ -250,6 +250,12 @@ def random_partitioning(G: nx.Graph, partition_num: int):
 def get_partitioning_score(G: nx.Graph, partitioner, scoring, partition_num: int):
     """
     Get the score of a partitioner on a graph.
+
+    :param G: The graph to partition.
+    :param partitioner: The partitioner to use. Should be a function that takes a graph and a number of partitions and returns a list of partitions.
+    :param scoring: The scoring function to use. Should be a function that takes a graph and a list of partitions and returns a score.
+    :param partition_num: The number of partitions to use.
+    :return: The score of the partitioner on the graph.
     """
     partitions = partitioner(G, partition_num)
     return scoring(G, partitions)
