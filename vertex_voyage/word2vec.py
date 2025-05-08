@@ -249,7 +249,8 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     if seed is None:
         seed = random.randint(0, 10e6)
     walks = training_data
-    walks = [[w + 1 for w in walk] for walk in walks]
+    if min(min(walk) for walk in walks) == 0:
+        walks = [[w + 1 for w in walk] for walk in walks]
     training = generate_skip_grams(walks, window_size, num_ns, vocab_size+1, seed)
     model = train_word2vec_model(training, vocab_size+1, embedding_dim, learning_rate, epochs, epoch_callbacks)
     weights = model.get_layer('w2v_embedding').get_weights()[0]
