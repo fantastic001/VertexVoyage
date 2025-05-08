@@ -19,7 +19,16 @@ from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from experiments.datasets import datasets
 
-
+class VertexEnumerator:
+    def __init__(self):
+        self.visited = set()
+        self.index = {}
+    
+    def __call__(self, node):
+        if node not in self.visited:
+            self.visited.add(node)
+            self.index[node] = len(self.visited) - 1
+        return self.index[node]
 
 def get_distger_embedding(dim,
                            min_walk_size,
@@ -35,7 +44,7 @@ def get_distger_embedding(dim,
                            use_threads = True):
     from vertex_voyage.node2vec import Node2Vec
     def f(G):
-        node2vec = Node2Vec(dim, min_walk_size, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
+        node2vec = DistGER(dim, min_walk_size, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
         node2vec.fit(G)
         return {node: node2vec.embed_node(node) for node in G.nodes()}
     return f
@@ -49,18 +58,18 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
             data = [] 
             for name, generator in list(datasets.items())[:1]:
                 print("Dataset: " + name + " " * 70)
+                t = VertexEnumerator()
                 g = list(Transform(FirstN(generator(), N), lambda x: Event(
-                    src=int(x.src),
-                    dest=int(x.dest),
+                    src=t(int(x.src)),
+                    dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),
                     type=x.type,
                     attrs=x.attrs,
                 )))
                 g = to_nx_graph(g)
-                
                 partitions = partitioner_class(g, 16, *args, **kwargs)
                 balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
-
+                print("Balance: ", balance)
                 scoring = get_f1_reconstruction_score(emb_gen)
                 data.append({
                     "dataset": name,
