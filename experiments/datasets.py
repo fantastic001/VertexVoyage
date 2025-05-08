@@ -12,11 +12,11 @@ from vertex_voyage.temporal_partitioning import (
 )
 
 datasets = {
+    "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
+    "SBM 1B": lambda: FileEventSequence("data/sbm_1B.txt"),
     "Live Journal": lambda: FileEventSequence("data/LiveJournal.txt"),
     "UK2002": lambda: FileEventSequence("data/uk2002.txt"),
     "Twitch": lambda: FileEventSequence("data/twitch.txt"),
-    "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
-    "SBM 1B": lambda: FileEventSequence("data/sbm_1B.txt"),
     "Wiki Talks": lambda: FileEventSequence("data/wiki-talks.txt")
 }
 
