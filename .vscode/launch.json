@@ -12,6 +12,15 @@
             "env": {
                 "FAILFAST": "1",
             }
+        },
+        {
+            "name": "Benchmark",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "vertex_voyage.benchmark",
+            "args": [
+                "Embedding DistGER benchmark for partitioner modified__lfm on large datasets"
+            ]
         }
     ]
 }
