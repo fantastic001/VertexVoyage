@@ -57,7 +57,7 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
         def run(self, results_folder):
             N = 1000
             data = [] 
-            for name, generator in list(datasets.items())[:1]:
+            for name, generator in list(datasets.items()):
                 print("Dataset: " + name + " " * 70)
                 t = VertexEnumerator()
                 g = list(Transform(FirstN(generator(), N), lambda x: Event(
