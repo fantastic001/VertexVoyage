@@ -8,7 +8,6 @@ import vertex_voyage.config as cfg
 import multiprocessing.pool as mpp
 import vertex_voyage_native
 
-@cfg.pluggable
 class Node2Vec:
 
     def __init__(self, 
@@ -132,7 +131,7 @@ class Node2Vec:
     
     def _train(self):
         walks = [
-            [n.argmax() for n in walk] for walk in self.walks
+            [n.argmax() if hasattr(n, "argmax") and n.ndim > 0 else n for n in walk] for walk in self.walks
         ]
         return word2vec(
             training_data=walks,
