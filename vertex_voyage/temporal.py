@@ -432,6 +432,21 @@ class FirstN(FromIterable):
         self.n = n
         super().__init__(self._draw_first(sequence, n))
 
+class Transform(FromIterable):
+    
+    def __transform(self, sequence: EventSequence, transform: callable):
+        for event in sequence:
+            yield transform(event)
+    
+    def __init__(self, sequence: EventSequence, transform: callable):
+        self.sequence = sequence
+        self.transform = transform
+        super().__init__(self._transform(sequence, transform))
+    
+    def _transform(self, sequence: EventSequence, transform: callable):
+        for event in sequence:
+            yield transform(event)
+
 def to_nx_graph(tg: EventSequence):
     """
     Returns a networkx graph from an event sequence
