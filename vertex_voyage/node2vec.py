@@ -106,6 +106,9 @@ class Node2Vec:
 
     def _random_walks(self):
         walks = []
+        self.G: nx.Graph
+        if self.G.number_of_nodes() == 0:
+            return [] 
         if self.use_threads:
             starts = [np.random.choice(list(self.G.nodes())) for _ in range(self.n_walks)]
             with mpp.ThreadPool() as pool:
@@ -133,6 +136,8 @@ class Node2Vec:
         walks = [
             [n.argmax() if hasattr(n, "argmax") and n.ndim > 0 else n for n in walk] for walk in self.walks
         ]
+        if len(walks) == 0:
+            return np.zeros((len(self.nodes), self.dim))
         return word2vec(
             training_data=walks,
             vocab_size=len(self.g_nodes),
