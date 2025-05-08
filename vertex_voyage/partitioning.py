@@ -493,3 +493,13 @@ if __name__ == "__main__":
         communities = vvn.lfm(g, 5, 1, 0.5, 10)
         print(communities)
 
+
+def extract_subgraphs(G: nx.Graph, partitions: list):
+    """
+    Extract subgraphs from the graph G based on the given partitions.
+    """
+    subgraphs = []
+    for partition in partitions:
+        subgraph = G.subgraph(partition)
+        subgraphs.append(subgraph)
+    return subgraphs
