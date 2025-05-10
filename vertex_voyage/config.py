@@ -159,9 +159,9 @@ def get_symbols_satisfying(predicate):
     visited = set()
     for name, plugin in plugins:
         for symbol in dir(plugin):
-            if symbol in visited:
+            if (name, symbol) in visited:
                 continue
-            visited.add(symbol)
+            visited.add((name, symbol))
             if predicate(getattr(plugin, symbol)):
                 result.append(getattr(plugin, symbol))
     return result
