@@ -105,7 +105,12 @@ def walk(graph: Graph, walker: Walker, threshold=0.999, min_length=20, max_lengt
         src_deg = graph.out_degree.get(current_v, 1)
         dst_deg = graph.out_degree.get(dst, 1)
 
-        p_accept = (1 / (src_deg - common_neighbors)) * max(src_deg, dst_deg) / min(src_deg, dst_deg)
+        if src_deg == 0 or dst_deg == 0:
+            p_accept = 0.0
+        elif src_deg == common_neighbors:
+            p_accept = 0
+        else:
+            p_accept = (1 / (src_deg - common_neighbors)) * max(src_deg, dst_deg) / min(src_deg, dst_deg)
         p_norm = math.tanh(p_accept)
         p = random.random()
 
