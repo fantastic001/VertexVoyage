@@ -148,3 +148,23 @@ Example command to run Vertex Voyage:
 ```sh
 VERTEX_VOYAGE_CONFIG=~/.vertex_voyage/config.json VERTEX_VOYAGE_PORT=8080 vertex_voyage
 ```
+
+# Running benchmarks 
+
+To run particular benchmark from experiments folder, run:
+
+    python -m vertex_voyage.benchmark BENCHMARK_NAME 
+
+To list all benchmarks:
+
+    python -m vertex_voyage.benchmark --list 
+
+By default, we run benchmarks on small datasets for testing purposes. To run full benchmarks:
+
+    export VERTEX_VOYAGE_FULL_BENCHMARK=1 
+    python -m vertex_voyage.benchmark BENCHMARK_NAME 
+
+Or, to run on cluster:
+
+    export VERTEX_VOYAGE_FULL_BENCHMARK=1 
+    python -m vertex_voyage.benchmark --all --no-display 

@@ -222,6 +222,10 @@ def save_benchmark_hash(benchmark_class):
         vars = " ".join(vats)    
         code = str(code) + str(vars)
         code = code.encode('utf-8')
+    # we also add VV environment to the hash 
+    for k in sorted(os.environ.keys()):
+        if k.startswith("VERTEX_VOYAGE_"):
+            code += f"{k}={os.environ[k]}".encode('utf-8')
     hash_value = sha256(code).hexdigest()
     with open(hash_file, "w") as f:
         f.write(hash_value)
@@ -264,6 +268,7 @@ if __name__ == "__main__":
     parser.add_argument("--list", action="store_true", help="List all available benchmarks.")
     parser.add_argument("--interactive", "-i", action="store_true", help="Interactively select benchmark")
     parser.add_argument("--no-display", action="store_true", help="Do not display the benchmark results.")
+    parser.add_argument("--all", action="store_true", help="Run all benchmarks.")
     args = parser.parse_args()
     if args.list:
         print("Available benchmarks:")
@@ -277,6 +282,12 @@ if __name__ == "__main__":
             print(f"{i+1}: {get_benchmark_name(b)}")
         i = int(input("> "))
         run_benchmark(get_benchmark_name(benchmarks[i-1]), not args.no_display) 
+        sys.exit(0)
+    if args.all:
+        print("Running all benchmarks...")
+        for i, name in enumerate(get_benchmark_names()):
+            print(f"Running benchmark {i+1}/{len(get_benchmark_names())}: {name}...")
+            run_benchmark(name, not args.no_display)
         sys.exit(0)
     if args.benchmark:
         print(f"Running benchmark {args.benchmark}...")
