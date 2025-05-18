@@ -1,4 +1,5 @@
 
+from experiments.utils import is_full_benchmark
 from vertex_voyage.benchmark_base import Benchmark
 from vertex_voyage.temporal_partitioning import (
     LabelPropagationTemporalGraphPartitioner, 
@@ -140,7 +141,10 @@ class TemporalTwitchLabelPropagationBenchmark(Benchmark):
 
     def run(self, results_path):
         data = [] 
-        g = list(FirstN(FileEventSequence("data/twitch.txt"), 10000))
+        if not is_full_benchmark():
+            g = list(FirstN(FileEventSequence("data/twitch.txt"), 10000))
+        else:
+            g = list(FileEventSequence("data/twitch.txt"))
         partitioner = LabelPropagationTemporalGraphPartitioner(16, 0.5)
         for i, matrix in enumerate(edge_cut_matrix(g, partitioner)):
             same_partition = sum(matrix[j][j] for j in range(matrix.shape[0]))

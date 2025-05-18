@@ -1,6 +1,6 @@
 
 from vertex_voyage.temporal import FileEventSequence, FirstN
-from experiments.utils import display_benchmark_results, benchmark_partitioner
+from experiments.utils import display_benchmark_results, benchmark_partitioner, is_full_benchmark
 from vertex_voyage.benchmark_base import Benchmark
 import pandas as pd 
 import os 
@@ -25,7 +25,7 @@ def create_benchmark_class(partitioner_class, *args):
         NAME = "Benchmark for partitioner " + partitioner_class.__name__ + " on large datasets"
 
         def run(self, results_folder):
-            N = 1000
+            N = 1000 if not is_full_benchmark() else None 
             data = [] 
             for name, generator in datasets.items():
                 print("Dataset: " + name + " " * 70)
@@ -34,7 +34,7 @@ def create_benchmark_class(partitioner_class, *args):
                     16,
                     partitioner_class,
                     *args,
-                    graph_generator=lambda: FirstN(generator(), N)
+                    graph_generator=lambda: FirstN(generator(), N) if N else generator()
                 )
                 data.append({
                     "dataset": name,

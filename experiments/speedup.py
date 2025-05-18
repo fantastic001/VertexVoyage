@@ -22,6 +22,8 @@ from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from experiments.datasets import datasets
 from datetime import datetime
+from experiments.utils import is_full_benchmark
+
 
 def timeit(func, *args, **kwargs):
     start = datetime.now()
@@ -66,12 +68,14 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
         NAME = f"Performance comparison max {emb_name} vs partitioner {partitioner_class.__name__} on large datasets"
 
         def run(self, results_folder):
-            N = 10
+            N = 10 if not is_full_benchmark() else None
             data = [] 
             for name, generator in list(datasets.items()):
                 print("Dataset: " + name + " " * 70)
                 t = VertexEnumerator()
-                g = list(Transform(FirstN(generator(), N), lambda x: Event(
+                if N:
+                    g = FirstN(generator(), N)
+                g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),
@@ -231,12 +235,14 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
         NAME = f"Performance comparison max {emb_name} vs {partitioner.__name__} on {dataset} with varying {param}"
 
         def run(self, results_folder):
-            N = 10
+            N = 10 if not is_full_benchmark() else None
             data = [] 
             generator = datasets[dataset]
             for i, p in enumerate(param_range):
                 t = VertexEnumerator()
-                g = list(Transform(FirstN(generator(), N), lambda x: Event(
+                if N:
+                    g = FirstN(generator(), N)
+                g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),
@@ -382,12 +388,14 @@ def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, p
         NAME = f"Performance comparison max {emb_name} vs LFM on {dataset} with varying {param}"
 
         def run(self, results_folder):
-            N = 10
+            N = 10 if not is_full_benchmark() else None
             data = [] 
             generator = datasets[dataset]
             for i, p in enumerate(param_range):
                 t = VertexEnumerator()
-                g = list(Transform(FirstN(generator(), N), lambda x: Event(
+                if N:
+                    g = FirstN(generator(), N)
+                g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),

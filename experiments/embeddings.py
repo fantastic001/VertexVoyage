@@ -19,6 +19,7 @@ from vertex_voyage.temporal_partitioning import (
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from experiments.datasets import datasets
+from experiments.utils import is_full_benchmark
 
 class VertexEnumerator:
     def __init__(self):
@@ -55,12 +56,14 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
         NAME = f"Embedding {emb_name} benchmark for partitioner {partitioner_class.__name__} on large datasets"
 
         def run(self, results_folder):
-            N = 1000
+            N = 1000 if not is_full_benchmark() else None 
             data = [] 
             for name, generator in list(datasets.items()):
                 print("Dataset: " + name + " " * 70)
                 t = VertexEnumerator()
-                g = list(Transform(FirstN(generator(), N), lambda x: Event(
+                if N:
+                    g = FirstN(generator(), N)
+                g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),

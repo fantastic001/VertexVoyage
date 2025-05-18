@@ -11,6 +11,7 @@ from vertex_voyage.partitioning import get_partition_average_balance
 import matplotlib.pyplot as plt
 import pandas as pd 
 import os 
+from experiments.utils import is_full_benchmark
 
 class ForestFireBenchmark(Benchmark):
     """
