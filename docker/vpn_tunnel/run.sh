@@ -7,7 +7,7 @@ is_inside_container() {
 VPN_GATEWAY=${VPN_GATEWAY:-"vpn-gateway"}
 VPN_USER=${VPN_USER:-"vpn-user"}
 VPN_PASSWORD=${VPN_PASSWORD:-"vpn-password"}
-SSH_UER=${SSH_USER:-"ssh-user"}
+SSH_USER=${SSH_USER:-"ssh-user"}
 
 
 ANYCONNECT_PATH="/opt/cisco/anyconnect/bin/vpn"
@@ -22,7 +22,11 @@ $VPN_PASSWORD
 y
 EOF
 
-    test $? -eq 0 && echo "Connected to VPN" || echo "Failed to connect to VPN"
+    if [ $? -eq 0 ]; then
+        echo "Connected to VPN"
+    else
+        echo "Failed to connect to VPN"
+    fi
     cat /opt/cisco/anyconnect*.log
 }
 
