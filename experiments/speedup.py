@@ -75,6 +75,8 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
                 t = VertexEnumerator()
                 if N:
                     g = FirstN(generator(), N)
+                else:
+                    g = generator()
                 g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
@@ -242,6 +244,8 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
                 t = VertexEnumerator()
                 if N:
                     g = FirstN(generator(), N)
+                else:
+                    g = generator()
                 g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
@@ -395,6 +399,8 @@ def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, p
                 t = VertexEnumerator()
                 if N:
                     g = FirstN(generator(), N)
+                else:
+                    g = generator()
                 g = list(Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
