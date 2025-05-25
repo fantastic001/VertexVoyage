@@ -176,6 +176,10 @@ def benchmark_changed(benchmark_class):
         os.makedirs(results_folder)
         save_benchmark_hash(benchmark_class)
         return True
+    if os.path.exists(os.path.join(results_folder, "error.txt")):
+        print(f"Results folder {results_folder} contains error.txt file, benchmark run method has been changed.")
+        os.remove(os.path.join(results_folder, "error.txt"))
+        return True
     if not os.path.exists(hash_file):
         save_benchmark_hash(benchmark_class)
         return False 
@@ -285,9 +289,28 @@ if __name__ == "__main__":
         sys.exit(0)
     if args.all:
         print("Running all benchmarks...")
-        for i, name in enumerate(get_benchmark_names()):
+        all_names = get_benchmark_names()
+        all_names = sorted(all_names, key=lambda x: x.lower())
+        if not all_names:
+            print("No benchmarks found.")
+            sys.exit(0)
+        print(f"Found {len(all_names)} benchmarks.")
+        for i, name in enumerate(all_names):
             print(f"Running benchmark {i+1}/{len(get_benchmark_names())}: {name}...")
-            run_benchmark(name, not args.no_display)
+            try:
+                run_benchmark(name, not args.no_display)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"Error running benchmark {name}: {e}")
+                print("Exception traceback printed above.")
+                if os.path.exists(get_benchmark_results_folder(name)):
+                    print(f"Results folder {get_benchmark_results_folder(name)} exists, but benchmark failed. Please check the results folder for more information.")
+                    error_file = os.path.join(get_benchmark_results_folder(name), "error.txt")
+                    with open(error_file, "w") as f:
+                        f.write(str(e))
+                else:
+                    print(f"Results folder {get_benchmark_results_folder(name)} does not exist, benchmark failed. Please check the reexception traceback above for more information.")
         sys.exit(0)
     if args.benchmark:
         print(f"Running benchmark {args.benchmark}...")
