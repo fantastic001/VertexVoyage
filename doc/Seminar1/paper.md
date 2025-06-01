@@ -1,7 +1,12 @@
+---
+bibliography: ./refs.bib
+---
 
 # Evaluation and analysis of graph vertex embeddings in distributed environment with community-aware vertex partitioning
 
 ## Introduction 
+
+<!-- citation example [@apache_software_foundation_zookeeper_2011] -->
 
 ### Motivation
 
@@ -18,7 +23,7 @@ lfm i modifikovani lfm i njihova evaluacija
  -->
 
 
- ## Methods 
+## Methods 
 
 ### System architecture 
 
