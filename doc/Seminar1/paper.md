@@ -25,7 +25,7 @@ Graph vertex embeddings are a powerful technique for representing nodes in a gra
 
 ### Motivation
 
-Today, many real-world applications involve large-scale graphs, such as social networks, biological networks, and knowledge graphs. In order to perform machine learning tasks on these graphs, it is essential to generate meaningful embeddings that capture the relationships and structures within the graph. By doing so, it is possible to leverage the rich information contained in these graphs for various applications, such as recommendation systems, fraud detection, and network analysis.
+Today, many real-world applications involve large-scale graphs, such as social networks [@zachary_information_1977] [@rozemberczki_multi-scale_2021] [@savic_analysis_2017], biological networks [@li_graph_2025] and web page graphs [@adamic_political_2005]. In order to perform machine learning tasks on these graphs, it is essential to generate meaningful embeddings that capture the relationships and structures within the graph. By doing so, it is possible to leverage the rich information contained in these graphs for various applications, such as recommendation systems, fraud detection, and network analysis.
 
 Traditional methods for generating embeddings often struggle with large graphs due to their size and complexity, leading to inefficiencies and suboptimal results. The sheer size of these graphs often exceeds the memory capacity of a single machine, necessitating distributed computing approaches. 
 
