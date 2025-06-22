@@ -41,6 +41,17 @@ In the context of distributed graph processing, there are several challenges tha
 4. **Partitioning Time**: The time taken to partition the graph can be significant, especially for large graphs. Therefore, it is essential to use efficient partitioning algorithms that can quickly produce high-quality partitions.
 5. **Balance of Partitions**: Ensuring that partitions are balanced in terms of the number of nodes and edges can help improve the efficiency of distributed processing. Imbalanced partitions can lead to some machines being overloaded while others are underutilized, resulting in inefficient resource usage and longer processing times.
 
+So the goal of this paper is to partition large graph such that we preserve the community structure of the graph while keeping balance of partitions in a bounded interval with the goal of generating high-quality embeddings in a distributed environment. This involves evaluating different partitioning algorithms and embedding methods to determine their effectiveness in capturing community structures and generating meaningful embeddings in a distributed setting.
+
+Formally, the problem can be defined as follows:
+
+Given a large graph \( G = (V, E) \) with vertices \( V \) and edges \( E \), the goal is to find a partitioning of the vertices into \( k \) subsets \( P_1, P_2, \ldots, P_k \) such that:
+1. The partitioning preserves the community structure of the graph, meaning that nodes within the same community are more likely to be placed in the same partition. This criteria means minimizing the edge cut between partitions $ \sum_{i \neq j} |E(P_i, P_j)| $, where $ E(P_i, P_j) $ is the set of edges between partitions $ P_i $ and $ P_j $.
+2. The partitions are balanced, meaning that the number of vertices in each partition is within a bounded interval, i.e., \( \forall i, |P_i| \in [\frac{|V|}{k} (1 - \epsilon), \frac{|V|}{k} (1 + \epsilon)] \) for some small \( \epsilon > 0 \).
+3. The partitioning time is minimized, meaning that the time taken to compute the partitioning is as low as possible, ideally linear in the number of vertices and edges in the graph.
+
+
+
 ### Related work 
 
 
