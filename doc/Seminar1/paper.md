@@ -45,9 +45,12 @@ So the goal of this paper is to partition large graph such that we preserve the 
 
 Formally, the problem can be defined as follows:
 
-Given a large graph \( G = (V, E) \) with vertices \( V \) and edges \( E \), the goal is to find a partitioning of the vertices into \( k \) subsets \( P_1, P_2, \ldots, P_k \) such that:
+Given a large graph $G = (V, E)$ with vertices $V$ and edges $E$ , the goal is to find a partitioning of the vertices into $k$ subsets $P_1, P_2, \ldots, P_k$ such that:
+
 1. The partitioning preserves the community structure of the graph, meaning that nodes within the same community are more likely to be placed in the same partition. This criteria means minimizing the edge cut between partitions $\sum_{i \neq j} |E(P_i, P_j)|$, where $ E(P_i, P_j) $ is the set of edges between partitions $ P_i $ and $ P_j $ .
+
 2. The partitions are balanced, meaning that the number of vertices in each partition is within a bounded interval, i.e., $\forall i, |P_i| \in [\frac{|V|}{k} (1 - \epsilon), \frac{|V|}{k} (1 + \epsilon)]$ for some small $\epsilon > 0$ .
+
 3. The partitioning time is minimized, meaning that the time taken to compute the partitioning is as low as possible, ideally linear in the number of vertices and edges in the graph.
 
 
