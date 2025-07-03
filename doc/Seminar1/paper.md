@@ -91,6 +91,8 @@ Main contributions of this paper include:
 
 <!-- Ovde objasnim ZK i kako je sve implementirano kao velika baza podataka -->
 
+![System architecture](./png/Copy%20of%20Arhitektura%20i%20infrastruktura.drawio.png)
+
 ### Partitioning 
 
 <!-- ovde objasnim LFM -->
