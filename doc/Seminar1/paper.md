@@ -19,7 +19,7 @@ In real graphs, there are several properties that are often observed [@watts_col
 - **Community structure**: Vertices tend to form clusters or communities, where vertices within the same community are more densely connected than those in different communities. This property is prevalent in social networks, where groups of friends or colleagues often form tightly-knit communities. [@leskovec_community_2009]
 - **Scale-free property**: The degree distribution of the graph follows a power-law, meaning that a few vertices have a very high degree, while most vertices have a low degree. This is often observed in social networks, where a small number of individuals (e.g., celebrities) have many connections, while the majority of users have relatively few connections. [@barabasi_emergence_1999]
 
-Graph vertex embeddings are a powerful technique for representing nodes in a graph as low-dimensional vectors , enabling various machine learning tasks such as node classification, link prediction [@leskovec_predicting_2010], and community detection. The effectiveness of these embeddings often depends on the underlying graph structure and the methods used to generate them. When faced with large graphs, the challenge of efficiently computing these embeddings while preserving the graph's structural properties becomes paramount. This paper explores the evaluation and analysis of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning to enhance the quality of embeddings.
+Graph vertex embeddings are a powerful technique for representing vertices in a graph as low-dimensional vectors, enabling various machine learning tasks such as vertex classification, link prediction [@leskovec_predicting_2010], and community detection. The effectiveness of these embeddings often depends on the underlying graph structure and the methods used to generate them. When faced with large graphs, the challenge of efficiently computing these embeddings while preserving the graph's structural properties becomes paramount. This paper explores the evaluation and analysis of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning to enhance the quality of embeddings and reduce the need for network communication during the embedding generation process.
 
 
 
@@ -29,17 +29,17 @@ Today, many real-world applications involve large-scale graphs, such as social n
 
 Traditional methods for generating embeddings often struggle with large graphs due to their size and complexity, leading to inefficiencies and suboptimal results. The sheer size of these graphs often exceeds the memory capacity of a single machine, necessitating distributed computing approaches. 
 
-Motivation for this work stems from the need to develop efficient methods for generating high-quality embeddings in a distributed environment, while also considering the community structure of the graph. Community-aware partitioning can significantly improve the quality of embeddings by ensuring that nodes within the same community are processed together, thereby preserving local structures and relationships while reducing network communication overhead.
+Motivation for this work stems from the need to develop efficient methods for generating high-quality embeddings in a distributed environment, while also considering the community structure of the graph. Community-aware partitioning can significantly improve the quality of embeddings by ensuring that vertices within the same community are processed together, thereby preserving local structures and relationships while reducing network communication overhead.
 
 ### Problem statement 
 
 In the context of distributed graph processing, there are several challenges that need to be addressed:
 
 1. **Scalability**: Efficiently processing large graphs requires algorithms that can scale across multiple machines.
-2. **Community Structure**: Many graphs exhibit community structures, where nodes are densely connected within communities but sparsely connected between them. Capturing this structure is crucial for generating meaningful embeddings.
-3. **Partitioning Effectiveness**: Effective partitioning of the graph can significantly impact the quality of embeddings, as it influences how nodes are grouped and how information is propagated during embedding generation. Additionally, partitioning should be done in a way that minimizes inter-partition communication, which is a common bottleneck in distributed systems. 
+2. **Community Structure**: Many graphs exhibit community structures, where vertices are densely connected within communities but sparsely connected between them. Capturing this structure is crucial for generating meaningful embeddings.
+3. **Partitioning Effectiveness**: Effective partitioning of the graph can significantly impact the quality of embeddings, as it influences how vertices are grouped and how information is propagated during embedding generation. Additionally, partitioning should be done in a way that minimizes inter-partition communication, which is a common bottleneck in distributed systems. 
 4. **Partitioning Time**: The time taken to partition the graph can be significant, especially for large graphs. Therefore, it is essential to use efficient partitioning algorithms that can quickly produce high-quality partitions.
-5. **Balance of Partitions**: Ensuring that partitions are balanced in terms of the number of nodes and edges can help improve the efficiency of distributed processing. Imbalanced partitions can lead to some machines being overloaded while others are underutilized, resulting in inefficient resource usage and longer processing times.
+5. **Balance of Partitions**: Ensuring that partitions are balanced in terms of the number of vertices and edges can help improve the efficiency of distributed processing. Imbalanced partitions can lead to some machines being overloaded while others are underutilized, resulting in inefficient resource usage and longer processing times.
 
 So the goal of this paper is to partition large graph such that we preserve the community structure of the graph while keeping balance of partitions in a bounded interval with the goal of generating high-quality embeddings in a distributed environment. This involves evaluating different partitioning algorithms and embedding methods to determine their effectiveness in capturing community structures and generating meaningful embeddings in a distributed setting.
 
@@ -47,13 +47,13 @@ Formally, the problem can be defined as follows:
 
 Given a large graph $G = (V, E)$ with vertices $V$ and edges $E$ , the goal is to find a partitioning of the vertices into $k$ subsets $P_1, P_2, \ldots, P_k$ such that:
 
-1. The partitioning preserves the community structure of the graph, meaning that nodes within the same community are more likely to be placed in the same partition. This criteria means minimizing the edge cut between partitions $\sum_{i \neq j} |E(P_i, P_j)|$, where $ E(P_i, P_j) $ is the set of edges between partitions $ P_i $ and $ P_j $ .
+1. The partitioning preserves the community structure of the graph, meaning that vertices within the same community are more likely to be placed in the same partition. This criteria means minimizing the edge cut between partitions $\sum_{i \neq j} |E(P_i, P_j)|$, where $ E(P_i, P_j) $ is the set of edges between partitions $ P_i $ and $ P_j $ . Formally, edge cut is defined as: $E(P_i, P_j) = \{ (u, v) \in E | u \in P_i, v \in P_j \}$. 
 
 2. The partitions are balanced, meaning that the number of vertices in each partition is within a bounded interval, i.e., $\forall i, |P_i| \in [\frac{|V|}{k} (1 - \epsilon), \frac{|V|}{k} (1 + \epsilon)]$ for some small $\epsilon > 0$ .
 
 3. The partitioning time is minimized, meaning that the time taken to compute the partitioning is as low as possible, ideally linear in the number of vertices and edges in the graph.
 
-
+A partition $P_k$ is set of vertices stored in a single machine in distributed environment. Every machine (node in cluster) can communicate with other machines in the cluster, but the communication is expensive and should be minimized. Number of machines is denoted as $K$ and the goal is to partition the graph into $K$ partitions such that the above criteria are satisfied as much as possible.
 
 ### Related work 
 
