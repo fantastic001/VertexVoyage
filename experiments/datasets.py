@@ -12,12 +12,12 @@ from vertex_voyage.temporal_partitioning import (
 )
 
 datasets = {
-    "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
-    "SBM 1B": lambda: FileEventSequence("data/sbm_1B.txt"),
-    "Live Journal": lambda: FileEventSequence("data/LiveJournal.txt"),
-    "UK2002": lambda: FileEventSequence("data/uk2002.txt"),
     "Twitch": lambda: FileEventSequence("data/twitch.txt"),
-    "Wiki Talks": lambda: FileEventSequence("data/wiki-talks.txt")
+    "Wiki Talks": lambda: FileEventSequence("data/wiki-talks.txt"),
+    "UK2002": lambda: FileEventSequence("data/uk2002.txt"),
+    "Live Journal": lambda: FileEventSequence("data/LiveJournal.txt"),
+    "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
+    "SBM 1B": lambda: FileEventSequence("data/sbm_1B.txt")
 }
 
 def create_benchmark_class(partitioner_class, *args):
