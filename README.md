@@ -168,3 +168,29 @@ Or, to run on cluster:
 
     export VERTEX_VOYAGE_FULL_BENCHMARK=1 
     python -m vertex_voyage.benchmark --all --no-display 
+
+
+# Development 
+
+## Conda setup
+
+Create environment
+
+```
+conda create myenv -c conda-forge rust python=3.9 
+```
+
+Activate conda and install dependencies:
+
+```
+conda activate myenv
+pip install -r requirements.txt
+```
+
+Compile Rust code with `maturin`
+
+```
+cd vertex_voyage_native
+maturin develop
+```
+
