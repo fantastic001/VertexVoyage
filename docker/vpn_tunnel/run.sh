@@ -9,17 +9,26 @@ VPN_USER=${VPN_USER:-"vpn-user"}
 VPN_PASSWORD=${VPN_PASSWORD:-"vpn-password"}
 SSH_USER=${SSH_USER:-"ssh-user"}
 
-
+ANYCONNECT_ROOT=/opt/cisco/anyconnect/
 ANYCONNECT_PATH="/opt/cisco/anyconnect/bin/vpn"
 ANYCONNECT_AGENT_PATH="/opt/cisco/anyconnect/bin/vpnagentd"
 connect_to_vpn() {
+    #echo "Disabling updates"
+    #sed -i -e "s/<BypassDownloader>false<\\/BypassDownloader>/<BypassDownloader>true<\\/BypassDownloader>/g" $ANYCONNECT_ROOT//AnyConnectLocalPolicy.xml
+
+    if [ ! -f $ANYCONNECT_ROOT/bin/vpnagentd ]; then 
+        ANYCONNECT_ROOT=/opt/cisco/secureclient/
+        ANYCONNECT_PATH="/opt/cisco/secureclient/bin/vpn"
+        ANYCONNECT_AGENT_PATH="/opt/cisco/secureclient/bin/vpnagentd"
+    fi 
+    grep BypassDownloader $ANYCONNECT_ROOT//AnyConnectLocalPolicy.xml
+
     echo "Starting AnyConnect agent"
     $ANYCONNECT_AGENT_PATH
     echo "Connecting to VPN $VPN_GATEWAY"
     $ANYCONNECT_PATH -s connect $VPN_GATEWAY <<EOF
 $VPN_USER
 $VPN_PASSWORD
-y
 EOF
 
     if [ $? -eq 0 ]; then
@@ -66,7 +75,18 @@ if is_inside_container; then
     cp /etc/resolv.conf /etc/resolv.conf.bak
     umount /etc/resolv.conf
     cp /etc/resolv.conf.bak /etc/resolv.conf
+    echo "Connecting to VPN..."
     connect_to_vpn
+    sleep 10
+    UPGRADE=0
+    while ps aux | grep vpndownload | grep -v grep; do 
+        echo "Upgrade in progress....Waiting"
+	sleep 10
+	UPGRADE=1
+    done
+    if [ $UPGRADE = 1 ]; then 
+        connect_to_vpn
+    fi 
     # no argument - tunnel ssh 
     if [ $# -eq 0 ]; then
         ssh_tunnel $SERVER_IP $SERVER_PORT $LOCAL_PORT $SSH_USER $SSH_PASSWORD
