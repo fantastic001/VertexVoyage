@@ -357,7 +357,7 @@ lfm_k = create_benchmark_class_for_partitioner(
         window_size=20,
     ),
     modified__lfm,
-    "k",
+    "pm_k",
     [1, 2, 4, 8, 16, 32, 64],
     partition_count=16,
     alpha=1
