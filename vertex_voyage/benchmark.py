@@ -235,22 +235,27 @@ def save_benchmark_hash(benchmark_class):
         f.write(hash_value)
     return hash_value
 
-def run_benchmark(name: str, display: bool = True):
+def run_benchmark(name: str, display: bool = True, check_changed: bool = True):
     """
     Run a benchmark by name.
     
     :param name: The name of the benchmark class.
     :param display: Whether to display the benchmark results.
+    :param check_changed: Whether to check if the benchmark has changed.
     :return: The result of the benchmark.
     """
     cls = get_benchmark_class(name)
     benchmark = cls()
     results_folder = get_config_str("results_folder", "results/", "Path to the results folder.")
     results_folder = get_benchmark_results_folder(name)
-    if benchmark_changed(cls):
-        benchmark.run(results_folder)
-    if display:
-        benchmark.display(results_folder)
+    if check_changed:
+        if benchmark_changed(cls):
+            benchmark.run(results_folder)
+        if display:
+            benchmark.display(results_folder)
+    else:
+        if display:
+            benchmark.display(results_folder)
 
 def get_benchmark_names():
     """
@@ -273,6 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("--interactive", "-i", action="store_true", help="Interactively select benchmark")
     parser.add_argument("--no-display", action="store_true", help="Do not display the benchmark results.")
     parser.add_argument("--all", action="store_true", help="Run all benchmarks.")
+    parser.add_argument("--no-check-changed", action="store_true", help="Do not check if the benchmark has changed.")
     args = parser.parse_args()
     if args.list:
         print("Available benchmarks:")
@@ -298,7 +304,11 @@ if __name__ == "__main__":
         for i, name in enumerate(all_names):
             print(f"Running benchmark {i+1}/{len(get_benchmark_names())}: {name}...")
             try:
-                run_benchmark(name, not args.no_display)
+                run_benchmark(
+                    name, 
+                    not args.no_display, 
+                    not args.no_check_changed
+                )
             except Exception as e:
                 import traceback
                 traceback.print_exc()
