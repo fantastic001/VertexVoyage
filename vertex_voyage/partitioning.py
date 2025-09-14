@@ -73,7 +73,6 @@ def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: floa
         random_comm.append(node)
     return list(communities)
 
-@cfg.pluggable
 def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = False, threshold: float = 0.5, alpha: float = 1, seed = None) -> list:
     """
     Partition the graph into a given number of partitions using LFM algorithm.
