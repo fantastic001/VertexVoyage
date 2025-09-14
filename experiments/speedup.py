@@ -1,4 +1,5 @@
 
+from random import seed
 from numpy import mod
 from vertex_voyage import data
 from vertex_voyage.temporal import Event, FirstN, Transform, to_nx_graph
@@ -10,7 +11,7 @@ from vertex_voyage.partitioning import (
     get_f1_reconstruction_score,
     get_partition_average_balance,
     get_node2vec_embedding,
-    modified__lfm,
+    partition_graph,
     random_partitioning,
     label_propagation_partitioner
 )
@@ -24,6 +25,9 @@ from experiments.datasets import datasets
 from datetime import datetime
 from experiments.utils import is_full_benchmark
 
+
+def lfm(G, partition_num, alpha, threshold, seed):
+    return partition_graph(G, partition_num, True, threshold, alpha, seed)
 
 def timeit(func, *args, **kwargs):
     start = datetime.now()
@@ -89,6 +93,7 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
                 balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
                 print("Balance: ", balance)
                 embeddings = [timeit(emb_gen, g.subgraph(p)) for p in partitions]
+                print("Number of embeddings: ", len(embeddings))
                 emb_t = sum([t[1] for t in embeddings])
                 max_emb_time = max([t[1] for t in embeddings])
                 data.append({
@@ -136,7 +141,10 @@ Node2VecBenchmark = create_benchmark_class(
         walk_size=80,
         window_size=20,
     ),
-    modified__lfm
+    lfm,
+    alpha=1,
+    threshold=0.5,
+    seed=42,
 )
 
 DistGERBenchmark = create_benchmark_class(
@@ -155,7 +163,10 @@ DistGERBenchmark = create_benchmark_class(
         min_walk_size=20,
         window_size=20,
     ),
-    modified__lfm
+    lfm,
+    alpha=1,
+    threshold=0.5,
+    seed=42
 )
 
 RandomNode2VecBenchmark = create_benchmark_class(
@@ -307,11 +318,10 @@ lfm_threshold = create_benchmark_class_for_partitioner(
         walk_size=80,
         window_size=20,
     ),
-    modified__lfm,
+    lfm,
     "threshold",
     [0, .5, 1], 
-    partition_count=16,
-    pm_k=16,
+    partition_num=16,
     alpha=1
 )
 
@@ -331,37 +341,16 @@ lfm_alpha = create_benchmark_class_for_partitioner(
         walk_size=80,
         window_size=20,
     ),
-    modified__lfm,
+    lfm,
     "alpha",
     [1, 1.5, 2], 
-    partition_count=16,
-    pm_k=16,
+    partition_num=16,
     alpha=1,
-    threshold=0.5
+    threshold=0.5,
+    seed=42
 )
 
-lfm_k = create_benchmark_class_for_partitioner(
-    "SBM 10M", 
-    "Node2Vec", 
-    get_node2vec_embedding(
-        dim=128,
-        epochs=1,
-        p=0.5,
-        q=0.5,
-        learning_rate=0.01, 
-        negative_sample_num=5,
-        n_walks=100,
-        seed=42,
-        use_threads=True,
-        walk_size=80,
-        window_size=20,
-    ),
-    modified__lfm,
-    "pm_k",
-    [1, 2, 4, 8, 16, 32, 64],
-    partition_count=16,
-    alpha=1
-)
+
 
 lfm_partition_count = create_benchmark_class_for_partitioner(
     "SBM 10M", 
@@ -379,10 +368,9 @@ lfm_partition_count = create_benchmark_class_for_partitioner(
         walk_size=80,
         window_size=20,
     ),
-    modified__lfm,
-    "partition_count",
+    lfm,
+    "partition_num",
     [1, 2, 4, 8, 16, 32],
-    pm_k=16,
     alpha=1,
     threshold=0.5
 )
