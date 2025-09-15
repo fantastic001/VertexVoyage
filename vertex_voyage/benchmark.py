@@ -8,6 +8,7 @@ from vertex_voyage.benchmark_base import Benchmark
 import matplotlib.pyplot as plt
 from hashlib import sha256
 import inspect 
+from vertex_voyage.stats import run_with_monitoring
 
 class SimplePatch:
     def __init__(self, target_path, new_value=None):
@@ -291,7 +292,7 @@ if __name__ == "__main__":
         for i, b in enumerate(benchmarks):
             print(f"{i+1}: {get_benchmark_name(b)}")
         i = int(input("> "))
-        run_benchmark(get_benchmark_name(benchmarks[i-1]), not args.no_display) 
+        run_with_monitoring(run_benchmark,get_benchmark_name(benchmarks[i-1]), not args.no_display)
         sys.exit(0)
     if args.all:
         print("Running all benchmarks...")
@@ -304,7 +305,8 @@ if __name__ == "__main__":
         for i, name in enumerate(all_names):
             print(f"Running benchmark {i+1}/{len(get_benchmark_names())}: {name}...")
             try:
-                run_benchmark(
+                run_with_monitoring(
+                    run_benchmark,
                     name, 
                     not args.no_display, 
                     not args.no_check_changed
@@ -324,13 +326,22 @@ if __name__ == "__main__":
         sys.exit(0)
     if args.benchmark:
         print(f"Running benchmark {args.benchmark}...")
-        result = run_benchmark(args.benchmark, not args.no_display)
+        result = run_with_monitoring(
+            run_benchmark, 
+            args.benchmark, 
+            not args.no_display
+        )
         print(result)
     else:
         print("Running all benchmarks...")
         for name in get_benchmark_names():
             print(f"Running benchmark {name}...")
-            result = run_benchmark(name)
+            result = run_with_monitoring(
+                run_benchmark, 
+                name, 
+                not args.no_display, 
+                not args.no_check_changed
+            )
             print(result)
     
 
