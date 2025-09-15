@@ -13,3 +13,4 @@ pyyaml
 gensim
 tabulate
 maturin
+psutil
