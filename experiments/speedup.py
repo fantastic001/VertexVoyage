@@ -24,7 +24,8 @@ from vertex_voyage.distger import DistGER
 from experiments.datasets import datasets
 from datetime import datetime
 from experiments.utils import is_full_benchmark
-
+import tracemalloc
+import gc 
 
 def lfm(G, partition_num, alpha, threshold, seed):
     return partition_graph(G, partition_num, True, threshold, alpha, seed)
@@ -248,37 +249,55 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
         NAME = f"Performance comparison max {emb_name} vs {partitioner.__name__} on {dataset} with varying {param}"
 
         def run(self, results_folder):
+            tracemalloc.start()
             N = 10 if not is_full_benchmark() else None
             data = [] 
             generator = datasets[dataset]
-            for i, p in enumerate(param_range):
-                t = VertexEnumerator()
-                if N:
-                    g = FirstN(generator(), N)
-                else:
-                    g = generator()
-                g = list(Transform(g, lambda x: Event(
-                    src=t(int(x.src)),
-                    dest=t(int(x.dest)),
-                    timestamp=int(x.timestamp),
-                    type=x.type,
-                    attrs=x.attrs,
-                )))
-                g = to_nx_graph(g)
-                kwargs[param] = p
-                partitions, partition_t = timeit(partitioner, g, **kwargs)
-                balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, kwargs["partition_count"])
-                embeddings = [timeit(emb_gen, g.subgraph(p)) for p in partitions]
-                emb_t = sum([t[1] for t in embeddings])
-                max_emb_time = max([t[1] for t in embeddings])
-                data.append({
-                    f"{param}": p,
-                    "balance": balance,
-                    "partition_time": partition_t,
-                    "max_embedding_time": max_emb_time,
-                    "embedding_time": emb_t,
-                })
-                self.report_progress(i+1, len(param_range))
+            for iter in range(30):
+                for i, p in enumerate(param_range):
+                    t = VertexEnumerator()
+                    if N:
+                        g = FirstN(generator(), N)
+                    else:
+                        g = generator()
+                    g = list(Transform(g, lambda x: Event(
+                        src=t(int(x.src)),
+                        dest=t(int(x.dest)),
+                        timestamp=int(x.timestamp),
+                        type=x.type,
+                        attrs=x.attrs,
+                    )))
+                    ss1 = tracemalloc.take_snapshot()
+                    g = to_nx_graph(g)
+                    gc.collect()
+                    ss2 = tracemalloc.take_snapshot()
+                    stats = ss2.compare_to(ss1, 'lineno')
+                    print("Total memory usage for to_nx_graph: ", sum([stat.size_diff for stat in stats]))
+                    kwargs[param] = p
+                    partitions, partition_t = timeit(partitioner, g, **kwargs)
+                    ss2 = tracemalloc.take_snapshot()
+                    stats = ss2.compare_to(ss1, 'lineno')
+                    print("Total memory usage for partitioning: ", sum([stat.size_diff for stat in stats]))
+                    balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, kwargs["partition_num"])
+                    embeddings = [] 
+                    for i, part in enumerate(partitions):
+                        embeddings.append(timeit(emb_gen, g.subgraph(part)))
+                    partitions = None
+                    g = None
+                    gc.collect()
+                    ss2 = tracemalloc.take_snapshot()
+                    stats = ss2.compare_to(ss1, 'lineno')
+                    print("Total memory usage for embedding: ", sum([stat.size_diff for stat in stats]))
+                    emb_t = sum([t[1] for t in embeddings])
+                    max_emb_time = max([t[1] for t in embeddings])
+                    data.append({
+                        f"{param}": p,
+                        "balance": balance,
+                        "partition_time": partition_t,
+                        "max_embedding_time": max_emb_time,
+                        "embedding_time": emb_t,
+                    })
+                self.report_progress(iter, 30)
             df = pd.DataFrame(data)
             df.to_csv(os.path.join(results_folder, "results.csv"))
         
@@ -322,7 +341,8 @@ lfm_threshold = create_benchmark_class_for_partitioner(
     "threshold",
     [0, .5, 1], 
     partition_num=16,
-    alpha=1
+    alpha=1,
+    seed=42
 )
 
 lfm_alpha = create_benchmark_class_for_partitioner(
@@ -372,8 +392,90 @@ lfm_partition_count = create_benchmark_class_for_partitioner(
     "partition_num",
     [1, 2, 4, 8, 16, 32],
     alpha=1,
+    threshold=0.5,
+    seed=42
+)
+
+
+
+
+
+lfm_threshold_twitch = create_benchmark_class_for_partitioner(
+    "Twitch", 
+    "Node2Vec", 
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    lfm,
+    "threshold",
+    [0, .5, 1], 
+    partition_num=16,
+    seed=42,
+    alpha=1
+)
+
+lfm_alpha_twitch = create_benchmark_class_for_partitioner(
+    "Twitch", 
+    "Node2Vec", 
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    lfm,
+    "alpha",
+    [1, 1.5, 2], 
+    partition_num=16,
+    alpha=1,
+    threshold=0.5,
+    seed=42
+)
+
+
+
+lfm_partition_count_twitch = create_benchmark_class_for_partitioner(
+    "Twitch", 
+    "Node2Vec", 
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    lfm,
+    "partition_num",
+    [1, 2, 4, 8, 16, 32],
+    alpha=1,
+    seed=42,
     threshold=0.5
 )
+
+
 
 def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, param_range, **kwargs):
     class _Benchmark(Benchmark):
@@ -398,7 +500,7 @@ def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, p
                 )))
                 g = to_nx_graph(g)
                 kwargs[param] = p
-                partitions, partition_t = timeit(modified__lfm, g, 16, pm_k=16, alpha=1, threshold=0.5)
+                partitions, partition_t = timeit(lfm, g, 16, pm_k=16, alpha=1, threshold=0.5)
                 embeddings = [timeit(emb_gen(**kwargs), g.subgraph(p)) for p in partitions]
                 emb_t = sum([t[1] for t in embeddings])
                 max_emb_time = max([t[1] for t in embeddings])
