@@ -17,7 +17,6 @@ datasets = {
     "UK2002": lambda: FileEventSequence("data/uk2002.txt"),
     "Live Journal": lambda: FileEventSequence("data/LiveJournal.txt"),
     "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
-    "SBM 1B": lambda: FileEventSequence("data/sbm_1B.txt")
 }
 
 def create_benchmark_class(partitioner_class, *args):
@@ -70,3 +69,40 @@ WinBenchmark = create_benchmark_class(
     WindowedLabelPropagationTemporalGraphPartitioner,
     1000
 )
+
+class DatasetBenchmark(Benchmark):
+    NAME = "Dataset Benchmark"
+    
+    def run(self, results_folder):
+        data = []
+        for name, generator in datasets.items():
+            print("Dataset: " + name + " " * 70)
+            seq = generator()
+            count = 0
+            dg = {} 
+            for event in seq:
+                count += 1
+                if event.src not in dg:
+                    dg[event.src] = 0
+                dg[event.src] += 1
+            avg = sum(dg.values()) / len(dg) if len(dg) > 0 else 0
+            var = sum((x - avg) ** 2 for x in dg.values()) / len(dg) if len(dg) > 0 else 0
+
+            data.append({
+                "dataset": name,
+                "nodes": len(dg),
+                "edges": count,
+                "avg_degree": avg,
+                "var_degree": var
+            })
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(results_folder, "dataset_stats.csv"))
+            
+    
+    def display(self, results_folder):
+        try:
+            df = pd.read_csv(os.path.join(results_folder, "dataset_stats.csv"))
+            print(df.to_markdown())
+        except FileNotFoundError:
+            self.run(results_folder)
+            self.display(results_folder)
