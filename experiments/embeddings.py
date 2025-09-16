@@ -1,5 +1,5 @@
 
-from vertex_voyage.temporal import Event, FirstN, Transform, to_nx_graph
+from vertex_voyage.temporal import Event, FirstN, Transform, to_nx_graph, to_vv_graph
 from vertex_voyage.benchmark_base import Benchmark
 import pandas as pd 
 import os 
@@ -65,14 +65,14 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
                     g = FirstN(generator(), N)
                 else:
                     g = generator()
-                g = list(Transform(g, lambda x: Event(
+                g = Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),
                     type=x.type,
                     attrs=x.attrs,
-                )))
-                g = to_nx_graph(g)
+                ))
+                g = to_vv_graph(g)
                 partitions = partitioner_class(g, 16, *args, **kwargs)
                 balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
                 print("Balance: ", balance)
