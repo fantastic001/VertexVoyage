@@ -1,15 +1,16 @@
 
-from typing import Any, Optional
+from typing import Optional
 
 class VVGraph:
-    def __init__(self, edges: Optional[dict[Any, list[Any]]] = None, induced_nodes: Optional[set[Any]] = None):
+    def __init__(self, edges: Optional[dict[int, list[int]]] = None, induced_nodes: Optional[set[int]] = None):
         if edges is None:
             self._edges = dict()
         else:
             self._edges = edges
-        self.induced_nodes = induced_nodes
+        self.induced_nodes = set(induced_nodes) if induced_nodes is not None else None
 
-    def add_edge(self, u: Any, v: Any):
+
+    def add_edge(self, u: int, v: int):
         if u not in self._edges:
             self._edges[u] = []
         if v not in self._edges:
@@ -19,7 +20,7 @@ class VVGraph:
         if u not in self._edges[v]:
             self._edges[v].append(u)
 
-    def remove_edge(self, u: Any, v: Any):
+    def remove_edge(self, u: int, v: int):
         if self.induced_nodes is not None:
             if u not in self.induced_nodes or v not in self.induced_nodes:
                 return
@@ -34,12 +35,12 @@ class VVGraph:
             return self.induced_nodes & set(self._edges.keys())
         return set(self._edges.keys())
     
-    def degree(self, node: Any) -> int:
+    def degree(self, node: int) -> int:
         if self.induced_nodes is not None and node not in self.induced_nodes:
             return 0
         if node not in self._edges:
             return 0
-        return len(set(self._edges.get(node, [])) & self.nodes())
+        return len(set(self._edges.get(node, [])) & self.nodes)
     
     @property
     def edges(self):
@@ -55,16 +56,30 @@ class VVGraph:
                         yield (u, v)
                     seen.add((u, v))
     def number_of_edges(self) -> int:
-        return sum(len(neighbors) for neighbors in self._edges.values()) // 2
+        return sum(len(list(filter((lambda x: x in self.nodes), neighbors))) for neighbors in self._edges.values()) // 2
     def number_of_nodes(self) -> int:
-        return len(self.nodes())
+        return len(self.nodes)
     
-    def subgraph(self, induced_nodes: set[Any]) -> 'VVGraph':
+    def subgraph(self, induced_nodes: set[int]) -> 'VVGraph':
         return VVGraph(
             edges=self._edges, 
             induced_nodes=induced_nodes if self.induced_nodes is None else self.induced_nodes & induced_nodes
         )
-    def neighbors(self, node: Any) -> list[Any]:
+    def neighbors(self, node: int) -> set[int]:
+        if self.induced_nodes is None:
+            return set(self._edges.get(node, []))
+        if self.induced_nodes is not None and node not in self.induced_nodes:
+            return set()
+        return set(self._edges.get(node, [])) & self.nodes
+    def __iter__(self):
+        return iter(self.nodes)
+    def __contains__(self, node: int) -> bool:
+        if self.induced_nodes is not None and node not in self.induced_nodes:
+            return False
+        return node in self._edges
+    def __getitem__(self, node: int) -> list[int]:
         if self.induced_nodes is not None and node not in self.induced_nodes:
             return []
+        if not self.induced_nodes:
+            return self._edges.get(node, [])
         return list(set(self._edges.get(node, [])) & self.nodes)
