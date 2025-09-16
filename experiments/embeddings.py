@@ -8,7 +8,7 @@ from vertex_voyage.partitioning import (
     get_f1_reconstruction_score,
     get_partition_average_balance,
     get_node2vec_embedding,
-    modified__lfm,
+    partition_graph,
     random_partitioning,
     label_propagation_partitioner
 )
@@ -20,6 +20,9 @@ from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from experiments.datasets import datasets
 from experiments.utils import is_full_benchmark
+
+def lfm(G, nparts, alpha=1.0, threshold=.5):
+    return partition_graph(G, nparts, alpha=alpha, threshold=threshold, use_modified_lfm=True)
 
 class VertexEnumerator:
     def __init__(self):
@@ -120,7 +123,7 @@ Node2VecBenchmark = create_benchmark_class(
         walk_size=80,
         window_size=20,
     ),
-    modified__lfm
+    lfm
 )
 
 DistGERBenchmark = create_benchmark_class(
@@ -139,7 +142,7 @@ DistGERBenchmark = create_benchmark_class(
         min_walk_size=20,
         window_size=20,
     ),
-    modified__lfm
+    lfm
 )
 
 RandomNode2VecBenchmark = create_benchmark_class(
