@@ -267,7 +267,7 @@ def get_f1_reconstruction_score(embedding_func):
         embeddings = {}
         node_count = {} 
         for part in partitions:
-            embedding = embedding_func(G.subgraph(part))
+            embedding = embedding_func(G.subgraph(part), G.nodes)
             for k,v in embedding.items():
                 if k not in embeddings:
                     embeddings[k] = v
@@ -292,9 +292,9 @@ def get_node2vec_embedding(dim,
                            seed = None,
                            use_threads = True):
     from vertex_voyage.node2vec import Node2Vec
-    def f(G):
+    def f(G, all_nodes):
         node2vec = Node2Vec(dim, walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
-        node2vec.fit(G)
+        node2vec.fit(G, all_nodes)
         return {node: node2vec.embed_node(node) for node in G.nodes}
     return f
 

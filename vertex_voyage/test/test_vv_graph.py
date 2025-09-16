@@ -93,3 +93,8 @@ class TestVVGraph(TestCase):
         for node in vv_graph.nodes:
             embedding = node2vec.embed_node(node)
             self.assertEqual(len(embedding), node2vec.dim)
+        node2vec.fit(vv_graph.subgraph(list(vv_graph.nodes)[:10]), nodes=list(vv_graph.nodes))
+        for node in list(vv_graph.nodes)[:10]:
+            embedding = node2vec.embed_node(node)
+            self.assertEqual(len(embedding), node2vec.dim)
+        

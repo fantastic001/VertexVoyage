@@ -45,9 +45,9 @@ def get_distger_embedding(dim,
                            seed = None,
                            use_threads = True):
     from vertex_voyage.node2vec import Node2Vec
-    def f(G):
+    def f(G, nodes):
         node2vec = DistGER(dim, min_walk_size, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
-        node2vec.fit(G)
+        node2vec.fit(G, nodes)
         return {node: node2vec.embed_node(node) for node in G.nodes()}
     return f
 

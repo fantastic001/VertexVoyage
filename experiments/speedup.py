@@ -62,9 +62,9 @@ def get_distger_embedding(dim,
                            seed = None,
                            use_threads = True):
     from vertex_voyage.node2vec import Node2Vec
-    def f(G):
+    def f(G, all_nodes):
         node2vec = DistGER(dim, min_walk_size, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
-        node2vec.fit(G)
+        node2vec.fit(G, all_nodes)
         return {node: node2vec.embed_node(node) for node in G.nodes()}
     return f
 
@@ -93,7 +93,7 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
                 partitions, partition_t = timeit(partitioner_class, g, 16, *args, **kwargs)
                 balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
                 print("Balance: ", balance)
-                embeddings = [timeit(emb_gen, g.subgraph(p)) for p in partitions]
+                embeddings = [timeit(emb_gen, g.subgraph(p), g.nodes) for p in partitions]
                 print("Number of embeddings: ", len(embeddings))
                 emb_t = sum([t[1] for t in embeddings])
                 max_emb_time = max([t[1] for t in embeddings])
@@ -274,7 +274,7 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
                     balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, kwargs["partition_num"])
                     embeddings = [] 
                     for i, part in enumerate(partitions):
-                        embeddings.append(timeit(emb_gen, g.subgraph(part)))
+                        embeddings.append(timeit(emb_gen, g.subgraph(part), g.nodes))
                     partitions = None
                     g = None
                     gc.collect()
@@ -491,7 +491,7 @@ def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, p
                 g = to_vv_graph(g)
                 kwargs[param] = p
                 partitions, partition_t = timeit(lfm, g, 16, pm_k=16, alpha=1, threshold=0.5)
-                embeddings = [timeit(emb_gen(**kwargs), g.subgraph(p)) for p in partitions]
+                embeddings = [timeit(emb_gen(**kwargs), g.subgraph(p), g.nodes) for p in partitions]
                 emb_t = sum([t[1] for t in embeddings])
                 max_emb_time = max([t[1] for t in embeddings])
                 data.append({
