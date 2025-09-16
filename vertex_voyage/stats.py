@@ -5,6 +5,9 @@ import time
 import contextlib 
 import gc 
 import sys
+from vertex_voyage.config import get_config_float
+
+MEMORY_LIMIT_GB = get_config_float("memory_limit_gb", None, "Memory limit in GB for the process")
 
 def is_debugging() -> bool:
     """
@@ -34,6 +37,10 @@ async def monitor_memory(interval: float = 5.0, pid: int = None) -> None:
             rss = proc.memory_info().rss  # resident set size (bytes)
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             print(f"[{ts}] RSS: {_gb(rss):.3f} GB")
+            if MEMORY_LIMIT_GB and _gb(rss) > MEMORY_LIMIT_GB:
+                print(f"[{ts}] Memory limit of {MEMORY_LIMIT_GB} GB exceeded. Exiting.", flush=True)
+                # send sigkill to self
+                proc.kill()
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         # graceful shutdown
