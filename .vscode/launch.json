@@ -19,8 +19,11 @@
             "request": "launch",
             "module": "vertex_voyage.benchmark",
             "args": [
-                "Embedding DistGER benchmark for partitioner modified__lfm on large datasets"
-            ]
+                "Performance comparison max Node2Vec vs lfm on SBM 10M with varying threshold"
+            ],
+            "env": {
+                "VERTEX_VOYAGE_FULL_BENCHMARK": "1",
+            }
         }
     ]
 }
