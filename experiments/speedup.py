@@ -82,14 +82,14 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
                     g = FirstN(generator(), N)
                 else:
                     g = generator()
-                g = list(Transform(g, lambda x: Event(
+                g = Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),
                     type=x.type,
                     attrs=x.attrs,
-                )))
-                g = to_nx_graph(g)
+                ))
+                g = to_vv_graph(g)
                 partitions, partition_t = timeit(partitioner_class, g, 16, *args, **kwargs)
                 balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
                 print("Balance: ", balance)
@@ -267,7 +267,6 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
                         type=x.type,
                         attrs=x.attrs,
                     ))
-                    ss1 = tracemalloc.take_snapshot()
                     g = to_vv_graph(g)
                     gc.collect()                    
                     kwargs[param] = p
@@ -482,14 +481,14 @@ def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, p
                     g = FirstN(generator(), N)
                 else:
                     g = generator()
-                g = list(Transform(g, lambda x: Event(
+                g = Transform(g, lambda x: Event(
                     src=t(int(x.src)),
                     dest=t(int(x.dest)),
                     timestamp=int(x.timestamp),
                     type=x.type,
                     attrs=x.attrs,
-                )))
-                g = to_nx_graph(g)
+                ))
+                g = to_vv_graph(g)
                 kwargs[param] = p
                 partitions, partition_t = timeit(lfm, g, 16, pm_k=16, alpha=1, threshold=0.5)
                 embeddings = [timeit(emb_gen(**kwargs), g.subgraph(p)) for p in partitions]
