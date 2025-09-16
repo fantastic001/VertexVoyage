@@ -2,7 +2,7 @@
 from random import seed
 from numpy import mod
 from vertex_voyage import data
-from vertex_voyage.temporal import Event, FirstN, Transform, to_nx_graph
+from vertex_voyage.temporal import Event, FirstN, Transform, to_nx_graph, to_vv_graph
 from vertex_voyage.benchmark_base import Benchmark
 import pandas as pd 
 import os 
@@ -260,24 +260,18 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
                         g = FirstN(generator(), N)
                     else:
                         g = generator()
-                    g = list(Transform(g, lambda x: Event(
+                    g = Transform(g, lambda x: Event(
                         src=t(int(x.src)),
                         dest=t(int(x.dest)),
                         timestamp=int(x.timestamp),
                         type=x.type,
                         attrs=x.attrs,
-                    )))
+                    ))
                     ss1 = tracemalloc.take_snapshot()
-                    g = to_nx_graph(g)
-                    gc.collect()
-                    ss2 = tracemalloc.take_snapshot()
-                    stats = ss2.compare_to(ss1, 'lineno')
-                    print("Total memory usage for to_nx_graph: ", sum([stat.size_diff for stat in stats]))
+                    g = to_vv_graph(g)
+                    gc.collect()                    
                     kwargs[param] = p
                     partitions, partition_t = timeit(partitioner, g, **kwargs)
-                    ss2 = tracemalloc.take_snapshot()
-                    stats = ss2.compare_to(ss1, 'lineno')
-                    print("Total memory usage for partitioning: ", sum([stat.size_diff for stat in stats]))
                     balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, kwargs["partition_num"])
                     embeddings = [] 
                     for i, part in enumerate(partitions):
@@ -285,9 +279,6 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
                     partitions = None
                     g = None
                     gc.collect()
-                    ss2 = tracemalloc.take_snapshot()
-                    stats = ss2.compare_to(ss1, 'lineno')
-                    print("Total memory usage for embedding: ", sum([stat.size_diff for stat in stats]))
                     emb_t = sum([t[1] for t in embeddings])
                     max_emb_time = max([t[1] for t in embeddings])
                     data.append({
