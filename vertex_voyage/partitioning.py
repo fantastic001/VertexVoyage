@@ -6,7 +6,9 @@ from cdlib.algorithms.internal.lfm import Community
 from binpacking import to_constant_bin_number
 import random 
 import vertex_voyage.config as cfg 
-import vertex_voyage_native as vvn 
+import vertex_voyage_native as vvn
+
+from vertex_voyage.vv_graph import VVGraph 
 
 
 class __NativeGraph:
@@ -293,7 +295,7 @@ def get_node2vec_embedding(dim,
     def f(G):
         node2vec = Node2Vec(dim, walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
         node2vec.fit(G)
-        return {node: node2vec.embed_node(node) for node in G.nodes()}
+        return {node: node2vec.embed_node(node) for node in G.nodes}
     return f
 
 class CSVFileProblem:
@@ -308,7 +310,10 @@ def label_propagation_partitioner(G: nx.Graph, partition_num: int):
     Partition the graph using label propagation algorithm.
     """
     partitions = {i: [] for i in range(partition_num)}
-    labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, weight="weight", seed=None)
+    if isinstance(G, VVGraph):
+        labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=None)
+    else:
+        labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=None, weight='weight')
     partitions =  to_constant_bin_number(list(labels), partition_num, key=len)
     partitions = [[list(label) for label in p] for p in partitions]
     partitions = [list(sum(part, [])) for part in partitions]
