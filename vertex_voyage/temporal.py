@@ -469,9 +469,9 @@ def to_vv_graph(tg: EventSequence) -> VVGraph:
     G = VVGraph()
     for event in tg:
         if event.type == EventType.ADD:
-            G.add_edge(event.src, event.dest)
+            G.add_edge(int(event.src), int(event.dest))
         elif event.type == EventType.REMOVE:
-            G.remove_edge(event.src, event.dest)
+            G.remove_edge(int(event.src), int(event.dest))
             pass
     return G
 
