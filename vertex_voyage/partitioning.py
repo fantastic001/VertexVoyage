@@ -25,7 +25,7 @@ def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: floa
     if seed is not None:
         random.seed(seed)
     communities = []
-    node_not_include = list(G.nodes.keys())[:]
+    node_not_include = list(G.nodes)[:]
     node_num = len(node_not_include)
     if pm_k is not None:
         k = pm_k

@@ -4,6 +4,8 @@ from random import choice, random as rand, randint, sample
 from random import shuffle
 from struct import pack, unpack
 
+from vertex_voyage.vv_graph import VVGraph
+
 class EventType(Enum):
     ADD = 1
     REMOVE = 2
@@ -460,6 +462,18 @@ def to_nx_graph(tg: EventSequence):
             G.remove_edge(event.src, event.dest)
     return G
 
+def to_vv_graph(tg: EventSequence) -> VVGraph:
+    """
+    Returns a VVGraph from an event sequence
+    """
+    G = VVGraph()
+    for event in tg:
+        if event.type == EventType.ADD:
+            G.add_edge(event.src, event.dest)
+        elif event.type == EventType.REMOVE:
+            G.remove_edge(event.src, event.dest)
+            pass
+    return G
 
 def draw_graph(tg: EventSequence):
     """
