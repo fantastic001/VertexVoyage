@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np 
 import tensorflow as tf
 import random 
+from vertex_voyage.vv_graph import VVGraph
 from vertex_voyage.word2vec import word2vec
 import vertex_voyage.config as cfg 
 import multiprocessing.pool as mpp
@@ -75,10 +76,13 @@ class Node2Vec:
 
     def fit(self, G, nodes = None):
         self.G = G
-        self.is_weighted = any('weight' in data for u, v, data in self.G.edges(data=True))
-        self.node_to_neightbours_map = {node: list(self.G.neighbors(node)) for node in self.G.nodes()}
+        if isinstance(G, VVGraph):
+            self.is_weighted = False 
+        else:
+            self.is_weighted = any('weight' in data for u, v, data in self.G.edges(data=True))
+        self.node_to_neightbours_map = {node: list(self.G.neighbors(node)) for node in self.G.nodes}
         if nodes is None:
-            nodes = list(G.nodes())
+            nodes = list(G.nodes)
         self.g_nodes = nodes
         self.nodes = {node: self._encode(node) for node in nodes}
         self.walks = self._random_walks()
@@ -110,12 +114,12 @@ class Node2Vec:
         if self.G.number_of_nodes() == 0:
             return [] 
         if self.use_threads:
-            starts = [np.random.choice(list(self.G.nodes())) for _ in range(self.n_walks)]
+            starts = [np.random.choice(list(self.G.nodes)) for _ in range(self.n_walks)]
             with mpp.ThreadPool() as pool:
                 walks = pool.map(self._random_walk, starts)
         else:
             for _ in range(self.n_walks):
-                start = np.random.choice(list(self.G.nodes()))
+                start = np.random.choice(list(self.G.nodes))
                 walks.append(self._random_walk(start))
         return walks
     
