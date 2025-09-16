@@ -84,7 +84,10 @@ class Node2Vec:
         if nodes is None:
             nodes = list(G.nodes)
         self.g_nodes = nodes
-        self.nodes = {node: self._encode(node) for node in nodes}
+        if not isinstance(G, VVGraph):
+            self.nodes = {node: self._encode(node) for node in nodes}
+        else:
+            self.nodes = nodes 
         self.walks = self._random_walks()
         self.W = self._train() 
         W = np.zeros((len(nodes), self.dim))
@@ -101,7 +104,10 @@ class Node2Vec:
 
     def embed_node(self, node):
         try:
-            return self.W[list(self.nodes).index(node)]
+            if not isinstance(self.G, VVGraph):
+                return self.W[list(self.nodes).index(node)]
+            else:
+                return self.W[node]
         except KeyError:
             return np.zeros(self.dim)
     
@@ -124,12 +130,18 @@ class Node2Vec:
         return walks
     
     def _random_walk(self, node):
-        walk = [self.nodes[node]]
+        if not isinstance(self.G, VVGraph):
+            walk = [self.nodes[node]]
+        else:
+            walk = [node]
         current = node
         prev = None
         for _ in range(self.walk_size - 1):
             next_node = self._get_next(prev, current)
-            walk.append(self.nodes[next_node])
+            if not isinstance(self.G, VVGraph):
+                walk.append(self.nodes[next_node])
+            else:
+                walk.append(next_node)
             prev = current
             current = next_node
         return walk

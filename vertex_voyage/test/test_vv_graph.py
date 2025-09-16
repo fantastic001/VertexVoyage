@@ -1,9 +1,12 @@
 
 from unittest import TestCase
 
+from vertex_voyage.reconstruction import reconstruct
 from vertex_voyage.vv_graph import VVGraph
 from vertex_voyage.partitioning import random_partitioning, label_propagation_partitioner
 
+import networkx as nx
+from vertex_voyage.node2vec import Node2Vec
 
 class TestVVGraph(TestCase):
     def test_add_and_remove_edge(self):
@@ -56,3 +59,37 @@ class TestVVGraph(TestCase):
         for part in partitions:
             all_nodes.update(part)
         self.assertEqual(all_nodes, g.nodes)
+
+    def test_zachary_node2vec(self):
+        G = nx.karate_club_graph()
+        vv_graph = VVGraph()
+        for u, v in G.edges():
+            vv_graph.add_edge(u, v)
+        node2vec = Node2Vec(
+            dim=128, 
+            walk_size=80, 
+            n_walks=100, 
+            window_size=10,
+            epochs=10, 
+            p = .25,
+            q = 4,
+            negative_sample_num=10, # in practice, should be 500
+            seed=42,
+            learning_rate=0.01,
+            use_threads=False
+        )
+        node2vec.fit(vv_graph)
+        # calculate embeddings
+        embeddings = node2vec.embed_nodes(list(vv_graph.nodes))
+        # reconstruct graph
+        k = vv_graph.number_of_edges()
+        reconstructed_graph = reconstruct(k, embeddings, list(vv_graph.nodes))
+        recall = sum([len(set(vv_graph.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(vv_graph.neighbors(n))) for n in list(vv_graph.nodes)]) / len(vv_graph.nodes)
+        precision = sum([len(set(vv_graph.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in list(vv_graph.nodes) if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in list(vv_graph.nodes) if len(list(reconstructed_graph.neighbors(n))) > 0])
+        f1 = 2 * (precision * recall) / (precision + recall)
+        self.assertGreaterEqual(f1, 0.57)
+    
+        node2vec.fit(vv_graph)
+        for node in vv_graph.nodes:
+            embedding = node2vec.embed_node(node)
+            self.assertEqual(len(embedding), node2vec.dim)
