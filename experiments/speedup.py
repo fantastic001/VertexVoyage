@@ -75,35 +75,36 @@ def create_benchmark_class(emb_name, emb_gen, partitioner_class, *args, **kwargs
         def run(self, results_folder):
             N = 10 if not is_full_benchmark() else None
             data = [] 
-            for name, generator in list(datasets.items()):
-                print("Dataset: " + name + " " * 70)
-                t = VertexEnumerator()
-                if N:
-                    g = FirstN(generator(), N)
-                else:
-                    g = generator()
-                g = Transform(g, lambda x: Event(
-                    src=t(int(x.src)),
-                    dest=t(int(x.dest)),
-                    timestamp=int(x.timestamp),
-                    type=x.type,
-                    attrs=x.attrs,
-                ))
-                g = to_vv_graph(g)
-                partitions, partition_t = timeit(partitioner_class, g, 16, *args, **kwargs)
-                balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
-                print("Balance: ", balance)
-                embeddings = [timeit(emb_gen, g.subgraph(p), g.nodes) for p in partitions]
-                print("Number of embeddings: ", len(embeddings))
-                emb_t = sum([t[1] for t in embeddings])
-                max_emb_time = max([t[1] for t in embeddings])
-                data.append({
-                    "dataset": name,
-                    "balance": balance,
-                    "partition_time": partition_t,
-                    "max_embedding_time": max_emb_time,
-                    "embedding_time": emb_t,
-                })
+            for iter in range(5):
+                for name, generator in list(datasets.items()):
+                    print("Dataset: " + name + " " * 70)
+                    t = VertexEnumerator()
+                    if N:
+                        g = FirstN(generator(), N)
+                    else:
+                        g = generator()
+                    g = Transform(g, lambda x: Event(
+                        src=t(int(x.src)),
+                        dest=t(int(x.dest)),
+                        timestamp=int(x.timestamp),
+                        type=x.type,
+                        attrs=x.attrs,
+                    ))
+                    g = to_vv_graph(g)
+                    partitions, partition_t = timeit(partitioner_class, g, 16, *args, **kwargs)
+                    balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, 16)
+                    print("Balance: ", balance)
+                    embeddings = [timeit(emb_gen, g.subgraph(p), g.nodes) for p in partitions]
+                    print("Number of embeddings: ", len(embeddings))
+                    emb_t = sum([t[1] for t in embeddings])
+                    max_emb_time = max([t[1] for t in embeddings])
+                    data.append({
+                        "dataset": name,
+                        "balance": balance,
+                        "partition_time": partition_t,
+                        "max_embedding_time": max_emb_time,
+                        "embedding_time": emb_t,
+                    })
             df = pd.DataFrame(data)
             df.to_csv(os.path.join(results_folder, "results.csv"))
         
@@ -253,7 +254,7 @@ def create_benchmark_class_for_partitioner(dataset, emb_name, emb_gen, partition
             N = 10 if not is_full_benchmark() else None
             data = [] 
             generator = datasets[dataset]
-            for iter in range(30):
+            for iter in range(5):
                 for i, p in enumerate(param_range):
                     t = VertexEnumerator()
                     if N:
@@ -331,7 +332,7 @@ lfm_threshold = create_benchmark_class_for_partitioner(
     "threshold",
     [0, .5, 1], 
     partition_num=16,
-    alpha=1,
+    alpha=2,
     seed=42
 )
 
@@ -381,7 +382,7 @@ lfm_partition_count = create_benchmark_class_for_partitioner(
     lfm,
     "partition_num",
     [1, 2, 4, 8, 16, 32],
-    alpha=1,
+    alpha=2,
     threshold=0.5,
     seed=42
 )
@@ -466,6 +467,80 @@ lfm_partition_count_twitch = create_benchmark_class_for_partitioner(
 )
 
 
+lfm_threshold_uk2002 = create_benchmark_class_for_partitioner(
+    "UK2002", 
+    "Node2Vec", 
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    lfm,
+    "threshold",
+    [0, .5, 1], 
+    partition_num=16,
+    seed=42,
+    alpha=1
+)
+
+lfm_alpha_uk2002 = create_benchmark_class_for_partitioner(
+    "UK2002", 
+    "Node2Vec", 
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    lfm,
+    "alpha",
+    [1, 1.5, 2], 
+    partition_num=16,
+    alpha=1,
+    threshold=0.5,
+    seed=42
+)
+
+lfm_partition_count_uk2002 = create_benchmark_class_for_partitioner(
+    "UK2002", 
+    "Node2Vec", 
+    get_node2vec_embedding(
+        dim=128,
+        epochs=1,
+        p=0.5,
+        q=0.5,
+        learning_rate=0.01, 
+        negative_sample_num=5,
+        n_walks=100,
+        seed=42,
+        use_threads=True,
+        walk_size=80,
+        window_size=20,
+    ),
+    lfm,
+    "partition_num",
+    [1, 2, 4, 8, 16, 32],
+    alpha=1,
+    seed=42,
+    threshold=0.5
+)
+
+
 
 def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, param_range, **kwargs):
     class _Benchmark(Benchmark):
@@ -475,32 +550,33 @@ def create_benchmark_class_for_emb_with_lfm(dataset, emb_name, emb_gen, param, p
             N = 10 if not is_full_benchmark() else None
             data = [] 
             generator = datasets[dataset]
-            for i, p in enumerate(param_range):
-                t = VertexEnumerator()
-                if N:
-                    g = FirstN(generator(), N)
-                else:
-                    g = generator()
-                g = Transform(g, lambda x: Event(
-                    src=t(int(x.src)),
-                    dest=t(int(x.dest)),
-                    timestamp=int(x.timestamp),
-                    type=x.type,
-                    attrs=x.attrs,
-                ))
-                g = to_vv_graph(g)
-                kwargs[param] = p
-                partitions, partition_t = timeit(lfm, g, 16, pm_k=16, alpha=1, threshold=0.5)
-                embeddings = [timeit(emb_gen(**kwargs), g.subgraph(p), g.nodes) for p in partitions]
-                emb_t = sum([t[1] for t in embeddings])
-                max_emb_time = max([t[1] for t in embeddings])
-                data.append({
-                    f"{param}": p,
-                    "partition_time": partition_t,
-                    "max_embedding_time": max_emb_time,
-                    "embedding_time": emb_t,
-                })
-                self.report_progress(i+1, len(param_range))
+            for iter in range(5):
+                for i, p in enumerate(param_range):
+                    t = VertexEnumerator()
+                    if N:
+                        g = FirstN(generator(), N)
+                    else:
+                        g = generator()
+                    g = Transform(g, lambda x: Event(
+                        src=t(int(x.src)),
+                        dest=t(int(x.dest)),
+                        timestamp=int(x.timestamp),
+                        type=x.type,
+                        attrs=x.attrs,
+                    ))
+                    g = to_vv_graph(g)
+                    kwargs[param] = p
+                    partitions, partition_t = timeit(lfm, g, 16, pm_k=16, alpha=1, threshold=0.5)
+                    embeddings = [timeit(emb_gen(**kwargs), g.subgraph(p), g.nodes) for p in partitions]
+                    emb_t = sum([t[1] for t in embeddings])
+                    max_emb_time = max([t[1] for t in embeddings])
+                    data.append({
+                        f"{param}": p,
+                        "partition_time": partition_t,
+                        "max_embedding_time": max_emb_time,
+                        "embedding_time": emb_t,
+                    })
+                    self.report_progress(i+1, len(param_range))
             df = pd.DataFrame(data)
             df.to_csv(os.path.join(results_folder, "results.csv"))
         
