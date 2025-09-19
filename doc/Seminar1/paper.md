@@ -93,17 +93,71 @@ Main contributions of this paper include:
 
 ![System architecture](./png/Copy%20of%20Arhitektura%20i%20infrastruktura.drawio.png)
 
-### Partitioning 
+Distributed embedding system consists of several components that work together to enable efficient graph processing and embedding generation. The main components of the system include:
 
-<!-- ovde objasnim LFM -->
+1. **Graph Storage**: The graph data is stored in a distributed database, such as network attached storage (NAS), which allows for efficient storage and retrieval of large-scale graph data. 
+2. **Community Detection Module**: This module is responsible for detecting communities within the graph and partitioning it into smaller subgraphs that can be processed independently. The partitioning is done using community-aware algorithms, such as the LFM [@lancichinetti_detecting_2009] and label propagation algorithm [@raghavan_near_2007], to ensure that vertices within the same community are grouped together.
+3. **Partitioning Module**: This module takes the output from the community detection module and further refines the partitions to ensure balance and number of partitions is equal to number of machines in the cluster. This is done using algorithms that optimize for balance such as bin packing algorithms [@gupta_new_1999].
+4. **Embedding Generation Module**: This module is responsible for generating vertex embeddings using methods such as Node2Vec [@grover_node2vec_2016] and DistGER [@fang_distributed_2023]. The embedding generation is performed in a distributed manner, with each machine processing its assigned partition of the graph tihout the need for excessive network communication.
+
+Nodes in the cluster communicate with each other using a distributed coordination service, such as Apache ZooKeeper [@apache_software_foundation_zookeeper_2011], to ensure synchronization and coordination during the embedding generation process. The system is designed to be scalable, allowing for the addition of more machines to handle larger graphs and improve processing efficiency.
+
+### Community detection and graph partitioning
+
+<!-- ovde objasnim LFM i label propagation -->
+
+LFM is a community detection algorithm that identifies overlapping communities in large-scale networks. The algorithm operates by iteratively expanding communities based on a fitness function that measures the quality of the community structure. The fitness function considers both the internal density of connections within a community and the external connections to other communities. The LFM algorithm starts with a seed vertex and expands the community by adding neighboring vertices that improve the fitness score. This process is repeated until no further improvement can be made.
+
+During experiments, it was observed that LFM can oscillate in terms of the remaining unassigned vertices. To address this, a modified version of the LFM algorithm was implemented, which includes a mechanism to track the number of unassigned vertices and terminate the algorithm if number of communities becomes too large. This modification helps to stabilize the partitioning process and ensures that the algorithm converges to a solution in a reasonable time frame.
+
+Since LFM can be inefficient in terms of time complexity for very large graphs, especially when the number of communities becomes large, a threshold is set as percentage of unassigned vertices to terminate the algorithm early. This threshold helps to prevent excessive computation time while still allowing for effective community detection. Unassigned vertices after termination are assigned randomly to existing communities to ensure that all vertices are included in the final partitioning. By doing this, it is possible to control the balance between community-structure preservation and partitioning time, making the algorithm more practical for large-scale graph processing. Currently, most of the practical systems like Apache Giraph use random partitioning due to its simplicity and speed [@martella_practical_2015].
+
+Label propagation is another community detection algorithm that operates on the principle of spreading labels through the network. Each node adopts the label of the most frequent neighbor label, and this process is repeated until a stable state is reached. 
+
+Both LFM and label propagation are effective in detecting communities in large-scale graphs and are used in the community detection module of the system. Still, both algorithms can produce unbalanced partitions if only community structure is considered. To ensure balance, a bin packing algorithm [@gupta_new_1999] is applied after community detection to refine the partitions and ensure that they are balanced in terms of the number of vertices and edges.
+
+Bin packing algorithm has many variants. In this paper, the approach from [@gupta_new_1999] is used. Each item (community) is assigned to the bin (partition) with the lowest current weight (number of vertices in partition) that can accommodate the item without exceeding the maximum allowed weight. If no such bin exists, maximum allowed weight is increased and the process is repeated until all items are assigned to bins. This approach ensures that the partitions are balanced while also preserving the community structure of the graph as much as possible since communities are assigned to partitions as whole units.
 
 ### Embedding
 
 <!-- ukratko objasnim node2vec i distger  -->
 
+Node2Vec is a graph embedding method that generates low-dimensional representations of vertices in a graph by performing biased random walks. The algorithm uses two parameters, $p$ and $q$, to control the random walk process. The parameter $p$ determines the probability of returning to the previous vertex, while the parameter $q$ controls the probability of exploring new vertices. By adjusting these parameters, Node2Vec can capture both local and global structures in the graph. The random walks generated by Node2Vec are then used to train a Word2Vec model, which learns the embeddings based on the co-occurrence of vertices in the walks. Here, walk is treated as a sentence and vertices as words in the sentence. Negative sampling is used to optimize the training process, allowing the model to efficiently learn embeddings that capture the relationships between vertices in the graph.
+
+DistGER changes the way random walks are generated by maximizing the information gain when selecting the next vertex to visit. Even though DistGER provides its own distributed framework for generating embeddings, in this paper, the distributed framework described in system architecture is used to evaluate the effectiveness of DistGER in a distributed environment with community-aware partitioning. The random walks generated by DistGER are also used to train a Word2Vec model, similar to Node2Vec, to learn the vertex embeddings. Precisely, the walks generated by DistGER are used to train the same Word2Vec model as the one used for Node2Vec, allowing for a direct comparison of the embeddings generated by both methods. Only difference is in the way walks are generated.
+
 ### Evaluation criteria 
 
 <!-- Ovde objasnim kako su benchmarkovi radjeni -->
+
+To evaluate the effectiveness of the graph vertex embeddings generated in a distributed environment with community-aware partitioning, several criteria are considered:
+
+**Embedding Quality**: The quality of the embeddings is assessed using metrics such as F1-score of reconstructed graphs [@yip_restore_2023], which measures how well the embeddings capture the relationships between vertices in the original graph. Higher F1-scores indicate better preservation of graph structure in the embeddings. Let $G = (V,E)$ be the original graph and $G' = (V,E')$ be the reconstructed graph from embeddings. $G'$ is constructed by connecting k closest vertices in the embedding space, where k is the number of edges in the original graph. The F1-score is calculated as follows:
+
+$$ F1 = 2 * \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}} $$
+
+where
+
+$$ \text{Precision} = \frac{1}{|V|} \sum_{v \in V} \frac{|N(v) \cap N'(v)|}{|N'(v)|} $$
+
+$$ \text{Recall} = \frac{1}{|V|} \sum_{v \in V} \frac{|N(v) \cap N'(v)|}{|N(v)|} $$
+
+and $N(v)$ and $N'(v)$ are the neighbors of vertex $v$ in the original and reconstructed graphs, respectively.
+
+**Partition Quality**: The quality of the partitions is evaluated based on metrics such as edge cut, which measures the number of edges that connect vertices in different partitions. Lower edge cuts indicate better preservation of community structures within partitions. Edge cut is defined as: 
+
+$$ \text{EdgeCut} = \frac{1}{|E|} \sum_{(u,v) \in E} \mathbb{I}(p(u) \neq p(v)) $$
+
+where $E$ is the set of edges in the original graph, $p(u)$ is the partition of vertex $u$, and $\mathbb{I}(\cdot)$ is the indicator function.
+
+**Balance of Partitions**: The balance of the partitions is assessed by measuring the size of each partition and ensuring that they are within a bounded interval. This helps to ensure that the workload is evenly distributed across machines in the distributed environment.
+
+**Partitioning Time**: The time taken to partition the graph is measured to evaluate the efficiency of the partitioning algorithms. Faster partitioning times are preferred, especially for large graphs, as they reduce the overall processing time in a distributed environment.
+
+**Cluster similarity**: To measure how useful are the embeddings for clustering tasks, k-means clustering is performed on the embeddings and the resulting clusters are compared to ground-truth communities using Adjusted Rand Index (ARI) [@vinh_information_2009]. ARI measures the similarity between two clusterings by considering all pairs of samples and counting pairs that are assigned in the same or different clusters in the predicted and true clusterings. 
+
+
+
 
 ## Results and discussion
 
