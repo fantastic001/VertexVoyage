@@ -293,6 +293,27 @@ Alpha parametar &  &  &  \\
     
 \end{frame}
 
+\begin{frame}
+\begin{table}
+    
+\caption{Uporedna analiza performansi za LFM algoritam particionisanja}
+\label{tab:Performance_comparison_max_Node2Vec_vs_lfm_on_SBM_10M_with_varying_partition_num}
+\begin{tabular}{p{1in}p{1in}p{1in}p{1in}}
+\hline
+ & Vreme particionisanja & Paralelna implementacija & Sekvencijalna implementacija \\
+Broj particija &  &  &  \\
+\hline
+1 & 77.875600 & 107.061880 & 107.061880 \\
+2 & 155.384691 & 102.909459 & 198.506485 \\
+4 & 318.065973 & 90.397061 & 360.115173 \\
+8 & 604.270801 & 107.493993 & 724.160440 \\
+16 & 1202.096511 & 113.680622 & 1407.603405 \\
+32 & 2384.997995 & 122.427380 & 2801.377654 \\
+\hline
+\end{tabular}
+\end{table}
+\end{frame}
+
 \section{Zaključak}
 \begin{frame}{Zaključak}
     \begin{itemize}

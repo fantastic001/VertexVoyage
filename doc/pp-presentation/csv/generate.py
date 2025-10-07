@@ -26,10 +26,11 @@ for file in os.listdir(path):
                         getattr(plt, param)(value)
             plt.savefig(os.path.join(path, f"{basename}.png"), bbox_inches='tight')
     if os.path.isdir(os.path.join(path, file)):
-        results_file = os.path.join(path, file, "results.csv")
         metadata_file = os.path.join(path, file, "metadata.json")
         print("Processing metadata file ", metadata_file)
         metadata = json.load(open(metadata_file, 'r'))
+        results_file_name = metadata.get("results_file", "results.csv")
+        results_file = os.path.join(path, file, results_file_name) 
         df = pd.read_csv(results_file)
         if "columns" in metadata:
             if isinstance(metadata["columns"], dict):
