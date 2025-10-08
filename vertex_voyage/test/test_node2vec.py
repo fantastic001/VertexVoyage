@@ -24,7 +24,7 @@ class TestNode2Vec(unittest.TestCase):
         self.node2vec.nodes = {node: self.node2vec._encode(node) for node in self.G.nodes()}
         self.node2vec.node_to_neightbours_map = {node: list(self.G.neighbors(node)) for node in self.G.nodes()}
         walks = self.node2vec._random_walks()
-        self.assertEqual(len(walks), self.node2vec.n_walks)
+        self.assertEqual(len(walks), self.node2vec.n_walks * len(self.G.nodes()))
         for walk in walks:
             self.assertEqual(len(walk), self.node2vec.walk_size)
         
@@ -37,7 +37,7 @@ class TestNode2Vec(unittest.TestCase):
         node2vec.g_nodes = list(G.nodes())
         node2vec.nodes = {node: node2vec._encode(node) for node in G.nodes()}
         walks = node2vec._random_walks()
-        self.assertEqual(len(walks), node2vec.n_walks)
+        self.assertEqual(len(walks), node2vec.n_walks * len(G.nodes()))
         for walk in walks:
             self.assertEqual(len(walk), node2vec.walk_size)
             decoded_walk = [] 
@@ -128,7 +128,7 @@ class TestNode2Vec(unittest.TestCase):
         node2vec = Node2Vec(
             dim=128, 
             walk_size=80, 
-            n_walks=100, 
+            n_walks=10, 
             window_size=10,
             epochs=10, 
             p = .25,

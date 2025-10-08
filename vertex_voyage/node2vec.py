@@ -12,10 +12,10 @@ import vertex_voyage_native
 class Node2Vec:
 
     def __init__(self, 
-                 dim, 
-                 walk_size, 
-                 n_walks, 
-                 window_size,
+                 dim=128, 
+                 walk_size=80, 
+                 n_walks=10, 
+                 window_size=10,
                  epochs=10, 
                  p = .5, 
                  q = .5,
@@ -120,13 +120,14 @@ class Node2Vec:
         if self.G.number_of_nodes() == 0:
             return [] 
         if self.use_threads:
-            starts = [np.random.choice(list(self.G.nodes)) for _ in range(self.n_walks)]
+            starts = [n for _ in range(self.n_walks) for n in self.G.nodes]
             with mpp.ThreadPool() as pool:
                 walks = pool.map(self._random_walk, starts)
         else:
             for _ in range(self.n_walks):
-                start = np.random.choice(list(self.G.nodes))
-                walks.append(self._random_walk(start))
+                for n in self.G.nodes:
+                    start = n
+                    walks.append(self._random_walk(start))
         return walks
     
     def _random_walk(self, node):
