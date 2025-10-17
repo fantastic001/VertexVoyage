@@ -5,13 +5,16 @@ import os
 from datetime import datetime
 import hashlib
 
+from vertex_voyage.temporal import FirstN
+
 def grid_search(
         f, 
         apply, 
         acc, 
         param_ranges, 
         fixed_params=None, 
-        intermediate_callback=None
+        intermediate_callback=None,
+        report_progress=False
     ):
     """
     Perform a grid search over specified parameter ranges and calculate accumulated results.
@@ -35,6 +38,8 @@ def grid_search(
         A dictionary of parameters that remain constant during the search.
     intermediate_callback : function, optional
         A function that is called with the current result after each evaluation of `f` where current parameters are passed to callback as kwargs.
+    report_progress : bool, optional
+        If True, progress will be reported.
 
     Returns:
     The accumulated result after applying `f` over all combinations of parameters in `param_ranges`.
@@ -48,8 +53,14 @@ def grid_search(
     param_values = [param_ranges[name] for name in param_names]
 
     result = None
-
-    for values in product(*param_values):
+    P = product(*param_values)
+    total = 1
+    i = 0
+    if report_progress:
+        P = list(P)
+        total = len(P)
+        i = 0
+    for values in P:
         params = dict(zip(param_names, values))
         params.update(fixed_params)
         output = f(**params)
@@ -61,6 +72,9 @@ def grid_search(
             result = applied_output
         else:
             result = acc(result, applied_output)
+        if report_progress:
+            i += 1
+            print(f"Progress: " + "=" * (i * 20 // total) + " " * (20 - (i * 20 // total)) + f" {i}/{total}", end='\r')
 
     return result
 
@@ -164,17 +178,52 @@ class GridSearchPersistence:
     def __call__(self, result, **kwargs):
         return self.save(result, **kwargs)
 
+identity = lambda x: x
+
+
+
+class no_serialize:
+    def __init__(self, obj):
+        self.obj = obj
+    def __str__(self) -> str:
+        return ""
+    def __repr__(self) -> str:
+        return ""
 
 if __name__ == "__main__":
-    if os.path.exists('grid_search_results'):
-        persistence = GridSearchPersistence('grid_search_results')
-        loaded = persistence.load(y=10)
-        print("Loaded results:", loaded)
-        os._exit(0)
-    f = lambda x,y: x**2 + y
-    plus = lambda x, y: x + y
-    identity = lambda x: x
-    persistence = GridSearchPersistence('grid_search_results')
-    persistence['marker'] = 'test_run'
-    result = grid_search(f, identity, plus, param_ranges={'x': [1, 2]}, fixed_params={'y': 10}, intermediate_callback=persistence)
-    print("Final result:", result)
+    from experiments.datasets import datasets
+    from vertex_voyage.partitioning import partition_graph, min_corruptability
+    from vertex_voyage.vv_graph import VVGraph
+    from vertex_voyage.temporal import to_vv_graph
+    gs_persist = GridSearchPersistence(location="gs_cache")
+    whitelist = [
+        "Twitch"
+    ] 
+    datasets = {k: v for k, v in datasets.items() if k in whitelist}
+    for dataset_name, dataset in datasets.items():
+        gs_persist['dataset'] = dataset_name
+        g = FirstN(dataset(), n=100)
+        g = to_vv_graph(g)
+        print(f"Dataset: {dataset_name}")
+        print("   Number of nodes:", g.number_of_nodes())
+        mp = grid_search(
+            f = lambda threshold, alpha, num: partition_graph(
+                alpha=alpha,
+                threshold=threshold,
+                G=g,
+                partition_num=num,
+                use_modified_lfm=True
+            ),
+            apply=identity,
+            acc=lambda p1, p2: min_corruptability(
+                g, p1, p2
+            ),
+            param_ranges={
+                'threshold': [0, .5, 1],
+                'alpha': [.5, 1,2],
+                'num': [2,4,8,16]
+            }, 
+            intermediate_callback=gs_persist,
+            report_progress=True
+        )
+        print("\nMinimum corruptability:", mp)
