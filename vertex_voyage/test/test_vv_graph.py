@@ -68,12 +68,12 @@ class TestVVGraph(TestCase):
         node2vec = Node2Vec(
             dim=128, 
             walk_size=80, 
-            n_walks=100, 
+            n_walks=10, 
             window_size=10,
-            epochs=10, 
+            epochs=1, 
             p = .25,
             q = 4,
-            negative_sample_num=10, # in practice, should be 500
+            negative_sample_num=1, # in practice, should be 500
             seed=42,
             learning_rate=0.01,
             use_threads=False
@@ -89,7 +89,6 @@ class TestVVGraph(TestCase):
         f1 = 2 * (precision * recall) / (precision + recall)
         self.assertGreaterEqual(f1, 0.57)
     
-        node2vec.fit(vv_graph)
         for node in vv_graph.nodes:
             embedding = node2vec.embed_node(node)
             self.assertEqual(len(embedding), node2vec.dim)

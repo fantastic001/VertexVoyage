@@ -16,7 +16,7 @@ class Node2Vec:
                  walk_size=80, 
                  n_walks=10, 
                  window_size=10,
-                 epochs=10, 
+                 epochs=1, 
                  p = .5, 
                  q = .5,
                  negative_sample_num = 50,
