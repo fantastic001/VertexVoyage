@@ -106,6 +106,19 @@ def calculate_partitioning_corruption(G: nx.Graph, partitions: list):
     partitioning_corruption = 1-len(partitions_edges) / original_edges
     return partitioning_corruption
 
+def min_corruptability(G: nx.Graph, *partitionings):
+    """
+    Return partitioning with minimum corruption among given partitionings.
+    """
+    min_corruption = 1.0
+    best_partitioning = None
+    for partitioning in partitionings:
+        corruption = calculate_partitioning_corruption(G, partitioning)
+        if corruption < min_corruption:
+            min_corruption = corruption
+            best_partitioning = partitioning
+    return best_partitioning
+
 @cfg.pluggable
 def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm = False, threshold = 0.5, alpha: float = 1, partitions = None):
     """
