@@ -144,7 +144,23 @@ class GridSearchPersistence:
             p.update(params)
             json.dump(p, f, indent=4, default=str)
         
-        
+    def clean(self):
+        """
+        Clean all saved states from the location.
+        """
+        if os.path.exists(self.location):
+            children = os.listdir(self.location)
+            for child in children:
+                child_path = os.path.join(self.location, child)
+                if os.path.isdir(child_path):
+                    # skip backup directories
+                    if '_' in child:
+                        continue
+                    for filename in os.listdir(child_path):
+                        file_path = os.path.join(child_path, filename)
+                        os.remove(file_path)
+                    os.rmdir(child_path)
+
     def load(self, **params) -> list:
         """
         Load the state corresponding to the given parameters.
@@ -202,7 +218,7 @@ if __name__ == "__main__":
     datasets = {k: v for k, v in datasets.items() if k in whitelist}
     for dataset_name, dataset in datasets.items():
         gs_persist['dataset'] = dataset_name
-        g = FirstN(dataset(), n=100)
+        g = dataset()
         g = to_vv_graph(g)
         print(f"Dataset: {dataset_name}")
         print("   Number of nodes:", g.number_of_nodes())
@@ -227,3 +243,7 @@ if __name__ == "__main__":
             report_progress=True
         )
         print("\nMinimum corruptability:", mp)
+    print("Partitioning for alpha=.5 t=.5 and part_num=4 for Twitch:")
+    print(gs_persist.load(threshold=0.5, alpha=0.5, num=4, dataset="Twitch"))
+    print("Partitioning for alpha=.5 t=.5 and part_num=4 for Cora:")
+    print(gs_persist.load(threshold=0.5, alpha=0.5, num=4, dataset="Cora"))
