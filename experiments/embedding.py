@@ -52,7 +52,7 @@ class Commands:
                 })
         return result
     
-    def embedding(self, dataset_name: str):
+    def embedding(self, dataset_name: str, part_num: int):
         gsp = GridSearchPersistence(GS_LOCATION)
         print("Processing dataset ", dataset_name)
         t = VertexEnumerator()
@@ -64,7 +64,7 @@ class Commands:
             attrs=x.attrs,
         ))
         dataset = to_vv_graph(dataset)
-        for params, partitions in gsp.load(dataset=dataset_name):
+        for params, partitions in gsp.load(dataset=dataset_name, num=part_num):
             result = [] 
             model = Node2Vec()
             gsp["dataset"] = dataset_name
