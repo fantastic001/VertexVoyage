@@ -1,6 +1,8 @@
 ---
 title: "Evaluation and analysis of graph vertex embeddings in distributed environment with community-aware vertex partitioning"
 author: "Stefan Nožinić"
+abstract: |
+  This paper explores the evaluation and analysis of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning to enhance the time efficiency of embeddings and reduce the need for network communication during the embedding generation process. The study investigates various partitioning algorithms and embedding methods, assessing their effectiveness in capturing community structures and generating meaningful embeddings for large-scale graphs. Experimental results demonstrate the benefits of community-aware partitioning in improving embedding quality and efficiency in distributed settings.
 bibliography: ./refs.bib
 ---
 
