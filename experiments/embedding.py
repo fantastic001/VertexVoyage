@@ -23,6 +23,9 @@ class VertexEnumerator:
 
 
 class Commands:
+    def list(self):
+        gsp = GridSearchPersistence(GS_LOCATION)
+        return list(k for k, _ in gsp.load())
     def list_datasets(self):
         gsp = GridSearchPersistence(GS_LOCATION)
         datasets = set()
