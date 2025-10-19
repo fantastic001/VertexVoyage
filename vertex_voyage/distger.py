@@ -133,19 +133,18 @@ class DistGER(Node2Vec):
     """
     def __init__(
         self,
-        dim: int,
         min_walk_size: int,
-        max_walk_size: int,
-        n_walks: int,
-        window_size: int,
-        epochs: int = 10,
-        p: float = 0.5,
-        q: float = 0.5,
-        negative_sample_num: int = 50,
-        learning_rate: float = 0.01,
-        threshold: float = 0.999,
-        seed: int = None,
-        use_threads: bool = True
+        max_walk_size: int, 
+        dim: int = 128,
+        n_walks=10, 
+        window_size=10,
+        epochs=1, 
+        p = .5, 
+        q = .5,
+        negative_sample_num = 50,
+        learning_rate = 0.01,
+        seed = None,
+        use_threads = True
     ):
         
         self.threshold = threshold
