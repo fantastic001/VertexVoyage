@@ -119,7 +119,6 @@ def min_corruptability(G: nx.Graph, *partitionings):
             best_partitioning = partitioning
     return best_partitioning
 
-@cfg.pluggable
 def calculate_corruptability(G: nx.Graph, partition_num: int, use_modified_lfm = False, threshold = 0.5, alpha: float = 1, partitions = None):
     """
     Calculate the corruptability of the graph.
