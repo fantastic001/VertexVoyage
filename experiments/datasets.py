@@ -19,6 +19,7 @@ datasets = {
     "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
     "Cit-HepPh": lambda: FileEventSequence("data/cit_HepPh.txt"),
     "Cit-HepTh": lambda: FileEventSequence("data/cit_HepTh.txt"),
+    "test": lambda: FileEventSequence("data/test.txt"),
 }
 
 def create_benchmark_class(partitioner_class, *args):
