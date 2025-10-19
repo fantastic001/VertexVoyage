@@ -171,6 +171,112 @@ where $E$ is the set of edges in the original graph, $p(u)$ is the partition of 
 
 Experiments are conducted on several real-world graphs, including Twitch [@rozemberczki_twitch_2021], UK2002 [@], Wiki Talks [@leskovec_predicting_2010, @leskovec_signed_2010], and Live Journal [@backstrom_group_2006], as well as synthetic graphs generated using the Stochastic Block Model (SBM) [@holland_stochastic_1983] with 10 million edges. The performance of the proposed distributed embedding system with community-aware partitioning is compared against baseline methods, such as random partitioning and traditional embedding methods without partitioning.
 
+<!-- partitioning time for lfm lpa random  -->
+First, benchmarks on partitioning time were conducted to evaluate the time taken by different partitioning algorithms. 
+
+In Table 1, partitioning time is shown for LFM algorithm on different networks:
+
+| Network | Partitioning time (s) | # nodes | # edges |
+|---------|-----------------------|---------|---------|
+| Zachary Karate club | 0.001230 | 34 | 78 |
+| Les Miserables | 0.004032 | 77 | 254 |
+| Davis Southern Women | 0.004145 | 32 | 89 |
+| Florentine families | 0.000677 | 16 | 20 |
+| Twitch | | 168114 | 6797557 | 
+| UK2002 | |  |  |
+| Wiki Talks | |  |  |
+| Live Journal | |  |  |
+
+In Table 2, partitioning time is shown for different SBM graphs with varying number of vertices per community. Comparison is shown for original LFM implementation and modified LFM implementation with early stopping criteria based on unassigned vertices where threshold is set to 50% of total vertices. Probability of link across communities is set to 0.01 and probability of link inside community is set to 0.1. Number of communities is set to 3.
+
+
+| Community size | Partitioning time (s) - LFM | Partitioning time (s) - Modified LFM | # vertices | # edges |
+|----------------|-----------------------------|--------------------------------------|------------|---------|
+| 100            | 0.125113                    | 0.080214                             | 300        | 1755    |
+| 200            | 0.944693                    | 0.712999                             | 600        | 7171    |
+| 300            | 3.031000                    | 2.052959                             | 900        | 16154   |
+| 400            | 6.774440                    | 4.487337                             | 1200       | 28676   |
+| 500            | 12.589976                   | 8.317590                             | 1500       | 45139   |
+| 600            | 22.913838                   | 15.139224                            | 1800       | 65012   |
+| 700            | 39.479742                   | 26.455410                            | 2100       | 87815   |
+| 800            | 67.074574                   | 41.665899                            | 2400       | 115446  |
+| 900            | 86.972126                   | 54.922895                            | 2700       | 145352  |
+| 1000           | 110.282812                  | 73.058589                            | 3000       | 179382  |
+
+As can be seen from the results, the modified LFM algorithm with early stopping criteria significantly reduces the partitioning time compared to the original LFM implementation, especially for larger graphs. This demonstrates the effectiveness of the modification in improving the efficiency of the partitioning process while still preserving community structures.
+
+To demonstrate that F1 score stays relatively stable when performing embedding on partitioned graph, Table 3 shows F1 scores for embeddings generated using Node2Vec on Zachary Karate club graph with modified LFM partitioning.
+
+| Number of walks | F1 score for sequential Node2Vec | F1 score for distributed Node2Vec with modified LFM partitioning |
+|-----------------|----------------------------------|---------------------------------------------------------------|
+| 100             | 0.62                             | 0.53                                                          |
+| 200             | 0.76                             | 0.63                                                          |
+| 300             | 0.79                             | 0.65                                                          |
+| 400             | 0.80                             | 0.71                                                          |
+| 500             | 0.80                             | 0.66                                                          |
+| 600             | 0.77                             | 0.69                                                          |
+
+
+Same results are shown for Florentine families graph in Table 4 and for Les Miserables graph in Table 5 respectively.
+
+| Number of walks | F1 score for sequential Node2Vec | F1 score for distributed Node2Vec with modified LFM partitioning |
+|-----------------|----------------------------------|---------------------------------------------------------------|
+| 100             | 0.92                             | 0.81                                                          |
+| 200             | 0.85                             | 0.81                                                          |
+| 300             | 0.96                             | 0.84                                                          |
+| 400             | 0.96                             | 0.84                                                          |
+| 500             | 0.92                             | 0.8                                                           |
+| 600             | 0.92                             | 0.84                                                          |
+| 700             | 0.91                             | 0.85                                                          |
+| 800             | 0.92                             | 0.81                                                          |
+| 900             | 0.96                             | 0.84                                                          |
+
+
+| Number of walks | F1 score for sequential Node2Vec | F1 score for distributed Node2Vec with modified LFM partitioning |
+|-----------------|----------------------------------|---------------------------------------------------------------|
+| 100             | 0.49                             | 0.66                                                          |
+| 200             | 0.64                             | 0.72                                                          |
+| 300             | 0.62                             | 0.75                                                          |
+| 400             | 0.67                             | 0.75                                                          |
+| 500             | 0.68                             | 0.74                                                          |
+| 600             | 0.64                             | 0.76                                                          |
+| 700             | 0.64                             | 0.77                                                          |
+| 800             | 0.69                             | 0.75                                                          |
+| 900             | 0.68                             | 0.76                                                          |
+
+
+<!-- Takođe, računata je i sličnost klasterovanja nakon ugrađivanja upotrebom serijske i paralelne
+implementacije. U tabeli 4.11 je dat prikaz sličnosti klasterovanja upotrebom K-means algoritma sa
+brojem klastera 3, gde je sličnost računata ARI metodom. -->
+
+Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
+
+| Network | ARI | 
+|---------|-----|
+| Zaharijev karate klub | 1.0 |
+| Davis Southern Women | 0.65 |
+| Florentine Families | 0.38 |
+| Les Miserables | 0.45 | 
+| Twitch | 0.97 |
+| SBM generisan graf | 0.99 |
+
+From results, it can be observed that the distributed embedding with community-aware partitioning achieves high clustering similarity compared to the sequential implementation, indicating that the embeddings effectively capture the community structure of the graph and can be used for clustering tasks.
+
+
+
+<!-- corruptability on SBM  -->
+
+
+
+<!-- corruptability on small networks  -->
+
+
+<!-- corruptability on big networks  -->
+
+
+<!-- f1 scores for big networks  -->
+
+
 ## Conclusion 
 
 ## References 
