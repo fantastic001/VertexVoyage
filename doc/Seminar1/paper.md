@@ -1,10 +1,10 @@
 ---
+title: "Evaluation and analysis of graph vertex embeddings in distributed environment with community-aware vertex partitioning"
+author: "Stefan Nožinić"
 bibliography: ./refs.bib
 ---
 
-# Evaluation and analysis of graph vertex embeddings in distributed environment with community-aware vertex partitioning
-
-## Introduction 
+# Introduction 
 
 <!-- citation example [@apache_software_foundation_zookeeper_2011] -->
 
@@ -23,7 +23,7 @@ Graph vertex embeddings are a powerful technique for representing vertices in a 
 
 
 
-### Motivation
+## Motivation
 
 Today, many real-world applications involve large-scale graphs, such as social networks [@zachary_information_1977] [@rozemberczki_multi-scale_2021] [@savic_analysis_2017], biological networks [@li_graph_2025] and web page graphs [@adamic_political_2005]. In order to perform machine learning tasks on these graphs, it is essential to generate meaningful embeddings that capture the relationships and structures within the graph. By doing so, it is possible to leverage the rich information contained in these graphs for various applications, such as recommendation systems, fraud detection, and network analysis.
 
@@ -31,7 +31,7 @@ Traditional methods for generating embeddings often struggle with large graphs d
 
 Motivation for this work stems from the need to develop efficient methods for generating high-quality embeddings in a distributed environment, while also considering the community structure of the graph. Community-aware partitioning can significantly improve the quality of embeddings by ensuring that vertices within the same community are processed together, thereby preserving local structures and relationships while reducing network communication overhead.
 
-### Problem statement 
+## Problem statement 
 
 In the context of distributed graph processing, there are several challenges that need to be addressed:
 
@@ -55,7 +55,7 @@ Given a large graph $G = (V, E)$ with vertices $V$ and edges $E$ , the goal is t
 
 A partition $P_k$ is set of vertices stored in a single machine in distributed environment. Every machine (node in cluster) can communicate with other machines in the cluster, but the communication is expensive and should be minimized. Number of machines is denoted as $K$ and the goal is to partition the graph into $K$ partitions such that the above criteria are satisfied as much as possible.
 
-### Related work 
+## Related work 
 
 Graph vertex embedding is a well-studied area, with various methods proposed to generate low-dimensional representations of nodes in a graph. State of the art method which is widely used is Node2Vec [@grover_node2vec_2016] which uses random walks to capture the local and global structure of the graph. Node2Vec generates embeddings by performing biased random walks on the graph, allowing it to explore both local and global structures. The method has been shown to be effective in capturing community structures and generating meaningful embeddings for various machine learning tasks. As its improvement, DistGER [@fang_distributed_2023] is a distributed graph embedding method that extends Node2Vec by leveraging distributed computing to handle large graphs. DistGER uses a similar random walk approach but optimizes walk sampling in order to maximize the information gain when selecting the next vertex to visit. 
 
@@ -71,7 +71,7 @@ For dynamic graph partitioning, there are several methods available in literatur
 
 
 
-### Contributions of this paper 
+## Contributions of this paper 
 
 
 Main contributions of this paper include:
@@ -80,9 +80,9 @@ Main contributions of this paper include:
 3. A comparison of the performance of the LFM algorithm and its modified version in generating partitions that improve the quality of embeddings while reducing the need of network communication during the embedding generation process.
    
 
-## Methods 
+# Methods 
 
-### System architecture 
+## System architecture 
 
 <!-- Ovde objasnim ZK i kako je sve implementirano kao velika baza podataka -->
 
@@ -97,7 +97,7 @@ Distributed embedding system consists of several components that work together t
 
 Nodes in the cluster communicate with each other using a distributed coordination service, such as Apache ZooKeeper [@apache_software_foundation_zookeeper_2011], to ensure synchronization and coordination during the embedding generation process. The system is designed to be scalable, allowing for the addition of more machines to handle larger graphs and improve processing efficiency.
 
-### Community detection and graph partitioning
+## Community detection and graph partitioning
 
 <!-- ovde objasnim LFM i label propagation -->
 
@@ -113,18 +113,18 @@ Both LFM and label propagation are effective in detecting communities in large-s
 
 Bin packing algorithm has many variants. In this paper, the approach from [@gupta_new_1999] is used. Each item (community) is assigned to the bin (partition) with the lowest current weight (number of vertices in partition) that can accommodate the item without exceeding the maximum allowed weight. If no such bin exists, maximum allowed weight is increased and the process is repeated until all items are assigned to bins. This approach ensures that the partitions are balanced while also preserving the community structure of the graph as much as possible since communities are assigned to partitions as whole units.
 
-### Embedding
+## Embedding
 
 
 Node2Vec is a graph embedding method that generates low-dimensional representations of vertices in a graph by performing biased random walks. The algorithm uses two parameters, $p$ and $q$, to control the random walk process. The parameter $p$ determines the probability of returning to the previous vertex, while the parameter $q$ controls the probability of exploring new vertices. By adjusting these parameters, Node2Vec can capture both local and global structures in the graph. The random walks generated by Node2Vec are then used to train a Word2Vec model, which learns the embeddings based on the co-occurrence of vertices in the walks. Here, walk is treated as a sentence and vertices as words in the sentence. Negative sampling is used to optimize the training process, allowing the model to efficiently learn embeddings that capture the relationships between vertices in the graph.
 
 DistGER changes the way random walks are generated by maximizing the information gain when selecting the next vertex to visit. Even though DistGER provides its own distributed framework for generating embeddings, in this paper, the distributed framework described in system architecture is used to evaluate the effectiveness of DistGER in a distributed environment with community-aware partitioning. The random walks generated by DistGER are also used to train a Word2Vec model, similar to Node2Vec, to learn the vertex embeddings. Precisely, the walks generated by DistGER are used to train the same Word2Vec model as the one used for Node2Vec, allowing for a direct comparison of the embeddings generated by both methods. Only difference is in the way walks are generated.
 
-### Embedding aggregation
+## Embedding aggregation
 
 After generating embeddings for each partition, the next step is to aggregate these embeddings into a single model that represents the entire graph. This is done using an ensemble learning approach, where multiple smaller models (embeddings from each partition) are combined to create a larger model. The aggregation process involves averaging the embeddings of individual vertices across all partitions. This approach adds network overhead only during the aggregation phase, as each machine needs to send its local embeddings to a central node for aggregation. However, this overhead is minimal compared to the overall embedding generation process, as the majority of the computation is performed locally on each partition.
 
-### Evaluation criteria 
+## Evaluation criteria 
 
 To evaluate the effectiveness of the graph vertex embeddings generated in a distributed environment with community-aware partitioning, several criteria are considered:
 
@@ -155,7 +155,7 @@ where $E$ is the set of edges in the original graph, $p(u)$ is the partition of 
 
 
 
-## Results and discussion
+# Results and discussion
 
 Experiments are conducted on several real-world graphs, including Twitch [@rozemberczki_twitch_2021], UK2002 [@], Wiki Talks [@leskovec_predicting_2010, @leskovec_signed_2010], and Live Journal [@backstrom_group_2006], as well as synthetic graphs generated using the Stochastic Block Model (SBM) [@holland_stochastic_1983] with 10 million edges. The performance of the proposed distributed embedding system with community-aware partitioning is compared against baseline methods, such as random partitioning and traditional embedding methods without partitioning.
 
@@ -268,7 +268,7 @@ From results, it can be observed that the distributed embedding with community-a
 
 
 
-## Conclusion 
+# Conclusion 
 
-## References 
+# References 
 
