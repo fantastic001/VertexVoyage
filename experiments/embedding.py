@@ -6,7 +6,7 @@ from vertex_voyage.partitioning import calculate_partitioning_corruption
 from experiments.datasets import datasets
 from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
-
+from vertex_voyage.reconstruction import get_f1_score, reconstruct
 
 GS_LOCATION = "gs_cache"
 
@@ -84,6 +84,37 @@ class Commands:
                 embedding = model.embed_nodes([t(x) for x in part])
                 result.append(embedding)
             gsp.save(result, algorithm="node2vec")
+
+    def score(self, algorithm: str, dataset_name: str, num_parts: int, alpha: float, threshold: float):
+        gsp = GridSearchPersistence(GS_LOCATION)
+        scores = []
+        for params, embeddings in gsp.load(
+            algorithm=algorithm,
+            dataset=dataset_name,
+            num_parts=num_parts,
+            alpha=alpha,
+            threshold=threshold
+        ):
+            t = VertexEnumerator()
+            dataset = Transform(datasets[dataset_name](), lambda x: Event(
+                src=t(int(x.src)),
+                dest=t(int(x.dest)),
+                timestamp=int(x.timestamp),
+                type=x.type,
+                attrs=x.attrs,
+            ))
+            dataset = to_nx_graph(dataset)
+            reconstructed = reconstruct(len(dataset.nodes), embeddings, dataset.nodes)
+            f1_score = get_f1_score(dataset, embeddings)
+            scores.append({
+                'f1_score': f1_score,
+                'dataset': dataset_name,
+                'num_parts': num_parts,
+                'alpha': alpha,
+                'threshold': threshold
+            })
+        return scores
+
 
 if __name__ == "__main__":
     command_executor_main(Commands)
