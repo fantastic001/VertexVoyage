@@ -47,7 +47,7 @@ Formally, the problem can be defined as follows:
 
 Given a large graph $G = (V, E)$ with vertices $V$ and edges $E$ , the goal is to find a partitioning of the vertices into $k$ subsets $P_1, P_2, \ldots, P_k$ such that:
 
-1. The partitioning preserves the community structure of the graph, meaning that vertices within the same community are more likely to be placed in the same partition. This criteria means minimizing the edge cut between partitions $\sum_{i \neq j} |E(P_i, P_j)|$, where $ E(P_i, P_j) $ is the set of edges between partitions $ P_i $ and $ P_j $ . Formally, edge cut is defined as: $E(P_i, P_j) = \{ (u, v) \in E | u \in P_i, v \in P_j \}$. 
+1. The partitioning preserves the community structure of the graph, meaning that vertices within the same community are more likely to be placed in the same partition. This criteria means minimizing the edge cut between partitions $\sum_{i \neq j} |E(P_i, P_j)|$, where $E(P_i, P_j)$ is the set of edges between partitions $P_i$ and $P_j$ . Formally, edge cut is defined as: $E(P_i, P_j) = \{ (u, v) \in E | u \in P_i, v \in P_j \}$. 
 
 2. The partitions are balanced, meaning that the number of vertices in each partition is within a bounded interval, i.e., $\forall i, |P_i| \in [\frac{|V|}{k} (1 - \epsilon), \frac{|V|}{k} (1 + \epsilon)]$ for some small $\epsilon > 0$ .
 
@@ -238,12 +238,12 @@ Also, clustering similarity after embedding using sequential and parallel implem
 
 | Network | ARI | 
 |---------|-----|
-| Zaharijev karate klub | 1.0 |
+| Zachary Karate Club | 1.0 |
 | Davis Southern Women | 0.65 |
 | Florentine Families | 0.38 |
 | Les Miserables | 0.45 | 
 | Twitch | 0.97 |
-| SBM generisan graf | 0.99 |
+| SBM Generated Graph | 0.99 |
 
 From results, it can be observed that the distributed embedding with community-aware partitioning achieves high clustering similarity compared to the sequential implementation, indicating that the embeddings effectively capture the community structure of the graph and can be used for clustering tasks.
 
