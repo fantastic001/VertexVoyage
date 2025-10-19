@@ -1,12 +1,19 @@
 
-from vertex_voyage import node2vec
-from vertex_voyage.grid_search import GridSearchPersistence
+import numpy as np
+from vertex_voyage import data, node2vec
+from vertex_voyage.grid_search import (
+    GridSearchPersistence, 
+    grid_search, 
+    last, 
+    identity
+)
 from vertex_voyage.command_executor import command_executor_main
 from vertex_voyage.partitioning import calculate_partitioning_corruption
 from experiments.datasets import datasets
 from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
+from vertex_voyage.partitioning import partition_graph, min_corruptability
 
 GS_LOCATION = "gs_cache"
 
@@ -74,8 +81,6 @@ class Commands:
             gsp["num_parts"] = params["num"]
             gsp["alpha"] = params["alpha"]
             gsp["threshold"] = params["threshold"]
-            if params["num"] <= 4:
-                continue
             print("Embedding partitions...")
             print("   Partitions: ", len(partitions))
             print("  Dataset: ", dataset_name)
@@ -106,9 +111,31 @@ class Commands:
                 type=x.type,
                 attrs=x.attrs,
             ))
+            parts = gsp.load(
+                dataset=dataset_name,
+                num=num_parts,
+                alpha=alpha,
+                threshold=threshold
+            )
+            assert len(parts) == 1
+            parts = parts[0][1]
+            parts = [[t(x) for x in part] for part in parts]
             dataset = to_nx_graph(dataset)
-            reconstructed = reconstruct(len(dataset.nodes), embeddings, dataset.nodes)
-            f1_score = get_f1_score(dataset, embeddings)
+            mapping = {} 
+            assert len(parts) == len(embeddings)
+            assert all(len(part) == len(embedding) for part, embedding in zip(parts, embeddings))
+            for part, embedding in zip(parts, embeddings):
+                for node, vec in zip(part, embedding):
+                    mapping.setdefault(node, []).append(vec)
+            for node in mapping:
+                mapping[node] = np.mean(mapping[node], axis=0)
+            embeddings = [mapping[node] for node in dataset.nodes]
+            assert len(embeddings) == dataset.number_of_nodes()
+            assert all(emb is not None for emb in embeddings)
+            assert all(isinstance(emb, np.ndarray) for emb in embeddings)
+            assert all(isinstance(x, int) for x in dataset.nodes)
+            reconstructed = reconstruct(dataset.number_of_edges(), embeddings)
+            f1_score = get_f1_score(dataset, reconstructed)
             scores.append({
                 'f1_score': f1_score,
                 'dataset': dataset_name,
@@ -117,6 +144,38 @@ class Commands:
                 'threshold': threshold
             })
         return scores
+    
+    def partition(self, dataset_name: str):
+        gs_persist = GridSearchPersistence(GS_LOCATION)
+        whitelist = [
+            dataset_name
+        ] 
+        datasets_ = {k: v for k, v in datasets.items() if k in whitelist}
+        for dataset_name, dataset in datasets_.items():
+            gs_persist['dataset'] = dataset_name
+            g = dataset()
+            g = to_vv_graph(g)
+            print(f"Dataset: {dataset_name}")
+            print("   Number of nodes:", g.number_of_nodes())
+            mp = grid_search(
+                f = lambda threshold, alpha, num: partition_graph(
+                    alpha=alpha,
+                    threshold=threshold,
+                    G=g,
+                    partition_num=num,
+                    use_modified_lfm=True
+                ),
+                apply=identity,
+                acc=last,
+                param_ranges={
+                    'threshold': [0, .5, 1],
+                    'alpha': [1,2, 3],
+                    'num': [2,4,8,16]
+                }, 
+                intermediate_callback=gs_persist,
+                report_progress=True
+            )
+            print("\nMinimum corruptability:", mp)
 
 
 if __name__ == "__main__":
