@@ -90,7 +90,6 @@ def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = Fa
     partitions = [list(sum(part, [])) for part in partitions]
     return partitions
 
-@cfg.pluggable
 def calculate_partitioning_corruption(G: nx.Graph, partitions: list):
     """
     Partitioning corruption is 1 - ratio of size of edges of union of subgraphs of G induced by partitions and number of edges in original graph G  
