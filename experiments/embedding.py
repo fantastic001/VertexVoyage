@@ -81,7 +81,7 @@ class Commands:
             print("  Threshold: ", params["threshold"])
             for part in partitions:
                 model.fit(dataset.subgraph(part), dataset.nodes)
-                embedding = model.embed_nodes(part)
+                embedding = model.embed_nodes([t(x) for x in part])
                 result.append(embedding)
             gsp.save(result, algorithm="node2vec")
 
