@@ -62,7 +62,7 @@ class Commands:
                 })
         return result
     
-    def embedding(self, dataset_name: str, part_num: int):
+    def node2vec(self, dataset_name: str, part_num: int):
         gsp = GridSearchPersistence(GS_LOCATION)
         print("Processing dataset ", dataset_name)
         t = VertexEnumerator()
@@ -145,7 +145,7 @@ class Commands:
             })
         return scores
     
-    def partition(self, dataset_name: str):
+    def lfm(self, dataset_name: str):
         gs_persist = GridSearchPersistence(GS_LOCATION)
         whitelist = [
             dataset_name
@@ -153,6 +153,7 @@ class Commands:
         datasets_ = {k: v for k, v in datasets.items() if k in whitelist}
         for dataset_name, dataset in datasets_.items():
             gs_persist['dataset'] = dataset_name
+            gs_persist['algorithm'] = 'lfm'
             g = dataset()
             g = to_vv_graph(g)
             print(f"Dataset: {dataset_name}")
