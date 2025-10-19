@@ -245,9 +245,6 @@ Same results are shown for Florentine families graph in Table 4 and for Les Mise
 | 900             | 0.68                             | 0.76                                                          |
 
 
-<!-- Takođe, računata je i sličnost klasterovanja nakon ugrađivanja upotrebom serijske i paralelne
-implementacije. U tabeli 4.11 je dat prikaz sličnosti klasterovanja upotrebom K-means algoritma sa
-brojem klastera 3, gde je sličnost računata ARI metodom. -->
 
 Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
 
@@ -275,6 +272,7 @@ From results, it can be observed that the distributed embedding with community-a
 
 
 <!-- f1 scores for big networks  -->
+
 
 
 ## Conclusion 
