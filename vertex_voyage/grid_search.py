@@ -195,7 +195,7 @@ class GridSearchPersistence:
         return self.save(result, **kwargs)
 
 identity = lambda x: x
-
+last = lambda x, y: y
 
 
 class no_serialize:
@@ -213,7 +213,8 @@ if __name__ == "__main__":
     from vertex_voyage.temporal import to_vv_graph
     gs_persist = GridSearchPersistence(location="gs_cache")
     whitelist = [
-        "Twitch"
+        "Cit-HepPh",
+        "Cit-HepTh",
     ] 
     datasets = {k: v for k, v in datasets.items() if k in whitelist}
     for dataset_name, dataset in datasets.items():
@@ -231,12 +232,10 @@ if __name__ == "__main__":
                 use_modified_lfm=True
             ),
             apply=identity,
-            acc=lambda p1, p2: min_corruptability(
-                g, p1, p2
-            ),
+            acc=last,
             param_ranges={
                 'threshold': [0, .5, 1],
-                'alpha': [.5, 1,2],
+                'alpha': [1,2, 3],
                 'num': [2,4,8,16]
             }, 
             intermediate_callback=gs_persist,
@@ -244,6 +243,6 @@ if __name__ == "__main__":
         )
         print("\nMinimum corruptability:", mp)
     print("Partitioning for alpha=.5 t=.5 and part_num=4 for Twitch:")
-    print(gs_persist.load(threshold=0.5, alpha=0.5, num=4, dataset="Twitch"))
+    print(gs_persist.load(threshold=0.5, alpha=2, num=4, dataset="Twitch"))
     print("Partitioning for alpha=.5 t=.5 and part_num=4 for Cora:")
     print(gs_persist.load(threshold=0.5, alpha=0.5, num=4, dataset="Cora"))
