@@ -162,11 +162,11 @@ Experiments are conducted on several real-world graphs, including Twitch [@rozem
 <!-- partitioning time for lfm lpa random  -->
 First, benchmarks on partitioning time were conducted to evaluate the time taken by different partitioning algorithms. 
 
-In Table 1, partitioning time is shown for LFM algorithm on different networks:
+In Table 1 partitioning time is shown for LFM algorithm on different networks:
 
 | Network | Partitioning time (s) | # nodes | # edges |
 |---------|-----------------------|---------|---------|
-| Zachary Karate club | 0.001230 | 34 | 78 |
+| Zachary Karate Club | 0.001230 | 34 | 78 |
 | Les Miserables | 0.004032 | 77 | 254 |
 | Davis Southern Women | 0.004145 | 32 | 89 |
 | Florentine families | 0.000677 | 16 | 20 |
@@ -174,9 +174,11 @@ In Table 1, partitioning time is shown for LFM algorithm on different networks:
 | UK2002 | |  |  |
 | Wiki Talks | |  |  |
 | Live Journal | |  |  |
+Table: Partitioning time for LFM algorithm on real-world networks.
+
+
 
 In Table 2, partitioning time is shown for different SBM graphs with varying number of vertices per community. Comparison is shown for original LFM implementation and modified LFM implementation with early stopping criteria based on unassigned vertices where threshold is set to 50% of total vertices. Probability of link across communities is set to 0.01 and probability of link inside community is set to 0.1. Number of communities is set to 3.
-
 
 | Community size | Partitioning time (s) - LFM | Partitioning time (s) - Modified LFM | # vertices | # edges |
 |----------------|-----------------------------|--------------------------------------|------------|---------|
@@ -190,6 +192,8 @@ In Table 2, partitioning time is shown for different SBM graphs with varying num
 | 800            | 67.074574                   | 41.665899                            | 2400       | 115446  |
 | 900            | 86.972126                   | 54.922895                            | 2700       | 145352  |
 | 1000           | 110.282812                  | 73.058589                            | 3000       | 179382  |
+Table: Partitioning time for LFM and modified LFM on SBM generated graphs.
+
 
 As can be seen from the results, the modified LFM algorithm with early stopping criteria significantly reduces the partitioning time compared to the original LFM implementation, especially for larger graphs. This demonstrates the effectiveness of the modification in improving the efficiency of the partitioning process while still preserving community structures.
 
@@ -203,7 +207,7 @@ To demonstrate that F1 score stays relatively stable when performing embedding o
 | 400             | 0.80                             | 0.71                                                          |
 | 500             | 0.80                             | 0.66                                                          |
 | 600             | 0.77                             | 0.69                                                          |
-
+Table: F1 scores for embeddings generated using Node2Vec on Zachary Karate club graph with modified LFM partitioning.
 
 Same results are shown for Florentine families graph in Table 4 and for Les Miserables graph in Table 5 respectively.
 
@@ -218,7 +222,7 @@ Same results are shown for Florentine families graph in Table 4 and for Les Mise
 | 700             | 0.91                             | 0.85                                                          |
 | 800             | 0.92                             | 0.81                                                          |
 | 900             | 0.96                             | 0.84                                                          |
-
+Table: F1 scores for embeddings generated using Node2Vec on Florentine families graph with modified LFM partitioning.
 
 | Number of walks | F1 score for sequential Node2Vec | F1 score for distributed Node2Vec with modified LFM partitioning |
 |-----------------|----------------------------------|---------------------------------------------------------------|
@@ -231,7 +235,7 @@ Same results are shown for Florentine families graph in Table 4 and for Les Mise
 | 700             | 0.64                             | 0.77                                                          |
 | 800             | 0.69                             | 0.75                                                          |
 | 900             | 0.68                             | 0.76                                                          |
-
+Table: F1 scores for embeddings generated using Node2Vec on Les Miserables graph with modified LFM partitioning.
 
 
 Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
@@ -244,6 +248,7 @@ Also, clustering similarity after embedding using sequential and parallel implem
 | Les Miserables | 0.45 | 
 | Twitch | 0.97 |
 | SBM Generated Graph | 0.99 |
+Table: Clustering similarity using K-means algorithm on embeddings generated with distributed Node2Vec with modified LFM partitioning.
 
 From results, it can be observed that the distributed embedding with community-aware partitioning achieves high clustering similarity compared to the sequential implementation, indicating that the embeddings effectively capture the community structure of the graph and can be used for clustering tasks.
 
