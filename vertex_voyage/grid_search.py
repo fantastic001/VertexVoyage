@@ -120,8 +120,11 @@ class GridSearchPersistence:
         """
         if not os.path.exists(self.location):
             os.makedirs(self.location)
+        p = {}
+        p.update(self.fixed_params)
+        p.update(params)
 
-        param_str = json.dumps(params, sort_keys=True)
+        param_str = json.dumps(p, sort_keys=True)
         param_hash = hashlib.md5(param_str.encode()).hexdigest()
 
         dirpath = os.path.join(self.location, param_hash)
@@ -139,9 +142,6 @@ class GridSearchPersistence:
             pickle.dump(state, f)
         
         with open(params_path, 'w') as f:
-            p = {}
-            p.update(self.fixed_params)
-            p.update(params)
             json.dump(p, f, indent=4, default=str)
         
     def clean(self):
@@ -191,6 +191,32 @@ class GridSearchPersistence:
                             results.append((saved_params, state))
         return results
     
+    
+    def restore_backups(self):
+        """
+        Restore backups by renaming them back to their original directory names.
+        """
+        if not os.path.exists(self.location):
+            return
+        children = os.listdir(self.location)
+        for child in children:
+            child_path = os.path.join(self.location, child)
+            if os.path.isdir(child_path):
+                if '_' in child:
+                    params_path = os.path.join(child_path, 'params.json')
+                    state_path = os.path.join(child_path, 'state.pkl')
+                    if os.path.exists(params_path) and os.path.exists(state_path):
+                        params = json.load(open(params_path, 'r'))
+                        param_str = json.dumps(params, sort_keys=True)
+                        param_hash = hashlib.md5(param_str.encode()).hexdigest()
+                        original_path = os.path.join(self.location, param_hash)
+                        if not os.path.exists(original_path):
+                            os.rename(child_path, original_path)
+                            print(f"Restored backup for: {original_path}")
+                        else:
+                            print(f"Cannot restore backup for: {original_path}, original already exists., dataset={params.get('dataset','unknown')}")
+
+
     def __call__(self, result, **kwargs):
         return self.save(result, **kwargs)
 
