@@ -22,7 +22,6 @@
 Departman za matematiku i informatiku \\
 Prirodno-matematički fakultet \\
 Univerzitet u Novom Sadu \\
-Mentor: \MakeLowercase{dr} Miloš Savić
 }
 \date{11. septembar 2025.}
 
@@ -203,7 +202,7 @@ Mentor: \MakeLowercase{dr} Miloš Savić
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Ubrzanje}
+\begin{frame}{Teorijska osnova}
 \begin{itemize}
     \item Ubrzanje (engl. speedup) je mera koliko je paralelni algoritam brži u odnosu na serijski algoritam
     \item Definisano kao:
@@ -221,12 +220,20 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{itemize}
     \item Amdahlov zakon daje gornju granicu ubrzanja:
     $$ S \leq \frac{1}{f + \frac{1-f}{p}} $$
-    gde je $ f $ frakcija serijskog dela algoritma u odnosu na Ukupno vreme izvršavanja.
-    \item Neka je $T_{\text{part}}$ vreme particionisanja, a $T_{\text{embed}}(i)$ vreme ugrađivanja na čvoru $i$. Tada je ukupno vreme izvršavanja paralelnog algoritma:
+    gde je $ f $ deo serijskog dela algoritma u odnosu na ukupno vreme izvršavanja.
+    \item Neka je $T_{\text{part}}$ vreme particionisanja, a $T_{\text{embed}}(i)$ vreme ugrađivanja na particiji $i$. Tada je ukupno vreme izvršavanja paralelnog algoritma:
     $$ T_p = T_{\text{part}} + \max_{i=1}^{p} T_{\text{embed}}(i) $$
     \item Ukupno vreme izvršavanja serijskog algoritma (koji ne zahteva particionisanje) je:
     \item $$ T_1 = \sum_{i=1}^{K} T_{\text{embed}}(i) $$
 \end{itemize}    
+\end{frame}
+
+\begin{frame}
+\begin{itemize}
+    \item Iz ovih izraza možemo izvesti formulu za ubrzanje:
+    $$ S = \frac{\sum_{i=1}^{K} T_{\text{embed}}(i)}{T_{\text{part}} + \max_{i=1}^{p} T_{\text{embed}}(i)} $$
+    \item Ova formula pokazuje kako vreme particionisanja i vreme ugrađivanja na najviše opterećenoj particiji utiču na ukupno ubrzanje paralelnog algoritma.
+\end{itemize}
 \end{frame}
 
 \section{Rezultati}
@@ -258,17 +265,17 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \end{frame}
 
 \begin{frame}{Rezultati - vreme ugrađivanja na SBM sa 10M ivica}
+    $$ \alpha = 1 \quad \text{Broj particija} = 16 $$
     \begin{table}
     \caption{Uporedna analiza performansi za LFM algoritam particionisanja}
     \label{tab:Performance_comparison_max_Node2Vec_vs_modified__lfm_on_SBM_10M_with_varying_threshold}
-    \begin{tabular}{p{1in}p{1in}p{1in}p{1in}}
+    \begin{tabular}{p{1in}p{1in}}
     \hline 
-    & Vreme particionisanja & Vreme ugrađivanja na 16 & Vreme ugrađivanja na 1 \\
-    Prag &  &  &  \\
+    Prag & Vreme particionisanja \\
     \hline
-    0.000000 & 14118.587150 & 90.071612 & 174.646026 \\
-    0.500000 & 12948.078974 & 82.932776 & 158.931893 \\
-    1.000000 & 0.005604 & 60.919978 & 925.772633 \\
+    0.000000 & 14118.587150 \\
+    0.500000 & 12948.078974 \\
+    1.000000 & 0.005604 \\
     \hline
     \end{tabular}
     \end{table}
@@ -279,14 +286,13 @@ Mentor: \MakeLowercase{dr} Miloš Savić
 \begin{table}
 \caption{Uporedna analiza performansi za LFM algoritam particionisanja}
 \label{tab:Performance_comparison_max_Node2Vec_vs_modified__lfm_on_SBM_10M_with_varying_alpha}
-\begin{tabular}{p{1in}p{1in}p{1in}p{1in}}
+\begin{tabular}{p{1in}p{1in}p{1in}}
 \hline
- & Vreme particionisanja & Vreme ugrađivanja na 16 & Vreme ugrađivanja na 1 \\
-Alpha parametar &  &  &  \\
+$\alpha$  & Vreme particionisanja & Vreme ugrađivanja na 16 čvorova \\
 \hline
-1.000000 & 15151.445818 & 96.892017 & 188.360206 \\
-1.500000 & 14384.355827 & 83.339856 & 161.653478 \\
-2.000000 & 1489.028646 & 60.098522 & 14927.836920 \\
+1.000000 & 15151.445818 & 96.892017 \\
+1.500000 & 14384.355827 & 83.339856 \\
+2.000000 & 1489.028646 & 60.098522 \\
 \hline
 \end{tabular}
 \end{table}
@@ -300,15 +306,15 @@ Alpha parametar &  &  &  \\
 \label{tab:Performance_comparison_max_Node2Vec_vs_lfm_on_SBM_10M_with_varying_partition_num}
 \begin{tabular}{p{1in}p{1in}p{1in}p{1in}}
 \hline
- & Vreme particionisanja & Paralelna implementacija & Sekvencijalna implementacija \\
+ & Vreme particionisanja & Paralelna implementacija \\
 Broj particija &  &  &  \\
 \hline
-1 & 77.875600 & 107.061880 & 107.061880 \\
-2 & 155.384691 & 102.909459 & 198.506485 \\
-4 & 318.065973 & 90.397061 & 360.115173 \\
-8 & 604.270801 & 107.493993 & 724.160440 \\
-16 & 1202.096511 & 113.680622 & 1407.603405 \\
-32 & 2384.997995 & 122.427380 & 2801.377654 \\
+1 & 77.875600 & 107.061880  \\
+2 & 155.384691 & 102.909459 \\
+4 & 318.065973 & 90.397061 \\
+8 & 604.270801 & 107.493993 \\
+16 & 1202.096511 & 113.680622 \\
+32 & 2384.997995 & 122.427380 \\
 \hline
 \end{tabular}
 \end{table}
