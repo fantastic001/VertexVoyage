@@ -74,24 +74,38 @@ class Commands:
             attrs=x.attrs,
         ))
         dataset = to_vv_graph(dataset)
-        for params, partitions in gsp.load(dataset=dataset_name, num=part_num):
-            result = [] 
-            model = Node2Vec()
+        if part_num == 1:
             gsp["dataset"] = dataset_name
-            gsp["num_parts"] = params["num"]
-            gsp["alpha"] = params["alpha"]
-            gsp["threshold"] = params["threshold"]
-            print("Embedding partitions...")
-            print("   Partitions: ", len(partitions))
-            print("  Dataset: ", dataset_name)
-            print("  Alpha: ", params["alpha"])
-            print("  Num parts: ", params["num"])
-            print("  Threshold: ", params["threshold"])
-            for part in partitions:
-                model.fit(dataset.subgraph(part), dataset.nodes)
-                embedding = model.embed_nodes([t(x) for x in part])
-                result.append(embedding)
-            gsp.save(result, algorithm="node2vec")
+            gsp["num_parts"] = 1
+            gsp["alpha"] = 0
+            gsp["threshold"] = 0
+            print("Embedding full graph...")
+            model = Node2Vec()
+            model.fit(dataset)
+            embedding = model.embed_nodes(dataset.nodes)
+            gsp.save([embedding], algorithm="node2vec")
+        else:
+            for params, partitions in gsp.load(
+                dataset=dataset_name, 
+                num=part_num
+            ):
+                result = [] 
+                model = Node2Vec()
+                gsp["dataset"] = dataset_name
+                gsp["num_parts"] = params["num"]
+                gsp["alpha"] = params["alpha"]
+                gsp["threshold"] = params["threshold"]
+                print("Embedding partitions...")
+                print("   Partitions: ", len(partitions))
+                print("  Dataset: ", dataset_name)
+                print("  Alpha: ", params["alpha"])
+                print("  Num parts: ", params["num"])
+                print("  Threshold: ", params["threshold"])
+                for part in partitions:
+                    model.fit(dataset.subgraph(part), dataset.nodes)
+                    embedding = model.embed_nodes([t(x) for x in part])
+                    result.append(embedding)
+                gsp.save(result, algorithm="node2vec")
 
     def score(self, algorithm: str, dataset_name: str, num_parts: int, alpha: float, threshold: float):
         gsp = GridSearchPersistence(GS_LOCATION)
@@ -111,16 +125,19 @@ class Commands:
                 type=x.type,
                 attrs=x.attrs,
             ))
-            parts = gsp.load(
-                dataset=dataset_name,
-                num=num_parts,
-                alpha=alpha,
-                threshold=threshold
-            )
-            assert len(parts) == 1
-            parts = parts[0][1]
-            parts = [[t(x) for x in part] for part in parts]
             dataset = to_nx_graph(dataset)
+            if num_parts == 1:
+                parts = [list(dataset.nodes)]
+            else:
+                parts = gsp.load(
+                    dataset=dataset_name,
+                    num=num_parts,
+                    alpha=alpha,
+                    threshold=threshold
+                )
+                assert len(parts) == 1
+                parts = parts[0][1]
+                parts = [[t(x) for x in part] for part in parts]
             mapping = {} 
             assert len(parts) == len(embeddings)
             assert all(len(part) == len(embedding) for part, embedding in zip(parts, embeddings))
