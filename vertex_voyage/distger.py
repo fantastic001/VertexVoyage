@@ -144,7 +144,8 @@ class DistGER(Node2Vec):
         negative_sample_num = 50,
         learning_rate = 0.01,
         seed = None,
-        use_threads = True
+        use_threads = True,
+        threshold = 0.999
     ):
         
         self.threshold = threshold
