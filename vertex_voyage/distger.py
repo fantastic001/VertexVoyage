@@ -25,7 +25,7 @@ class Walker:
 class Graph:
     def __init__(self, G: nx.Graph):
         # dict vertex -> List of tuples neighbor and common neighbors
-        self.adjacency = {v: [(n, len(set(G.neighbors(v)) & set(G.neighbors(n)))) for n in G.neighbors(v)] for v in G.nodes()}
+        self.adjacency = {v: [(n, len(set(G.neighbors(v)) & set(G.neighbors(n)))) for n in G.neighbors(v)] for v in G.nodes}
         self.out_degree = {v: len(neigh) for v, neigh in self.adjacency.items()}
     
     def random_neighbor(self, vertex: int):
@@ -133,8 +133,8 @@ class DistGER(Node2Vec):
     """
     def __init__(
         self,
-        min_walk_size: int,
-        max_walk_size: int, 
+        min_walk_size: int = 10,
+        max_walk_size: int = 100,
         dim: int = 128,
         n_walks=10, 
         window_size=10,
@@ -153,6 +153,8 @@ class DistGER(Node2Vec):
         super().__init__(dim, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
 
     def _random_walk(self, node):
+        if not isinstance(self.nodes, list):
+            self.nodes = list(self.nodes)
         walker = Walker(node)
         graph = Graph(self.G)
         walk_ = list(self.nodes[n] for n in walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
