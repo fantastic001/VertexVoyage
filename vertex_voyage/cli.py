@@ -97,8 +97,10 @@ class VertexEnumerator:
         return self.index[node]
 
 
-def log(message: str):
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+def log(*messages):
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {' '.join(map(str, messages))}")
+
+
 class Commands:
     def serve(self):
         from vertex_voyage.cluster import register_node, get_binding_port
@@ -156,6 +158,7 @@ class Commands:
             alpha=alpha,
             threshold=threshold
         ):
+            log(f"Scoring embeddings for dataset {dataset_name} with params: {params}")
             t = VertexEnumerator()
             dataset = Transform(datasets[dataset_name](), lambda x: Event(
                 src=t(int(x.src)),
@@ -192,12 +195,32 @@ class Commands:
             assert all(isinstance(x, int) for x in dataset.nodes)
             reconstructed = reconstruct(dataset.number_of_edges(), embeddings)
             f1_score = get_f1_score(dataset, reconstructed)
+            # calculate ARI 
+            from sklearn.cluster import KMeans
+            single_embeddings = gsp.load(
+                algorithm=algorithm,
+                dataset=dataset_name,
+                num_parts=1,
+                p=params['p'],
+                q=params['q'],
+                dim=params['dim']
+            )
+            assert len(single_embeddings) == 1
+            single_embeddings = single_embeddings[0][1][0]
+            ari_data = {}
+            for clusters in [1,2,3]:
+                single_k_means = KMeans(n_clusters=clusters).fit_predict(single_embeddings)
+                k_means = KMeans(n_clusters=clusters).fit_predict(embeddings)
+                from sklearn.metrics import adjusted_rand_score
+                similarity = adjusted_rand_score(single_k_means, k_means)
+                ari_data[f'ari_{clusters}'] = similarity
             scores.append({
                 'f1_score': f1_score,
                 'dataset': dataset_name,
                 'num_parts': num_parts,
                 'alpha': alpha,
-                'threshold': threshold
+                'threshold': threshold,
+                **ari_data
             })
         return scores
     
@@ -209,6 +232,7 @@ class Commands:
             num=num_parts,
             algorithm=algorithm
         ):
+            log(f"Scoring partitioning for dataset {dataset_name} with params: {params}")
             dataset = to_nx_graph(datasets[dataset_name]())
             c = calculate_partitioning_corruption(dataset, partitions)
             balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, len(partitions))
