@@ -12,7 +12,10 @@ from vertex_voyage.command_executor import (
     command_executor_rpc
 )
 from vertex_voyage.command_executor import get_classes
-from vertex_voyage.partitioning import calculate_partitioning_corruption
+from vertex_voyage.partitioning import (
+    calculate_partitioning_corruption,
+    get_partition_average_balance,
+)
 from experiments.datasets import datasets
 from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
@@ -195,6 +198,26 @@ class Commands:
             })
         return scores
     
+    def score_partitioning(self, dataset_name: str, num_parts: int):
+        gsp = GridSearchPersistence(GS_LOCATION)
+        scores = []
+        for params, partitions in gsp.load(
+            dataset=dataset_name,
+            num=num_parts
+        ):
+            dataset = to_nx_graph(datasets[dataset_name]())
+            c = calculate_partitioning_corruption(dataset, partitions)
+            balance = get_partition_average_balance({i: len(p) for i, p in enumerate(partitions)}, len(partitions))
+            scores.append({
+                'corruptibility': c,
+                'dataset': dataset_name,
+                'balance': balance,
+                'num_parts': num_parts,
+                'alpha': params['alpha'],
+                'threshold': params['threshold']
+            })
+        return scores
+
     def lfm(self, dataset_name: str):
         gs_persist = GridSearchPersistence(GS_LOCATION)
         whitelist = [
