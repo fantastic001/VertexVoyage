@@ -276,6 +276,11 @@ class Commands:
     def fix(self):
         gsp = GridSearchPersistence(GS_LOCATION)
         gsp.restore()
+    
+
+    def remove_dataset(self, dataset_name: str):
+        gsp = GridSearchPersistence(GS_LOCATION)
+        gsp.delete(dataset=dataset_name)
         
 
 if __name__ == "__main__":
