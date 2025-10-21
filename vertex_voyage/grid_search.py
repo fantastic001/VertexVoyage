@@ -225,6 +225,32 @@ class GridSearchPersistence:
         Restore only backup directories.
         """
         self.restore(backup_only=True)
+        
+    def delete(self, **params):
+        """
+        Delete saved states corresponding to the given parameters.
+
+        Parameters:
+        params : dict
+            The parameters used to identify the saved state to delete.
+        """
+        children = os.listdir(self.location)
+        for child in children:
+            child_path = os.path.join(self.location, child)
+            if os.path.isdir(child_path):
+                # skip backup directories
+                if '_' in child:
+                    continue
+                params_path = os.path.join(child_path, 'params.json')
+                if os.path.exists(params_path):
+                    with open(params_path, 'r') as f:
+                        saved_params = json.load(f)
+                    if all(saved_params.get(k) == v for k, v in params.items()):
+                        # mark as deleted by renaming directory
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        deleted_path = os.path.join(self.location, f"{child}_deleted_{timestamp}")
+                        print(f"Deleting saved state at: {child_path}")
+                        os.rename(child_path, deleted_path)
     def __call__(self, result, **kwargs):
         return self.save(result, **kwargs)
 
