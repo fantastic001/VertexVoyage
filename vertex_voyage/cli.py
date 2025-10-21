@@ -113,7 +113,12 @@ class Commands:
         command_executor_rpc(get_classes("vertex_voyage") + ControlInterface.additional_classes, get_binding_port())
     def list(self):
         gsp = GridSearchPersistence(GS_LOCATION)
-        return list(k for k, _ in gsp.load())
+        results = []
+        for h, p in gsp.list():
+            ps = ', '.join(f"{k}={v}" for k, v in p.items())
+            results.append(f"{h}: {ps}")
+        return results
+
     def list_datasets(self):
         gsp = GridSearchPersistence(GS_LOCATION)
         datasets = set()

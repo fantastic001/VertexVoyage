@@ -160,6 +160,27 @@ class GridSearchPersistence:
                         file_path = os.path.join(child_path, filename)
                         os.remove(file_path)
                     os.rmdir(child_path)
+    def list(self) -> list:
+        """
+        Returns list of tuples (hash, params) for all saved states, ignoring backups and deleted states.
+
+        Returns:
+        A list of tuples (hash, params) for all saved states.
+        """
+        children = os.listdir(self.location)
+        results = []
+        for child in children:
+            child_path = os.path.join(self.location, child)
+            if os.path.isdir(child_path):
+                # skip backup directories
+                if '_' in child:
+                    continue
+                params_path = os.path.join(child_path, 'params.json')
+                if os.path.exists(params_path):
+                    with open(params_path, 'r') as f:
+                        saved_params = json.load(f)
+                    results.append((child, saved_params))
+        return results
 
     def load(self, **params) -> list:
         """
