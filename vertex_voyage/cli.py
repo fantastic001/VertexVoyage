@@ -16,6 +16,7 @@ from vertex_voyage.partitioning import calculate_partitioning_corruption
 from experiments.datasets import datasets
 from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
+from vertex_voyage.distger import DistGER
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
 from vertex_voyage.partitioning import partition_graph, min_corruptability
 from datetime import datetime
@@ -24,6 +25,60 @@ from vertex_voyage.config import get_config_str
 
 GS_LOCATION = get_config_str("gs_cache_location", "gs_cache", "Location to store grid search results")
 
+def perform_embedding(cls, alg: str, p: float, q: float, dim: int, dataset_name: str, part_num: int):
+    gsp = GridSearchPersistence(GS_LOCATION)
+    print("Processing dataset ", dataset_name)
+    t = VertexEnumerator()
+    dataset = Transform(datasets[dataset_name](), lambda x: Event(
+        src=t(int(x.src)),
+        dest=t(int(x.dest)),
+        timestamp=int(x.timestamp),
+        type=x.type,
+        attrs=x.attrs,
+    ))
+    dataset = to_vv_graph(dataset)
+    if part_num == 1:
+        gsp["dataset"] = dataset_name
+        gsp["num_parts"] = 1
+        gsp["alpha"] = 0
+        gsp["threshold"] = 0
+        gsp["p"] = p
+        gsp["q"] = q
+        gsp["dim"] = dim
+        log("Embedding full graph...")
+        model = cls()
+        model.fit(dataset)
+        embedding = model.embed_nodes(dataset.nodes)
+        gsp.save([embedding], algorithm=alg)
+    else:
+        for params, partitions in gsp.load(
+            dataset=dataset_name, 
+            num=part_num
+        ):
+            result = [] 
+            model = cls(
+                p=p,
+                q=q,
+                dim=dim
+            )
+            gsp["dataset"] = dataset_name
+            gsp["num_parts"] = params["num"]
+            gsp["alpha"] = params["alpha"]
+            gsp["threshold"] = params["threshold"]
+            gsp["p"] = p
+            gsp["q"] = q
+            gsp["dim"] = dim
+            log("Embedding partitions...")
+            log(f"   Partitions: {len(partitions)}")
+            log(f"  Dataset: {dataset_name}")
+            log(f"  Alpha: {params['alpha']}")
+            log(f"  Num parts: {params['num']}")
+            log(f"  Threshold: {params['threshold']}")
+            for part in partitions:
+                model.fit(dataset.subgraph(part), dataset.nodes)
+                embedding = model.embed_nodes([t(x) for x in part])
+                result.append(embedding)
+            gsp.save(result, algorithm=alg)
 class VertexEnumerator:
     def __init__(self):
         self.visited = set()
@@ -81,59 +136,9 @@ class Commands:
         return result
     
     def node2vec(self, dataset_name: str, part_num: int, p: float, q: float, dim: int):
-        gsp = GridSearchPersistence(GS_LOCATION)
-        print("Processing dataset ", dataset_name)
-        t = VertexEnumerator()
-        dataset = Transform(datasets[dataset_name](), lambda x: Event(
-            src=t(int(x.src)),
-            dest=t(int(x.dest)),
-            timestamp=int(x.timestamp),
-            type=x.type,
-            attrs=x.attrs,
-        ))
-        dataset = to_vv_graph(dataset)
-        if part_num == 1:
-            gsp["dataset"] = dataset_name
-            gsp["num_parts"] = 1
-            gsp["alpha"] = 0
-            gsp["threshold"] = 0
-            gsp["p"] = p
-            gsp["q"] = q
-            gsp["dim"] = dim
-            log("Embedding full graph...")
-            model = Node2Vec()
-            model.fit(dataset)
-            embedding = model.embed_nodes(dataset.nodes)
-            gsp.save([embedding], algorithm="node2vec")
-        else:
-            for params, partitions in gsp.load(
-                dataset=dataset_name, 
-                num=part_num
-            ):
-                result = [] 
-                model = Node2Vec(
-                    p=p,
-                    q=q,
-                    dim=dim
-                )
-                gsp["dataset"] = dataset_name
-                gsp["num_parts"] = params["num"]
-                gsp["alpha"] = params["alpha"]
-                gsp["threshold"] = params["threshold"]
-                gsp["p"] = p
-                gsp["q"] = q
-                gsp["dim"] = dim
-                log("Embedding partitions...")
-                log(f"   Partitions: {len(partitions)}")
-                log(f"  Dataset: {dataset_name}")
-                log(f"  Alpha: {params['alpha']}")
-                log(f"  Num parts: {params['num']}")
-                log(f"  Threshold: {params['threshold']}")
-                for part in partitions:
-                    model.fit(dataset.subgraph(part), dataset.nodes)
-                    embedding = model.embed_nodes([t(x) for x in part])
-                    result.append(embedding)
-                gsp.save(result, algorithm="node2vec")
+        return perform_embedding(Node2Vec, 'node2vec', p, q, dim, dataset_name, part_num)
+    def distger(self, dataset_name: str, part_num: int, p: float, q: float, dim: int):
+        return perform_embedding(DistGER, 'distger', p, q, dim, dataset_name, part_num)
 
     def score(self, algorithm: str, dataset_name: str, num_parts: int, alpha: float, threshold: float):
         gsp = GridSearchPersistence(GS_LOCATION)
