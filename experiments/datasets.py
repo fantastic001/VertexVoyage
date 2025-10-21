@@ -1,5 +1,5 @@
 
-from vertex_voyage.temporal import FileEventSequence, FirstN
+from vertex_voyage.temporal import CSVEventSequence, FileEventSequence, FirstN
 from experiments.utils import display_benchmark_results, benchmark_partitioner, is_full_benchmark
 from vertex_voyage.benchmark_base import Benchmark
 import pandas as pd 
@@ -20,6 +20,7 @@ datasets = {
     "Cit-HepPh": lambda: FileEventSequence("data/cit_HepPh.txt"),
     "Cit-HepTh": lambda: FileEventSequence("data/cit_HepTh.txt"),
     "test": lambda: FileEventSequence("data/test.txt"),
+    "CITESEER": lambda: FileEventSequence("data/citeseer.txt"),
 }
 
 def create_benchmark_class(partitioner_class, *args):
