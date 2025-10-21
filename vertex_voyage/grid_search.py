@@ -192,9 +192,13 @@ class GridSearchPersistence:
         return results
     
     
-    def restore_backups(self):
+    def restore(self, backup_only=False):
         """
-        Restore backups by renaming them back to their original directory names.
+        Restore saved states from backup directories and rename them to their original hash-based names.
+
+        If `backup_only` is True, only directories with '_' in their names (indicating they are backups) will be processed.
+
+        else: All directories will be processed.
         """
         if not os.path.exists(self.location):
             return
@@ -202,7 +206,7 @@ class GridSearchPersistence:
         for child in children:
             child_path = os.path.join(self.location, child)
             if os.path.isdir(child_path):
-                if '_' in child:
+                if '_' in child or not backup_only:
                     params_path = os.path.join(child_path, 'params.json')
                     state_path = os.path.join(child_path, 'state.pkl')
                     if os.path.exists(params_path) and os.path.exists(state_path):
@@ -216,7 +220,11 @@ class GridSearchPersistence:
                         else:
                             print(f"Cannot restore backup for: {original_path}, original already exists., dataset={params.get('dataset','unknown')}")
 
-
+    def restore_backups(self):
+        """
+        Restore only backup directories.
+        """
+        self.restore(backup_only=True)
     def __call__(self, result, **kwargs):
         return self.save(result, **kwargs)
 
