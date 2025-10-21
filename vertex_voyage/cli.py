@@ -1,6 +1,5 @@
 
 import numpy as np
-from vertex_voyage import data, node2vec
 from vertex_voyage.grid_search import (
     GridSearchPersistence, 
     grid_search, 
@@ -21,7 +20,10 @@ from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
-from vertex_voyage.partitioning import partition_graph, min_corruptability
+from vertex_voyage.partitioning import (
+    partition_graph,
+    label_propagation_partitioner
+)
 from datetime import datetime
 from vertex_voyage.config import get_config_str
 
@@ -66,6 +68,7 @@ def perform_embedding(cls, alg: str, p: float, q: float, dim: int, dataset_name:
             )
             gsp["dataset"] = dataset_name
             gsp["num_parts"] = params["num"]
+            gsp["partitioning_algorithm"] = params.get("algorithm", "unknown")
             gsp["alpha"] = params["alpha"]
             gsp["threshold"] = params["threshold"]
             gsp["p"] = p
@@ -198,12 +201,13 @@ class Commands:
             })
         return scores
     
-    def score_partitioning(self, dataset_name: str, num_parts: int):
+    def score_partitioning(self, dataset_name: str, num_parts: int, algorithm: str):
         gsp = GridSearchPersistence(GS_LOCATION)
         scores = []
         for params, partitions in gsp.load(
             dataset=dataset_name,
-            num=num_parts
+            num=num_parts,
+            algorithm=algorithm
         ):
             dataset = to_nx_graph(datasets[dataset_name]())
             c = calculate_partitioning_corruption(dataset, partitions)
@@ -251,6 +255,28 @@ class Commands:
             )
             log(f"\nMinimum corruptability: {mp}")
 
+    def lpa(self, dataset_name: str):
+        gsp = GridSearchPersistence(GS_LOCATION)
+        gsp["algorithm"] = "lpa"
+        dataset = to_nx_graph(datasets[dataset_name]())
+        grid_search(
+            f = lambda num: label_propagation_partitioner(
+                G=dataset,
+                partition_num=num
+            ),
+            apply=identity,
+            acc=last,
+            param_ranges={
+                'num': [2,4,8,16]
+            },
+            intermediate_callback=gsp,
+            report_progress=True
+        )
+    
+    def fix(self):
+        gsp = GridSearchPersistence(GS_LOCATION)
+        gsp.restore()
+        
 
 if __name__ == "__main__":
     command_executor_main(Commands)
