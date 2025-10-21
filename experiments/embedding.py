@@ -62,7 +62,7 @@ class Commands:
                 })
         return result
     
-    def node2vec(self, dataset_name: str, part_num: int):
+    def node2vec(self, dataset_name: str, part_num: int, p: float, q: float, dim: int):
         gsp = GridSearchPersistence(GS_LOCATION)
         print("Processing dataset ", dataset_name)
         t = VertexEnumerator()
@@ -79,6 +79,9 @@ class Commands:
             gsp["num_parts"] = 1
             gsp["alpha"] = 0
             gsp["threshold"] = 0
+            gsp["p"] = p
+            gsp["q"] = q
+            gsp["dim"] = dim
             print("Embedding full graph...")
             model = Node2Vec()
             model.fit(dataset)
@@ -90,11 +93,18 @@ class Commands:
                 num=part_num
             ):
                 result = [] 
-                model = Node2Vec()
+                model = Node2Vec(
+                    p=p,
+                    q=q,
+                    dim=dim
+                )
                 gsp["dataset"] = dataset_name
                 gsp["num_parts"] = params["num"]
                 gsp["alpha"] = params["alpha"]
                 gsp["threshold"] = params["threshold"]
+                gsp["p"] = p
+                gsp["q"] = q
+                gsp["dim"] = dim
                 print("Embedding partitions...")
                 print("   Partitions: ", len(partitions))
                 print("  Dataset: ", dataset_name)
