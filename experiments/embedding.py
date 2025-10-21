@@ -14,6 +14,7 @@ from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
 from vertex_voyage.partitioning import partition_graph, min_corruptability
+from datetime import datetime
 
 GS_LOCATION = "gs_cache"
 
@@ -29,6 +30,8 @@ class VertexEnumerator:
         return self.index[node]
 
 
+def log(message: str):
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 class Commands:
     def list(self):
         gsp = GridSearchPersistence(GS_LOCATION)
@@ -82,7 +85,7 @@ class Commands:
             gsp["p"] = p
             gsp["q"] = q
             gsp["dim"] = dim
-            print("Embedding full graph...")
+            log("Embedding full graph...")
             model = Node2Vec()
             model.fit(dataset)
             embedding = model.embed_nodes(dataset.nodes)
@@ -105,12 +108,12 @@ class Commands:
                 gsp["p"] = p
                 gsp["q"] = q
                 gsp["dim"] = dim
-                print("Embedding partitions...")
-                print("   Partitions: ", len(partitions))
-                print("  Dataset: ", dataset_name)
-                print("  Alpha: ", params["alpha"])
-                print("  Num parts: ", params["num"])
-                print("  Threshold: ", params["threshold"])
+                log("Embedding partitions...")
+                log(f"   Partitions: {len(partitions)}")
+                log(f"  Dataset: {dataset_name}")
+                log(f"  Alpha: {params['alpha']}")
+                log(f"  Num parts: {params['num']}")
+                log(f"  Threshold: {params['threshold']}")
                 for part in partitions:
                     model.fit(dataset.subgraph(part), dataset.nodes)
                     embedding = model.embed_nodes([t(x) for x in part])
@@ -183,8 +186,8 @@ class Commands:
             gs_persist['algorithm'] = 'lfm'
             g = dataset()
             g = to_vv_graph(g)
-            print(f"Dataset: {dataset_name}")
-            print("   Number of nodes:", g.number_of_nodes())
+            log(f"Dataset: {dataset_name}")
+            log(f"   Number of nodes: {g.number_of_nodes()}")
             mp = grid_search(
                 f = lambda threshold, alpha, num: partition_graph(
                     alpha=alpha,
@@ -203,7 +206,7 @@ class Commands:
                 intermediate_callback=gs_persist,
                 report_progress=True
             )
-            print("\nMinimum corruptability:", mp)
+            log(f"\nMinimum corruptability: {mp}")
 
 
 if __name__ == "__main__":
