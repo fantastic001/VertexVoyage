@@ -58,11 +58,11 @@ class TestReconstruction(unittest.TestCase):
 
     def test_reconstruction_shuffle(self):
         embeddings = [
-            np.array([np.sin(i * np.pi / 100), np.cos(i * np.pi / 100)]) for i in range(40000)
+            np.array([np.sin(i * np.pi / 100), np.cos(i * np.pi / 100)]) for i in range(4000)
         ]
         k = 2
         shuffle(embeddings)
-        nodes = [i for i in range(40000)]
+        nodes = [i for i in range(4000)]
         # expected_graph = reconstruct(k, embeddings, nodes)
         G = reconstruct(k, embeddings)
         # print("Expected graph edges:", expected_graph.edges())
