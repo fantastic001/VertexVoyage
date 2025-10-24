@@ -1,6 +1,7 @@
 
 import networkx as nx 
 import numpy as np 
+from vertex_voyage_native import get_reconstructed_edges
 
 
 def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
@@ -15,23 +16,13 @@ def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     Returns:
     nx.Graph: Reconstructed undirected graph.
     """
-    n = len(embedding)
-    graph = nx.Graph()
     if nodes is None:
-        for i in range(n):
-            graph.add_node(i)
-        nodes = list(range(n))
-    else:
-        for i, node in enumerate(nodes):
-            graph.add_node(node)
-    distances = [] 
-    for i in range(n):
-            for j in range(i+1, n):
-                distances.append((np.linalg.norm(embedding[i] - embedding[j]), i, j))
-    distances = sorted(distances, key=lambda x: x[0])
-    for _, x, y in distances[:k]:
-        graph.add_edge(nodes[x], nodes[y])
-    return graph
+        nodes = [i for i in range(len(embedding))]
+    reconstructed_edges = get_reconstructed_edges(np.array(embedding, dtype=np.float64), k)
+    reconstructed_edges = [(nodes[e[0]], nodes[e[1]]) for e in reconstructed_edges]
+    reconstructed_graph = nx.Graph()
+    reconstructed_graph.add_edges_from(reconstructed_edges)
+    return reconstructed_graph
 
 def get_f1_score(G, reconstructed_graph):
     nodes = G.nodes()
