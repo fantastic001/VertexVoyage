@@ -1,7 +1,26 @@
 use std::collections::{HashSet};
 use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
-
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use pyo3::{prelude::*};
+use rayon::prelude::*;
+
+struct Edge {
+    dist: f64,
+    i: usize,
+    j: usize,
+}
+
+// Max-heap by distance
+impl Ord for Edge {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.dist.partial_cmp(&other.dist).unwrap_or(Ordering::Equal)
+    }
+}
+impl PartialOrd for Edge { fn partial_cmp(&self, o: &Self) -> Option<Ordering> { Some(self.cmp(o)) } }
+impl PartialEq for Edge { fn eq(&self, o: &Self) -> bool { self.dist == o.dist } }
+impl Eq for Edge {}
+
 
 // Get the reconstructed edges for a given set embeddings and k nearest neighbors
 // Parameters:
@@ -15,24 +34,62 @@ fn get_reconstructed_edges(
     embeddings: PyReadonlyArray2<f64>, 
     k: usize) 
 -> PyResult<Vec<(usize, usize)>> {
-    let mut neighbors = Vec::new();
     let num_nodes = embeddings.shape()[0];
-    let mut edge_distances: Vec<(usize, usize, f64)> = Vec::new();
-    edge_distances.reserve(100000);
-    // Compute pairwise distances
-    for i in 0..num_nodes {
-        for j in i+1..num_nodes {
+    let dim = embeddings.shape()[1];
+    let mut neighbors: Vec<(usize, usize)> = Vec::new();
+
+    println!("Acquiring");
+    let emb = embeddings.as_array();
+    py.allow_threads(|| {
+        let cpu_num = num_cpus::get();
+        println!("Using {} threads", cpu_num);
         
-            let dist = embeddings.as_array().row(i).to_owned() - embeddings.as_array().row(j).to_owned();
-            let dist = dist.dot(&dist).sqrt();
-            edge_distances.push((i, j, dist));
-            
+        // parallel computing 
+        // each thread processes a chunk of nodes
+        let chunk_size = (num_nodes + cpu_num - 1) / cpu_num;
+        let local_heaps = (0..cpu_num).into_par_iter().map(|thread_id| {
+            let start = thread_id * chunk_size;
+            let end = ((thread_id + 1) * chunk_size).min(num_nodes);
+            let mut heap = BinaryHeap::with_capacity(k);
+            for i in start..end {
+                for j in i+1..num_nodes {
+                    let mut dist = 0.0;
+                    for d in 0..dim {
+                        let diff = &emb[[i, d]] - &emb[[j, d]];
+                        dist += &diff * &diff;
+                    }
+
+                    if heap.len() < k {
+                        heap.push(Edge { dist, i, j });
+                    } else if let Some(top) = heap.peek() {
+                        if dist < top.dist {
+                            heap.pop();
+                            heap.push(Edge { dist, i, j });
+                        }
+                    }
+                }
+            }
+            heap
+        }).collect::<Vec<_>>();
+        // Merge heaps from all threads
+        let mut heap = BinaryHeap::with_capacity(k);
+        for local_heap in local_heaps {
+            for edge in local_heap.into_sorted_vec() {
+                if heap.len() < k {
+                    heap.push(edge);
+                } else if let Some(top) = heap.peek() {
+                    if edge.dist < top.dist {
+                        heap.pop();
+                        heap.push(edge);
+                    }
+                }
+            }
         }
-    }
-    edge_distances.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
-    for i in 0..k {
-        neighbors.push((edge_distances[i].0, edge_distances[i].1));
-    }
+
+        neighbors = heap.into_sorted_vec().into_iter().map(|e| {
+            if e.i < e.j { (e.i, e.j) } else { (e.j, e.i) }
+        }).collect();
+    });
     Ok(neighbors)
 }
 
