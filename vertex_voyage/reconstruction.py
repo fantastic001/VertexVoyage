@@ -18,9 +18,11 @@ def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     """
     if nodes is None:
         nodes = [i for i in range(len(embedding))]
+    reconstructed_graph = nx.Graph()
+    for n in nodes:
+        reconstructed_graph.add_node(n)
     reconstructed_edges = get_reconstructed_edges(np.array(embedding, dtype=np.float64), k)
     reconstructed_edges = [(nodes[e[0]], nodes[e[1]]) for e in reconstructed_edges]
-    reconstructed_graph = nx.Graph()
     reconstructed_graph.add_edges_from(reconstructed_edges)
     return reconstructed_graph
 

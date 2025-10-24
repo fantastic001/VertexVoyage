@@ -153,8 +153,6 @@ class DistGER(Node2Vec):
         super().__init__(dim, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
 
     def _random_walk(self, node):
-        if not isinstance(self.nodes, list):
-            self.nodes = list(self.nodes)
         walker = Walker(node)
         graph = Graph(self.G)
         walk_ = list(self.nodes[n] for n in walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
