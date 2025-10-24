@@ -119,7 +119,7 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
         context_class = tf.expand_dims(
             tf.constant([context_word], dtype="int64"), 1)
         # context_class = tf.reshape(tf.constant(context_class, dtype="int64"), (1, 1))
-        if vocab_size < 10 or num_ns > vocab_size:
+        if vocab_size < 10 or num_ns > vocab_size or num_ns <= 0:
             negative_sampling_candidates = [] 
         else:
             negative_sampling_candidates, _, _ = tf.random.log_uniform_candidate_sampler(
@@ -186,7 +186,7 @@ def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate
     model: trained Word2Vec model
     """
     model = Word2Vec(vocab_size, embedding_dim)
-    loss_fn = loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+    loss_fn = loss=tf.keras.losses.BinaryCrossentropy(from_logits=True)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
     model.compile(optimizer=optimizer, loss=loss_fn)
