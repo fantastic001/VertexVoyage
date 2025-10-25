@@ -246,6 +246,15 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
     """
+    # use GPU if available
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError as e:
+            print(e)
+            # ignore errors
     if epoch_callbacks is None:
         epoch_callbacks = []
     
