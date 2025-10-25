@@ -5,7 +5,7 @@ from vertex_voyage.partitioning import calculate_corruptability, calculate_parti
 import networkx as nx
 from vertex_voyage.node2vec import Node2Vec
 import numpy as np 
-from vertex_voyage.reconstruction import reconstruct
+from vertex_voyage.reconstruction import get_f1_score, reconstruct
 import vertex_voyage_native as vvn 
 
 class TestPartitioning(unittest.TestCase):
@@ -33,20 +33,15 @@ class TestPartitioning(unittest.TestCase):
     def test_partitioned_n2v(self):
         dim = 128
         zachary = nx.karate_club_graph()
+        nodes = list(zachary.nodes())
+        # rename nodes to be 0,...,N-1
+        mapping = {}
+        for i, node in enumerate(nodes):
+            mapping[node] = i
+        zachary = nx.relabel_nodes(zachary, mapping)
         partition_num = 2
-        communities = partition_graph(zachary, partition_num)
-        n2v_full = Node2Vec(
-            dim=dim, 
-            walk_size=80, 
-            n_walks=10, 
-            window_size=10,
-            epochs=1, 
-            p = .25,
-            q = 4,
-            negative_sample_num=1, # in practice, should be 500
-            seed=42,
-            learning_rate=0.01,
-        )
+        communities = partition_graph(zachary, partition_num, use_modified_lfm=True, threshold=0)
+        n2v_full = Node2Vec(dim=dim, negative_sample_num=1)
         n2v_full.fit(zachary)
 
         n2v_partitioned = []
@@ -63,32 +58,27 @@ class TestPartitioning(unittest.TestCase):
                 seed=n2v_full.seed,
                 window_size=n2v_full.window_size
             ))
-            pg = nx.Graph()
-            pg.add_nodes_from(community)
-            pg.add_edges_from(zachary.subgraph(community).edges)
+            pg = zachary.subgraph(community)
             n2v_partitioned[-1].fit(pg, nodes = zachary.nodes())
         
-        W = np.zeros([len(zachary.nodes()), dim], dtype=np.float32)
-        for part in n2v_partitioned:
-            W = W + part.W
-        W /= partition_num
-        node = np.zeros([len(zachary.nodes())], dtype=np.float32)
-        node[0] = 1
-        emb = np.dot(node, W)
-        emb_full = np.dot(node, n2v_full.W)
-        embeddings = []
-        for i in range(len(zachary.nodes())):
-            code = np.zeros([len(zachary.nodes())], dtype=np.float32)
-            code[i] = 1
-            embeddings.append(np.dot(code, W))
+        embeddings = {}
+        for comm in communities:
+            for node in comm:
+                myemb = n2v_partitioned[communities.index(comm)]
+                if node not in embeddings:
+                    embeddings[node] = [] 
+                embeddings[node].append(myemb.embed_node(node))
+        for node in embeddings:
+            embeddings[node] = np.mean(embeddings[node], axis=0)
         k = len(zachary.edges())
         G = zachary
-        reconstructed_graph = reconstruct(k, embeddings)
+        result = [] 
+        for node in G.nodes():
+            result.append(embeddings[node])
+        reconstructed_graph = reconstruct(k, result, list(G.nodes()))
         nodes = G.nodes()
-        recall = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(G.neighbors(n))) for n in nodes]) / len(G.nodes())
-        precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
-        f1 = 2 * (precision * recall) / (precision + recall)
-        self.assertGreaterEqual(f1, 0.3)
+        f1 = get_f1_score(G, reconstructed_graph)
+        self.assertGreaterEqual(f1, 0.40)
 
     def test_partitioning_corruption(self):
         zachary = nx.karate_club_graph()

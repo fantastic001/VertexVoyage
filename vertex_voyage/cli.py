@@ -81,8 +81,9 @@ def perform_embedding(cls, alg: str, p: float, q: float, dim: int, dataset_name:
             log(f"  Num parts: {params['num']}")
             log(f"  Threshold: {params['threshold']}")
             for part in partitions:
+                part = [t(x) for x in part]
                 model.fit(dataset.subgraph(part), dataset.nodes)
-                embedding = model.embed_nodes([t(x) for x in part])
+                embedding = model.embed_nodes(part)
                 result.append(embedding)
             gsp.save(result, algorithm=alg)
 class VertexEnumerator:
