@@ -1,4 +1,5 @@
 
+import sys
 import numpy as np
 from vertex_voyage.grid_search import (
     GridSearchPersistence, 
@@ -100,6 +101,7 @@ class VertexEnumerator:
 
 def log(*messages):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {' '.join(map(str, messages))}")
+    sys.stdout.flush()
 
 
 class Commands:
