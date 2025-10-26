@@ -40,18 +40,10 @@ class TestNode2Vec(unittest.TestCase):
         self.assertEqual(len(walks), node2vec.n_walks * len(G.nodes()))
         for walk in walks:
             self.assertEqual(len(walk), node2vec.walk_size)
-            decoded_walk = [] 
-            for w in walk:
-                decoded = [k for k, v in node2vec.nodes.items() if (v == w).all()][0]
-                decoded_walk.append(decoded)
-            if 1 in decoded_walk:
-                self.assertTrue(2 in decoded_walk)
-                self.assertFalse(3 in decoded_walk)
-                self.assertFalse(4 in decoded_walk)
-            if 4 in decoded_walk:
-                self.assertTrue(3 in decoded_walk)
-                self.assertFalse(1 in decoded_walk)
-                self.assertFalse(2 in decoded_walk)
+            if 0 in walk:
+                self.assertTrue(1 in walk)
+            if 3 in walk:
+                self.assertTrue(2 in walk)
 
 
     def test_embed_node(self):

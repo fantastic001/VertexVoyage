@@ -99,8 +99,7 @@ class Node2Vec:
     def _encode(self, node):
         if not isinstance(self.G, VVGraph):
             node_index = list(self.g_nodes).index(node)
-            result = np.zeros(len(self.g_nodes))
-            result[node_index] = 1
+            result = node_index
         else:
             result = node
         return result
