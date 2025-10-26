@@ -350,7 +350,7 @@ class Commands:
             all_nodes = list(dataset.nodes)
             for p in [0.25, 0.5, 1, 2, 4]:
                 for q in [0.25, 0.5, 1, 2, 4]:
-                    model = Node2Vec(dim=10, p=p, q=q, n_walks=1, walk_size=10, window_size=3)
+                    model = Node2Vec(dim=100, p=p, q=q, n_walks=1, walk_size=10, window_size=3)
                     model.fit(pg, dataset.nodes)
                     emb = model.embed_nodes(part)
                     g = reconstruct(pg.number_of_edges(), emb, part)
