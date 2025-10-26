@@ -83,32 +83,30 @@ class Node2Vec:
         self.node_to_neightbours_map = {node: list(self.G.neighbors(node)) for node in self.G.nodes}
         if nodes is None:
             nodes = list(G.nodes)
-        self.g_nodes = nodes
+        self.g_nodes = list(G.nodes)
         if not isinstance(self.G, VVGraph):
             self.nodes = {node: self._encode(node) for node in nodes}
         else:
             self.nodes = self.g_nodes
         self.walks = self._random_walks()
         self.W = self._train() 
-        W = np.zeros((len(nodes), self.dim))
-        for i, node in enumerate(nodes):
+        W = np.zeros((len(self.g_nodes), self.dim))
+        for i, node in enumerate(self.g_nodes):
             W[i] = self.embed_node(node)
         self.W = W
         return self.W
 
     def _encode(self, node):
-        if not isinstance(self.G, VVGraph):
-            node_index = list(self.g_nodes).index(node)
-            result = node_index
-        else:
-            result = node
-        return result
+        try:
+            return self.g_nodes.index(node)
+        except ValueError:
+            return None 
 
     def embed_node(self, node):
-        try:
-            return self.W[list(self.nodes).index(node)]
-        except KeyError:
+        node_idx = self._encode(node)
+        if node_idx is None:
             return np.zeros(self.dim)
+        return self.W[node_idx]
     
     def embed_nodes(self, nodes):
         return [self.embed_node(node) for node in nodes]
@@ -119,32 +117,26 @@ class Node2Vec:
         if self.G.number_of_nodes() == 0:
             return [] 
         if self.use_threads:
-            starts = [n for _ in range(self.n_walks) for n in self.G.nodes]
+            starts = [n for _ in range(self.n_walks) for n in self.g_nodes]
             with mpp.ThreadPool() as pool:
                 walks = pool.map(self._random_walk, starts)
         else:
             for _ in range(self.n_walks):
-                for n in self.G.nodes:
+                for n in self.g_nodes:
                     start = n
                     walks.append(self._random_walk(start))
         return walks
     
     def _random_walk(self, node):
-        if not isinstance(self.G, VVGraph):
-            walk = [self.nodes[node]]
-        else:
-            walk = [node]
+        walk = [node]
         current = node
         prev = None
         for _ in range(self.walk_size - 1):
             next_node = self._get_next(prev, current)
-            if not isinstance(self.G, VVGraph):
-                walk.append(self.nodes[next_node])
-            else:
-                walk.append(next_node)
+            walk.append(next_node)
             prev = current
             current = next_node
-        return walk
+        return [self._encode(n) for n in walk]
     
 
     
