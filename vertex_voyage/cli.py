@@ -313,7 +313,68 @@ class Commands:
     def remove_dataset(self, dataset_name: str):
         gsp = GridSearchPersistence(GS_LOCATION)
         gsp.delete(dataset=dataset_name)
-        
+
+    def test(self):
+
+        import networkx as nx
+        gsp = GridSearchPersistence(GS_LOCATION)
+        log("Processing dataset ")
+        t = VertexEnumerator()
+        dataset = Transform(datasets["CITESEER"](), lambda x: Event(
+            src=t(int(x.src)),
+            dest=t(int(x.dest)),
+            timestamp=int(x.timestamp),
+            type=x.type,
+            attrs=x.attrs,
+        ))
+        dataset = to_nx_graph(dataset)
+        parts = partition_graph(dataset, 2, alpha=1, threshold=0, use_modified_lfm=True)
+        log("Total number of nodes: ", dataset.number_of_nodes())
+        log("Graph partitioned")
+        embs = {}
+        for part in parts:
+            log("Partition size: %d" % len(part))
+            best = None
+            best_f1 = -1
+            pg = dataset.subgraph(part)
+            gg = nx.Graph()
+            gg.add_edges_from(pg.edges)
+            cs = nx.connected_components(gg)
+            cs = list(reversed(sorted(cs, key=len)))
+            log("Biggest components: ", [len(x) for x in cs[:3]])
+            log("Isolated nodes: ", len(list(nx.isolates(gg))))
+            log("Number of connected components: ", nx.number_connected_components(gg))
+            log("Degree distribution: ", nx.degree_histogram(gg)[:5])
+            log("Average clustering: ", nx.average_clustering(gg))
+            log("Partition number of edges: ", pg.number_of_edges())
+            all_nodes = list(dataset.nodes)
+            for p in [0.25, 0.5, 1, 2, 4]:
+                for q in [0.25, 0.5, 1, 2, 4]:
+                    model = Node2Vec(dim=10, p=p, q=q, n_walks=1, walk_size=10, window_size=3)
+                    model.fit(pg, dataset.nodes)
+                    emb = model.embed_nodes(part)
+                    g = reconstruct(pg.number_of_edges(), emb, part)
+                    PG = nx.Graph()
+                    PG.add_edges_from(pg.edges)
+                    f1 = get_f1_score(PG, g)
+                    if f1 > best_f1:
+                        best_f1 = f1
+                        best = emb
+                        log("New best: ", p, q, best_f1)
+            log("Best achieved F1 score: ", best_f1)
+            for node, e in zip(part, best):
+                if node not in embs:
+                    embs[node] = []
+                embs[node].append(e)
+        for n in dataset.nodes:
+            embs[n] = np.mean(embs[n], axis=0)
+        embs = [embs[n] for n in dataset.nodes]
+        g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
+        G = nx.Graph()
+        G.add_edges_from(dataset.edges)
+        log("Global F1 score: ", get_f1_score(G, g))
+
+
 
 if __name__ == "__main__":
     command_executor_main(Commands)
