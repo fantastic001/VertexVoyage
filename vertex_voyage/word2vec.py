@@ -61,8 +61,6 @@ def skipgrams(
     couples = []
     labels = []
     for i, wi in enumerate(sequence):
-        if not wi:
-            continue
         if sampling_table is not None:
             if sampling_table[wi] < random.random():
                 continue
@@ -72,8 +70,6 @@ def skipgrams(
         for j in range(window_start, window_end):
             if j != i:
                 wj = sequence[j]
-                if not wj:
-                    continue
                 couples.append([wi, wj])
                 if categorical:
                     labels.append([0, 1])
@@ -86,7 +82,7 @@ def skipgrams(
         random.shuffle(words)
 
         couples += [
-            [words[i % len(words)], random.randint(1, vocabulary_size - 1)]
+            [words[i % len(words)], random.randint(0, vocabulary_size - 1)]
             for i in range(num_negative_samples)
         ]
         if categorical:
@@ -262,14 +258,14 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     if seed is None:
         seed = random.randint(0, 10e6)
     walks = training_data
-    walks = [[w + 1 for w in walk] for walk in walks]
-    training = generate_skip_grams(walks, window_size, num_ns, vocab_size+1, seed)
+    walks = [[w for w in walk] for walk in walks]
+    training = generate_skip_grams(walks, window_size, num_ns, vocab_size, seed)
     # if training is None, then return zero weights
     if training is None:
-        return np.zeros((vocab_size+1, embedding_dim))
-    model = train_word2vec_model(training, vocab_size+1, embedding_dim, learning_rate, epochs, epoch_callbacks)
+        return np.zeros((vocab_size, embedding_dim))
+    model = train_word2vec_model(training, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks)
     weights = model.get_layer('w2v_embedding').get_weights()[0]
-    return weights[1:]  # Skip the first row (non-word)
+    return weights
 
 if __name__ == "__main__":
   from vertex_voyage.node2vec import Node2Vec
