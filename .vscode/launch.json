@@ -14,6 +14,18 @@
             }
         },
         {
+            "name": "Evaluation",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "vertex_voyage",
+            "args": [
+                "test"
+            ],
+            "env": {
+                "FAILFAST": "1",
+            }
+        },
+        {
             "name": "Benchmark",
             "type": "debugpy",
             "request": "launch",
