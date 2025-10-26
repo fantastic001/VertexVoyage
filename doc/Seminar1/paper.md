@@ -173,9 +173,6 @@ In Table 1 partitioning time is shown for LFM algorithm on different networks:
 | Davis Southern Women | 0.004145 | 32 | 89 |
 | Florentine families | 0.000677 | 16 | 20 |
 | Twitch | | 168114 | 6797557 | 
-| UK2002 | |  |  |
-| Wiki Talks | |  |  |
-| Live Journal | |  |  |
 Table: Partitioning time for LFM algorithm on real-world networks.
 
 
@@ -240,6 +237,12 @@ Table: F1 scores for embeddings generated using Node2Vec on Florentine families 
 Table: F1 scores for embeddings generated using Node2Vec on Les Miserables graph with modified LFM partitioning.
 
 
+For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 1.
+
+| Network | F1 Score | Dim | Number of walks | Walk length |
+|---------|----------|-----|-----------------|---------------|
+| CITESEER| 35%      | 100 | 1 | 10 |
+
 Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
 
 | Network | ARI | 
@@ -255,6 +258,22 @@ Table: Clustering similarity using K-means algorithm on embeddings generated wit
 From results, it can be observed that the distributed embedding with community-aware partitioning achieves high clustering similarity compared to the sequential implementation, indicating that the embeddings effectively capture the community structure of the graph and can be used for clustering tasks.
 
 
+<!-- _____________ -->
+
+
+During experiments, it was observed that negative sampling in Word2Vec training can significantly impact the quality of the embeddings. For instance, in the table below, F1 scores for embeddings generated using Node2Vec on different graphs with modified LFM partitioning are shown for different values of negative samples when number of partitions is set to 2 and number of walks per node is set to 10.
+
+| Graph | ns=0 | ns=1 | ns=10 | ns=100 |
+|-------|------|------|-------|--------|
+| Zachary Karate Club | 10.89% | 41.8% | 41.3% | 14.5% | 
+| Les Miserables | 13.03% | 55.01% | 50.0% | 12.77% | 
+| ER(200, 0.05) | 3.9% | 11.73% | 16.29% | 13.67% |
+| BA(300, 50) | 27.5% | 38.82 | 39.2% | 39.2% |
+Table: F1 scores for embeddings generated using Node2Vec on different graphs with modified LFM partitioning for different values of negative samples (ns).
+
+
+
+<!-- _____________ -->
 
 <!-- corruptibility on SBM  -->
 
