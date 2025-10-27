@@ -23,6 +23,7 @@ datasets = {
     "CITESEER": lambda: FileEventSequence("data/citeseer.txt"),
     "les_mis": lambda: FileEventSequence("data/les_mis.txt"),
     "zachary": lambda: FileEventSequence("data/zachary.txt"),
+    "AstroPh": lambda: FileEventSequence("data/AstroPh.txt"),
 }
 
 def create_benchmark_class(partitioner_class, *args):
