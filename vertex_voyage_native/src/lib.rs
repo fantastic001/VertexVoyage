@@ -4,6 +4,9 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use pyo3::{prelude::*};
 use rayon::prelude::*;
+use rand::{Rng};
+use rand_chacha::{ChaCha20Rng, ChaChaRng, rand_core::{RngCore, SeedableRng}};
+
 
 struct Edge {
     dist: f64,
@@ -123,15 +126,151 @@ fn get_next(r: f64, prev_neighbors: Vec<usize>, neighbors: Vec<usize>, current: 
 }
 
 
+fn skipgrams(
+    sequence: Vec<usize>,
+    vocabulary_size: usize,
+    window_size: usize,
+) -> (Vec<(usize, usize)>, Vec<i32>) {
+    // Positive couples/labels
+    let mut couples: Vec<(usize, usize)> = Vec::new();
+    // We'll store labels in a neutral enum, then convert to a Python list at the end
+    let mut labels: Vec<i32> = Vec::new();
+
+    let n = sequence.len();
+
+    for (i, &wi) in sequence.iter().enumerate() {
+        let start = i.saturating_sub(window_size);
+        let end = (i + window_size + 1).min(n);
+        for j in start..end {
+            if j == i { continue; }
+            let wj = sequence[j];
+            couples.push((wi, wj));
+            labels.push(1);
+        }
+    }
+
+    (couples, labels)
+}
+
+fn log_uniform_candidate_sampler(
+    true_class: usize,
+    num_sampled: usize,
+    range_max: usize,
+    unique: bool,
+) -> Vec<usize> {
+    if num_sampled == 0 || range_max == 0 {
+        return Vec::new();
+    }
+
+    let max_possible = if range_max > 0 {
+        // exclude true_class if within range
+        if true_class < range_max { range_max - 1 } else { range_max }
+    } else { 0 };
+    let target = if unique { num_sampled.min(max_possible) } else { num_sampled };
+
+    let mut out = Vec::with_capacity(target);
+
+    // Inverse-CDF sampling for a rough log-uniform over [0, range_max)
+    // u ~ U(0, ln(range_max+1)), x = floor(exp(u)) - 1
+    // Reject true_class; if unique, also reject duplicates.
+    let ln_max = ((range_max as f64) + 1.0).ln();
+
+    let mut guard = 0usize;
+    let guard_limit = target * 20 + 100; // prevent pathological loops
+    let mut cha_cha_rng = ChaChaRng::from_seed(rand::thread_rng().gen());
+
+    while out.len() < target && guard < guard_limit {
+        guard += 1;
+        // generate a uniform f64 in [0, ln_max) using RngCore::next_u64()
+        // avoid relying on Rng::gen_range which may not be implemented for ChaCha20Rng in some crate combos
+        let rand_u = cha_cha_rng.next_u64();
+        let fract = (rand_u as f64) / (u64::MAX as f64 + 1.0);
+        let u: f64 = fract * ln_max;
+        let mut x: usize = u.exp().floor() as usize;
+        if x > 0 { x -= 1; }
+        if x >= range_max {
+            continue;
+        }
+        if x == true_class {
+            continue;
+        }
+        if unique && out.contains(&x) {
+            continue;
+        }
+        out.push(x);
+    }
+
+    out
+}
 
 
+#[pyfunction]
+fn generate_skip_grams(
+    py: Python<'_>,
+    sequences: Vec<Vec<usize>>,   // Python list[list[int]]
+    window_size: usize,
+    num_ns: usize,
+    vocab_size: usize,
+) -> PyResult<Option<(Vec<usize>, Vec<Vec<usize>>, Vec<Vec<i64>>)>> {
+    let mut targets: Vec<usize> = Vec::new();
+    let mut contexts: Vec<Vec<usize>> = Vec::new();
+    let mut labels: Vec<Vec<i64>> = Vec::new();
 
+    for sequence in sequences {
+        // positives only, no shuffle, no categorical
+        let (positive_skip_grams, _py_labels) = skipgrams(
+            sequence,
+            vocab_size,
+            window_size,
+        );
 
+        if positive_skip_grams.is_empty() {
+            continue;
+        }
+
+        for (target, context_word) in positive_skip_grams {
+            // follow the same guard logic as your Python version
+            let negatives: Vec<usize> =
+                if vocab_size < 10 || num_ns > vocab_size || num_ns == 0 {
+                    Vec::new()
+                } else {
+                    log_uniform_candidate_sampler(
+                        context_word,      // true_class
+                        num_ns,            // number of negatives requested
+                        vocab_size,        // [0, vocab_size)
+                        true,              // unique
+                    )
+                };
+
+            // contexts: [positive_context, negatives...]
+            let mut ctx_row = Vec::with_capacity(1 + negatives.len());
+            ctx_row.push(context_word);
+            ctx_row.extend(negatives.iter().copied());
+
+            // labels: [1, 0, 0, ...]
+            let mut lbl_row = Vec::with_capacity(ctx_row.len());
+            lbl_row.push(1);
+            lbl_row.extend(std::iter::repeat(0).take(ctx_row.len() - 1));
+
+            targets.push(target);
+            contexts.push(ctx_row);
+            labels.push(lbl_row);
+        }
+    }
+
+    if targets.is_empty() {
+        // Return None to Python if no targets (exact parity with your Python function)
+        return Ok(None);
+    }
+
+    Ok(Some((targets, contexts, labels)))
+}
 
 /// A Python module implemented in Rust.
 #[pymodule]
 fn vertex_voyage_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_next, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_skip_grams, m)?)?;
     m.add_function(wrap_pyfunction!(get_reconstructed_edges, m)?)?;
     Ok(())
 }

@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, preprocessing
 import random 
+from  vertex_voyage_native import generate_skip_grams  as skg 
 
 def skipgrams(
     sequence,
@@ -102,36 +103,7 @@ def skipgrams(
 
 def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
     targets, contexts, labels = [], [], []
-    for sequence in sequences:
-      positive_skip_grams, _ = skipgrams(
-          sequence,
-          vocabulary_size=vocab_size,
-          window_size=window_size,
-          negative_samples=0
-      )
-      if not positive_skip_grams:
-            continue
-      for target, context_word in positive_skip_grams:
-        context_class = tf.expand_dims(
-            tf.constant([context_word], dtype="int64"), 1)
-        # context_class = tf.reshape(tf.constant(context_class, dtype="int64"), (1, 1))
-        if vocab_size < 10 or num_ns > vocab_size or num_ns <= 0:
-            negative_sampling_candidates = [] 
-        else:
-            negative_sampling_candidates, _, _ = tf.random.log_uniform_candidate_sampler(
-                true_classes=context_class,  # class that should be sampled as 'positive'
-                num_true=1,  # each positive skip-gram has 1 positive context class
-                num_sampled=num_ns,  # number of negative context words to sample
-                unique=True,  # all the negative samples should be unique
-                range_max=vocab_size,  # pick index of the samples from [0, vocab_size]
-                seed=seed,  # seed for reproducibility
-                name="negative_sampling"  # name of this operation
-            )
-        context = tf.concat([tf.squeeze(context_class,1), negative_sampling_candidates], 0)
-        label = tf.constant([1] + [0]*len(negative_sampling_candidates), dtype="int64")
-        targets.append(target)
-        contexts.append(context)
-        labels.append(label)
+    targets, contexts, labels = skg(sequences, window_size, num_ns, vocab_size)
     if not targets:
         return None
     targets = np.array(targets)
