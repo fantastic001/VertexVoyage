@@ -314,13 +314,18 @@ class Commands:
         gsp = GridSearchPersistence(GS_LOCATION)
         gsp.delete(dataset=dataset_name)
 
-    def test(self):
+    def test(self, *, 
+             name: str = "CITESEER", 
+             partitions: int = 2, 
+             alpha: float = 1.0, 
+             threshold: float = 0.0
+    ):
 
         import networkx as nx
         gsp = GridSearchPersistence(GS_LOCATION)
         log("Processing dataset ")
         t = VertexEnumerator()
-        dataset = Transform(datasets["CITESEER"](), lambda x: Event(
+        dataset = Transform(datasets[name](), lambda x: Event(
             src=t(int(x.src)),
             dest=t(int(x.dest)),
             timestamp=int(x.timestamp),
@@ -328,7 +333,7 @@ class Commands:
             attrs=x.attrs,
         ))
         dataset = to_nx_graph(dataset)
-        parts = partition_graph(dataset, 2, alpha=1, threshold=0, use_modified_lfm=True)
+        parts = partition_graph(dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Graph partitioned")
         embs = {}
