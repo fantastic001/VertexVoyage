@@ -318,7 +318,9 @@ class Commands:
              name: str = "CITESEER", 
              partitions: int = 2, 
              alpha: float = 1.0, 
-             threshold: float = 0.0
+             threshold: float = 0.0,
+             break_early: bool = False,
+             skip_global: bool = False
     ):
 
         import networkx as nx
@@ -366,11 +368,18 @@ class Commands:
                         best_f1 = f1
                         best = emb
                         log("New best: ", p, q, best_f1)
+                    if break_early:
+                        break
+                if break_early:
+                    break
             log("Best achieved F1 score: ", best_f1)
             for node, e in zip(part, best):
                 if node not in embs:
                     embs[node] = []
                 embs[node].append(e)
+        if skip_global:
+            log("Skipping global F1 computation")
+            return
         for n in dataset.nodes:
             embs[n] = np.mean(embs[n], axis=0)
         embs = [embs[n] for n in dataset.nodes]
