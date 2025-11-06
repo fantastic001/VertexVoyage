@@ -320,7 +320,11 @@ class Commands:
              alpha: float = 1.0, 
              threshold: float = 0.0,
              break_early: bool = False,
-             skip_global: bool = False
+             skip_global: bool = False,
+             dim: int = 100,
+             default_p: float = 0,
+             default_q: float = 0,
+             long_run : bool = False
     ):
 
         import networkx as nx
@@ -357,7 +361,18 @@ class Commands:
             all_nodes = list(dataset.nodes)
             for p in [0.25, 0.5, 1, 2, 4]:
                 for q in [0.25, 0.5, 1, 2, 4]:
-                    model = Node2Vec(dim=100, p=p, q=q, n_walks=1, walk_size=10, window_size=3)
+                    if ((default_p > 0 and default_q > 0) and 
+                        not (p == default_p and q == default_q)):
+                        continue
+                    if long_run:
+                        n_walks = 10
+                        walk_size = 80
+                        window_size = 10
+                    else:
+                        n_walks = 1
+                        walk_size = 10
+                        window_size = 3
+                    model = Node2Vec(dim=dim, p=p, q=q, n_walks=n_walks, walk_size=walk_size, window_size=window_size)
                     model.fit(pg, dataset.nodes)
                     emb = model.embed_nodes(part)
                     g = reconstruct(pg.number_of_edges(), emb, part)
