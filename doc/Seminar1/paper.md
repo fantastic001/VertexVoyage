@@ -250,12 +250,54 @@ Partitioning time for these networks using modified LFM algorithm was below 1 se
 
 For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 10 with walk size 80.
 
+<!-- lfm threshold = 0 alpha = 1 -->
+
 | Network | Dim | F_1 for sequential | F_1 score on 2 nodes |
 |---------|-----|-----------------|---------------|
 | CITESEER| 50  | 24%            | 33%           |
 | AstroPh | 100 | 5.1%           | 6.6%          |
 | Cit-HepPh | 100 | 2.5%         | 2.8%         |
 | Cit-HepTh | 100 | 2.9%         | 3.2%        |
+
+Evaluation is also done when number of partitions is set to 4 and number of walks per node is set to 10 with walk size 80.
+
+| Network | F1 score on 4 nodes |
+|---------|---------------------|
+| CITESEER|                  |
+| AstroPh | |
+| Cit-HepPh | |
+| Cit-HepTh | |
+Table: F1 scores for embeddings generated using distributed Node2Vec with modified LFM partitioning on larger networks when number of partitions is set to 4.
+
+<!-- lfm threshold = 0.5 and alpha 1 -->
+
+| Network | F1 score on 4 nodes |
+|---------|---------------------|
+| CITESEER|                  |
+| AstroPh | |
+| Cit-HepPh | |
+| Cit-HepTh | |
+Table: F1 scores for embeddings generated using distributed Node2Vec with modified LFM partitioning on larger networks when number of partitions is set to 4.
+
+<!-- lfm threshold = 1 -->
+| Network | F1 score on 4 nodes |
+|---------|---------------------|
+| CITESEER|                  |
+| AstroPh | |
+| Cit-HepPh | |
+| Cit-HepTh | |
+Table: F1 scores for embeddings generated using distributed Node2Vec with modified LFM partitioning on larger networks when number of partitions is set to 4.
+
+
+<!-- LPA -->
+
+| Network | F1 score on 4 nodes |
+|---------|---------------------|
+| CITESEER|                  |
+| AstroPh | |
+| Cit-HepPh | |
+| Cit-HepTh | |
+Table: F1 scores for embeddings generated using distributed Node2Vec with label propagation partitioning on larger networks when number of partitions is set to 4.
 
 It was observed that LFM algorithm produces uniformly balanced partitions on these networks. Even when number of partitions is set higher than 2, partitions remain balanced within 10% of average partition size.
 
