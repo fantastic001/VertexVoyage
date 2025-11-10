@@ -237,11 +237,26 @@ Table: F1 scores for embeddings generated using Node2Vec on Florentine families 
 Table: F1 scores for embeddings generated using Node2Vec on Les Miserables graph with modified LFM partitioning.
 
 
-For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 1.
+The system is further evaluated on larger networks from literature to assess the performance of distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec. Following table shows characteristics of the networks used in the experiments.
 
-| Network | F1 Score | Dim | Number of walks | Walk length |
-|---------|----------|-----|-----------------|---------------|
-| CITESEER| 35%      | 100 | 1 | 10 |
+| Network | # nodes | # edges | Clustering coefficient |
+|---------|---------|---------|------------------------|
+| CITESEER| 3264    | 4532    | 0.14                   |
+| AstroPh | 18772   | 198110  | 0.63                   |
+| Cit-HepPh| 34546  | 420921  | 0.28                   |
+| Cit-HepTh| 27770  | 352324  | 0.31                   |
+Table: Characteristics of networks used in experiments.
+
+For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 10 with walk size 80.
+
+| Network | Dim | F_1 for sequential | F_1 score on 2 nodes |
+|---------|-----|-----------------|---------------|
+| CITESEER| 50  | 24%            | 33%           |
+| AstroPh | 100 | 5.1%           | 6.6%          |
+| Cit-HepPh | 100 | 2.5%         | 2.8%         |
+| Cit-HepTh | 100 | 2.9%         | 3.2%        |
+
+It was observed that LFM algorithm produces uniformly balanced partitions on these networks. Even when number of partitions is set higher than 2, partitions remain balanced within 10% of average partition size.
 
 Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
 
