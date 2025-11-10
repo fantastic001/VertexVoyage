@@ -246,6 +246,8 @@ The system is further evaluated on larger networks from literature to assess the
 | Cit-HepTh| 27770  | 352324  | 0.31                   |
 Table: Characteristics of networks used in experiments.
 
+Partitioning time for these networks using modified LFM algorithm was below 1 second for all networks regardless of the number of partitions set. Indeed, most of the time was spent in community detection, which is independent of the number of partitions. Bin packing algorithm for balancing partitions takes negligible time compared to community detection since number of communities is significantly lower than number of vertices in the graph.
+
 For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 10 with walk size 80.
 
 | Network | Dim | F_1 for sequential | F_1 score on 2 nodes |
