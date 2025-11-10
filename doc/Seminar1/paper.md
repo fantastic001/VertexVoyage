@@ -78,8 +78,7 @@ For dynamic graph partitioning, there are several methods available in literatur
 
 Main contributions of this paper include:
 1. A comprehensive evaluation of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning.
-2. An analysis of the effectiveness of different embedding methods, including node2vec and DistGER, in capturing community structures.
-3. A comparison of the performance of the LFM algorithm and its modified version in generating partitions that improve the quality of embeddings while reducing the need of network communication during the embedding generation process.
+2. A comparison of the performance of the LFM algorithm and its modified version in generating partitions that improve the quality of embeddings while reducing the need of network communication during the embedding generation process.
    
 
 # Methods 
