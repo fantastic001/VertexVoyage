@@ -252,7 +252,7 @@ For networks from literature, F1 score of reconstruction remains relatively stab
 
 <!-- lfm threshold = 0 alpha = 1 -->
 
-| Network | Dim | F_1 for sequential | F_1 score on 2 nodes |
+| Network | Dim | F1 score for sequential | F1 score on 2 nodes |
 |---------|-----|-----------------|---------------|
 | CITESEER| 50  | 24%            | 33%           |
 | AstroPh | 100 | 5.1%           | 6.6%          |
@@ -263,10 +263,10 @@ Evaluation is also done when number of partitions is set to 4 and number of walk
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
-| CITESEER|                  |
-| AstroPh | |
-| Cit-HepPh | |
-| Cit-HepTh | |
+| CITESEER| 18.99%                  |
+| AstroPh | 8.97%                  |
+| Cit-HepPh | 3.43%                  |
+| Cit-HepTh | 4.33%                  |
 Table: F1 scores for embeddings generated using distributed Node2Vec with modified LFM partitioning on larger networks when number of partitions is set to 4.
 
 <!-- lfm threshold = 0.5 and alpha 1 -->
