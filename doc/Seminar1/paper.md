@@ -276,9 +276,9 @@ Evaluation was also done when number of partitions is set to 4 where 50% of unas
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
 | CITESEER| 28.46%                 |
-| AstroPh | |
-| Cit-HepPh | |
-| Cit-HepTh | |
+| AstroPh | 9.21%                  |
+| Cit-HepPh | 3.37%               |
+| Cit-HepTh | 4.30%               |
 Table: F1 scores for embeddings generated using distributed Node2Vec with modified LFM partitioning on larger networks when number of partitions is set to 4 and threshold for unassigned vertices is set to 50%.
 
 <!-- lfm threshold = 1 -->
@@ -287,10 +287,10 @@ When vertices are partitioned randomly where each partition is selected with equ
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
-| CITESEER|                  |
-| AstroPh | |
-| Cit-HepPh | |
-| Cit-HepTh | |
+| CITESEER| 26.67%              |
+| AstroPh | 8.23%               |
+| Cit-HepPh | 3.08%             |
+| Cit-HepTh | 3.76%             |
 Table: F1 scores for embeddings generated using distributed Node2Vec with modified LFM partitioning on larger networks when number of partitions is set to 4.
 
 
