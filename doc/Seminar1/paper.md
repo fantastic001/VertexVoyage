@@ -344,9 +344,7 @@ Table: F1 scores for embeddings generated using Node2Vec on different graphs wit
 
 <!-- corruptibility on big networks  -->
 
-
-<!-- f1 scores for big networks  -->
-
+<!-- partition balance  -->
 
 
 # Conclusion 
