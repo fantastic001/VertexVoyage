@@ -344,7 +344,7 @@ Table: F1 scores for embeddings generated using Node2Vec on different graphs wit
 <!-- corruptibility on big networks  -->
 
 In experiments, it was observed that label propagation algorithm can produce balanced partitions which also 
-preserve community structure to some extent. In the table below, average balance and edge cut for label propagation
+preserves community structure to some extent. In the table below, average balance and edge cut for label propagation
 and modified LFM algorithm are shown for various real world networks when number of partitions is set to 4.
 
 | Network | Balance - LPA | Edge cut - LPA | Balance - LFM | Edge cut - LFM |
@@ -358,7 +358,9 @@ Table: Balance and edge cut for label propagation and modified LFM algorithm on 
 From table it can be seen that label propagation produces more balanced partitions with lower edge cuts compared to modified LFM algorithm. This also explains higher F1 scores observed when using label propagation for partitioning before embedding generation. 
 
 
-
+Overall, distributed graph vertex embedding with community-aware partitioning done
+using label propagation algorithm has shown to be the most effective, consistently
+outperforming other methods in terms of embedding quality, partition quality, and balance of partitions as well as reconstruction F1 scores.
 
 # Conclusion 
 
