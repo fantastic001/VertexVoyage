@@ -324,7 +324,8 @@ class Commands:
              dim: int = 100,
              default_p: float = 0,
              default_q: float = 0,
-             long_run : bool = False
+             long_run : bool = False,
+             use_lpa: bool = False
     ):
 
         import networkx as nx
@@ -339,7 +340,10 @@ class Commands:
             attrs=x.attrs,
         ))
         dataset = to_nx_graph(dataset)
-        parts = partition_graph(dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
+        if not use_lpa:
+            parts = partition_graph(dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
+        else:
+            parts = label_propagation_partitioner(dataset, partitions)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Graph partitioned")
         embs = {}
