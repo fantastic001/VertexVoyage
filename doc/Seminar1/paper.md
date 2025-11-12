@@ -295,8 +295,8 @@ Table: F1 scores for embeddings generated using distributed Node2Vec with modifi
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
-| CITESEER|                  |
-| AstroPh | |
+| CITESEER|  44.34%             |
+| AstroPh |  |
 | Cit-HepPh | |
 | Cit-HepTh | |
 Table: F1 scores for embeddings generated using distributed Node2Vec with label propagation partitioning on larger networks when number of partitions is set to 4.
@@ -333,9 +333,6 @@ Table: F1 scores for embeddings generated using Node2Vec on different graphs wit
 
 
 
-<!-- _____________ -->
-
-<!-- corruptibility on SBM  -->
 
 
 
@@ -344,10 +341,33 @@ Table: F1 scores for embeddings generated using Node2Vec on different graphs wit
 
 <!-- corruptibility on big networks  -->
 
-<!-- partition balance  -->
+In experiments, it was observed that label propagation algorithm can produce balanced partitions which also 
+preserve community structure to some extent. In the table below, average balance and edge cut for label propagation
+and modified LFM algorithm are shown for various real world networks when number of partitions is set to 4.
+
+| Network | Balance - LPA | Edge cut - LPA | Balance - LFM | Edge cut - LFM |
+|---------|---------------|----------------|---------------|----------------|
+| CITESEER | 0.000612     | 22%            | 0.0016        | 68.8%          |
+| AstroPh  | 0.824        | 8.4%        | 0.00085          | 74.5%          |
+| Cit-HepPh| 0.00005      | 20.6%          | 0.00147       | 73.8%          |
+| Cit-HepTh| 0.483        | 11.74%       | 0.0023          | 74.14%         |
+Table: Balance and edge cut for label propagation and modified LFM algorithm on various real world networks
+
+From table it can be seen that label propagation produces more balanced partitions with lower edge cuts compared to modified LFM algorithm. This also explains higher F1 scores observed when using label propagation for partitioning before embedding generation. 
+
+
 
 
 # Conclusion 
+
+In this paper, a distributed graph vertex embedding system with community-aware partitioning is proposed and evaluated. The system leverages community detection algorithms, such as LFM and label propagation, to partition the graph into smaller subgraphs that can be processed independently. The partitions are further refined using bin packing algorithms to ensure balance across machines in the distributed environment.
+
+The experimental results demonstrate that the proposed system effectively preserves community structures within partitions, leading to high-quality embeddings that capture the relationships between vertices in the original graph. The modified LFM algorithm with early stopping criteria significantly reduces partitioning time while maintaining the quality of the partitions. Additionally, label propagation shows promise in producing balanced partitions with lower edge cuts, resulting in improved embedding quality.
+
+As a future work, further exploration of dynamic graph partitioning methods and their impact on embedding quality in a distributed environment is suggested. Additionally, investigating the scalability of the system on larger graphs and optimizing the embedding aggregation process could lead to further improvements in performance and efficiency.
+
+Also, exploring other embedding methods such as DistGER [@fang_distributed_2023] and their compatibility with community-aware partitioning could provide insights into the generalizability of the proposed approach.
+
 
 # References 
 
