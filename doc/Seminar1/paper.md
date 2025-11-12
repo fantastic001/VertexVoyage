@@ -296,12 +296,14 @@ Table: F1 scores for embeddings generated using distributed Node2Vec with modifi
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
 | CITESEER|  44.34%             |
-| AstroPh |  |
-| Cit-HepPh | |
-| Cit-HepTh | |
+| AstroPh | 19.48%              |
+| Cit-HepPh | 4.8%             |
+| Cit-HepTh | 5.1%              |
 Table: F1 scores for embeddings generated using distributed Node2Vec with label propagation partitioning on larger networks when number of partitions is set to 4.
 
 It was observed that LFM algorithm produces uniformly balanced partitions on these networks. Even when number of partitions is set higher than 2, partitions remain balanced within 10% of average partition size.
+
+All evaluations were done using word2vec which was trained with negative sampling where number of negative samples was set to 1 and with one epoch since comparison with sequential Node2Vec was the main goal and increasing number of epochs would increase training time significantly.
 
 Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
 
