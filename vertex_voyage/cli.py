@@ -13,6 +13,7 @@ from vertex_voyage.command_executor import (
 )
 from vertex_voyage.command_executor import get_classes
 from vertex_voyage.partitioning import (
+    calculate_corruptability,
     calculate_partitioning_corruption,
     get_partition_average_balance,
 )
@@ -406,6 +407,26 @@ class Commands:
         G = nx.Graph()
         G.add_edges_from(dataset.edges)
         log("Global F1 score: ", get_f1_score(G, g))
+    
+    def evaluate_partitioning(
+            self, 
+            name: str, 
+            *,
+            threshold: float = 0.0,
+            alpha: float = 1.0,
+            use_lpa: bool = False
+        ):
+        dataset = to_nx_graph(datasets[name]())
+        if use_lpa:
+            parts = label_propagation_partitioner(dataset, partition_num=4)
+        else:
+            parts = partition_graph(dataset, partition_num=4, alpha=alpha, threshold=threshold, use_modified_lfm=True)
+        c = calculate_partitioning_corruption(dataset, parts)
+        balance = get_partition_average_balance({i: len(p) for i, p in enumerate(parts)}, len(parts))
+        log(f"Dataset: {name}")
+        log(f"   Number of nodes: {dataset.number_of_nodes()}")
+        log(f"   Corruptibility: {c}")
+        log(f"   Balance: {balance}")
 
 
 
