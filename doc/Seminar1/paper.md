@@ -57,7 +57,7 @@ A partition $P_k$ is set of vertices stored in a single machine in distributed e
 
 ## Related work 
 
-Graph vertex embedding is a well-studied area, with various methods proposed to generate low-dimensional representations of nodes in a graph. State of the art method which is widely used is Node2Vec [@grover_node2vec_2016] which uses random walks to capture the local and global structure of the graph. Node2Vec generates embeddings by performing biased random walks on the graph, allowing it to explore both local and global structures. The method has been shown to be effective in capturing community structures and generating meaningful embeddings for various machine learning tasks. As its improvement, DistGER [@fang_distributed_2023] is a distributed graph embedding method that extends Node2Vec by leveraging distributed computing to handle large graphs. DistGER uses a similar random walk approach but optimizes walk sampling in order to maximize the information gain when selecting the next vertex to visit. 
+Graph vertex embedding is a well-studied area, with various methods proposed to generate low-dimensional representations of nodes in a graph. State of the art method which is widely used is Node2Vec [@grover_node2vec_2016] which uses random walks to capture the local and global structure of the graph. Node2Vec generates embeddings by performing biased random walks on the graph, allowing it to explore both local and global structure. The method has been shown to be effective in capturing community structures and generating meaningful embeddings for various machine learning tasks. As its improvement, DistGER [@fang_distributed_2023] is a distributed graph embedding method that extends Node2Vec by leveraging distributed computing to handle large graphs. DistGER uses a similar random walk approach but optimizes walk sampling in order to maximize the information gain when selecting the next vertex to visit. 
 
 Another approach to scale Node2Vec is proposed in [@lombardo_scalable_2019] which is based on actor model and uses a distributed framework to generate embeddings for large graphs. This method allows for parallel processing of random walks, significantly improving the efficiency of embedding generation in terms of time and resource usage.
 
@@ -77,6 +77,7 @@ For dynamic graph partitioning, there are several methods available in literatur
 Main contributions of this paper include:
 1. A comprehensive evaluation of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning.
 2. A comparison of the performance of the LFM algorithm and its modified version in generating partitions that improve the quality of embeddings while reducing the need of network communication during the embedding generation process.
+3. A comparison of different partitioning algorithms, including random partitioning and label propagation, in terms of their effectiveness in capturing community structures and generating meaningful embeddings.
    
 
 # Methods 
@@ -98,7 +99,6 @@ Nodes in the cluster communicate with each other using a distributed coordinatio
 
 ## Community detection and graph partitioning
 
-<!-- ovde objasnim LFM i label propagation -->
 
 LFM is a community detection algorithm that identifies overlapping communities in large-scale networks. The algorithm operates by iteratively expanding communities based on a fitness function that measures the quality of the community structure. The fitness function considers both the internal density of connections within a community and the external connections to other communities. The LFM algorithm starts with a seed vertex and expands the community by adding neighboring vertices that improve the fitness score. This process is repeated until no further improvement can be made.
 
@@ -233,7 +233,7 @@ Table: F1 scores for embeddings generated using Node2Vec on Florentine families 
 Table: F1 scores for embeddings generated using Node2Vec on Les Miserables graph with modified LFM partitioning.
 
 
-The system is further evaluated on larger networks from literature to assess the performance of distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec. Following table shows characteristics of the networks used in the experiments.
+The system is further evaluated on larger networks from literature to assess the performance of distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec. Table 6 shows characteristics of the networks used in the experiments.
 
 | Network | # nodes | # edges | Clustering coefficient |
 |---------|---------|---------|------------------------|
@@ -245,7 +245,7 @@ Table: Characteristics of networks used in experiments.
 
 Partitioning time for these networks using modified LFM algorithm was below 1 second for all networks regardless of the number of partitions set. Indeed, most of the time was spent in community detection, which is independent of the number of partitions. Bin packing algorithm for balancing partitions takes negligible time compared to community detection since number of communities is significantly lower than number of vertices in the graph.
 
-For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 10 with walk size 80.
+Table 7 shows F1 scores for networks from literature. F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 10 with walk size 80.
 
 <!-- lfm threshold = 0 alpha = 1 -->
 
@@ -256,7 +256,7 @@ For networks from literature, F1 score of reconstruction remains relatively stab
 | Cit-HepPh | 100 | 2.5%         | 2.8%         |
 | Cit-HepTh | 100 | 2.9%         | 3.2%        |
 
-Evaluation is also done when number of partitions is set to 4 and number of walks per node is set to 10 with walk size 80.
+Evaluation is also done when number of partitions is set to 4 and number of walks per node is set to 10 with walk size 80, as shown in Table 8.
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
@@ -268,7 +268,7 @@ Table: F1 scores for embeddings generated using distributed Node2Vec with modifi
 
 <!-- lfm threshold = 0.5 and alpha 1 -->
 
-Evaluation was also done when number of partitions is set to 4 where 50% of unassigned vertices is used as threshold to terminate LFM algorithm early. The results are shown in the following table:
+Table 9 shows F1 scores when number of partitions is set to 4 where 50% of unassigned vertices is used as threshold to terminate LFM algorithm early. 
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
@@ -280,7 +280,7 @@ Table: F1 scores for embeddings generated using distributed Node2Vec with modifi
 
 <!-- lfm threshold = 1 -->
 
-When vertices are partitioned randomly where each partition is selected with equal probability, the results indicate a significant drop in F1 scores compared to community-aware partitioning methods. The results are shown in the following table:
+When vertices are partitioned randomly where each partition is selected with equal probability, the results indicate a significant drop in F1 scores compared to community-aware partitioning methods. The results are shown in the Table 10:
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
@@ -292,6 +292,8 @@ Table: F1 scores for embeddings generated using distributed Node2Vec with modifi
 
 
 <!-- LPA -->
+
+Label propagation algorithm is also evaluated as a community detection method for partitioning before embedding generation. The results are shown in Table 11:
 
 | Network | F1 score on 4 nodes |
 |---------|---------------------|
@@ -305,7 +307,10 @@ It was observed that LFM algorithm produces uniformly balanced partitions on the
 
 All evaluations were done using word2vec which was trained with negative sampling where number of negative samples was set to 1 and with one epoch since comparison with sequential Node2Vec was the main goal and increasing number of epochs would increase training time significantly.
 
-Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01.
+Also, clustering similarity after embedding using sequential and parallel implementations was calculated. In Table 6, the clustering similarity using the K-means algorithm with 3 clusters is presented, where the similarity was calculated using the ARI method. SBM generated network had 1000 vertices, 2 communities, where the connection probability within the community was p=0.1, and the connection probability of nodes that do not belong to the same community was q=0.01. 
+
+
+Table 12 shows clustering similarity using K-means algorithm on embeddings generated with distributed Node2Vec with modified LFM partitioning.
 
 | Network | ARI | 
 |---------|-----|
@@ -323,7 +328,7 @@ From results, it can be observed that the distributed embedding with community-a
 <!-- _____________ -->
 
 
-During experiments, it was observed that negative sampling in Word2Vec training can significantly impact the quality of the embeddings. For instance, in the table below, F1 scores for embeddings generated using Node2Vec on different graphs with modified LFM partitioning are shown for different values of negative samples when number of partitions is set to 2 and number of walks per node is set to 10.
+During experiments, it was observed that negative sampling in Word2Vec training can significantly impact the quality of the embeddings. For instance, in the Table 13, F1 scores for embeddings generated using Node2Vec on different graphs with modified LFM partitioning are shown for different values of negative samples when number of partitions is set to 2 and number of walks per node is set to 10.
 
 | Graph | ns=0 | ns=1 | ns=10 | ns=100 |
 |-------|------|------|-------|--------|
@@ -344,7 +349,7 @@ Table: F1 scores for embeddings generated using Node2Vec on different graphs wit
 <!-- corruptibility on big networks  -->
 
 In experiments, it was observed that label propagation algorithm can produce balanced partitions which also 
-preserves community structure to some extent. In the table below, average balance and edge cut for label propagation
+preserves community structure to some extent. In the Table 14, average balance and edge cut for label propagation
 and modified LFM algorithm are shown for various real world networks when number of partitions is set to 4.
 
 | Network | Balance - LPA | Edge cut - LPA | Balance - LFM | Edge cut - LFM |
