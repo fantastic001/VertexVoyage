@@ -2,17 +2,15 @@
 title: "Evaluation and analysis of graph vertex embeddings in distributed environment with community-aware vertex partitioning"
 author: "Stefan Nožinić"
 abstract: |
-  This paper explores the evaluation and analysis of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning to enhance the time efficiency of embeddings and reduce the need for network communication during the embedding generation process. The study investigates various partitioning algorithms and embedding methods, assessing their effectiveness in capturing community structures and generating meaningful embeddings for large-scale graphs. Experimental results demonstrate the benefits of community-aware partitioning in improving embedding quality and efficiency in distributed settings.
+  This paper explores the evaluation and analysis of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning to enhance the time efficiency of embeddings and reduce the need for network communication during the embedding generation process. The study investigates various partitioning algorithms and combined with Node2Vec algorithm, assessing their effectiveness in capturing community structures and generating meaningful embeddings for large-scale graphs. Experimental results demonstrate the benefits of community-aware partitioning in improving embedding quality and efficiency in distributed settings.
 bibliography: ./refs.bib
 ---
 
 # Introduction 
 
-<!-- citation example [@apache_software_foundation_zookeeper_2011] -->
 
 A graph is a mathematical structure consisting of vertices (or nodes) connected by edges. Graphs are widely used to model relationships and interactions in various domains [@van_der_hofstad_random_2024], such as social networks [@leskovec_signed_2010] [@backstrom_group_2006] [@rozemberczki_twitch_2021], collaboration networks [@savic_analysis_2017], terrorist networks [@krebs_mapping_2002] and blog citation networks [@adamic_political_2005]. In these applications, the relationships between entities can be represented as edges connecting the corresponding vertices.
 
-<!-- objasniti sta su realni grafovi i raspodelu stepeni kod njih kao i Watt-Strogatz princip -->
 
 In many real-world graphs, the degree distribution follows a power-law, meaning that a small number of vertices have a very high degree (i.e., they are connected to many other vertices), while most vertices have a low degree. This characteristic is often observed in social networks, where a few individuals (e.g., celebrities) have many connections, while the majority of users have relatively few connections.
 
