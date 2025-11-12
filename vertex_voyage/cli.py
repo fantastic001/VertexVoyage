@@ -417,6 +417,7 @@ class Commands:
             use_lpa: bool = False
         ):
         dataset = to_nx_graph(datasets[name]())
+        log("Processing dataset ", name)
         if use_lpa:
             parts = label_propagation_partitioner(dataset, partition_num=4)
         else:

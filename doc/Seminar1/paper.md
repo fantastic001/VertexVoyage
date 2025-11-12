@@ -168,7 +168,7 @@ In Table 1 partitioning time is shown for LFM algorithm on different networks:
 | Les Miserables | 0.004032 | 77 | 254 |
 | Davis Southern Women | 0.004145 | 32 | 89 |
 | Florentine families | 0.000677 | 16 | 20 |
-| Twitch | | 168114 | 6797557 | 
+| Twitch | 11.54 | 168114 | 6797557 | 
 Table: Partitioning time for LFM algorithm on real-world networks.
 
 
