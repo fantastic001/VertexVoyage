@@ -325,6 +325,7 @@ class Commands:
              dim: int = 100,
              default_p: float = 0,
              default_q: float = 0,
+             epochs: int = 1,
              long_run : bool = False,
              use_lpa: bool = False
     ):
@@ -377,7 +378,7 @@ class Commands:
                         n_walks = 1
                         walk_size = 10
                         window_size = 3
-                    model = Node2Vec(dim=dim, p=p, q=q, n_walks=n_walks, walk_size=walk_size, window_size=window_size)
+                    model = Node2Vec(dim=dim, p=p, q=q, n_walks=n_walks, walk_size=walk_size, window_size=window_size, epochs=epochs)
                     model.fit(pg, dataset.nodes)
                     emb = model.embed_nodes(part)
                     g = reconstruct(pg.number_of_edges(), emb, part)
