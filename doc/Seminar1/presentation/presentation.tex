@@ -175,6 +175,23 @@ Univerzitet u Novom Sadu \\
     \end{itemize}
 \end{frame}
 
+\section{Gubici strukturnih informacija}
+\begin{frame}{Mera gubitka strukturnih informacija}
+    \begin{columns}
+		\begin{column}{0.5\textwidth}
+            \includegraphics[width=\textwidth]{dot/graf.png}
+		\end{column}
+		\begin{column}{0.5\textwidth}
+            Neka je $ E_p $ skup svih grana koje sadrže čvorove takve da su oba čvora u particiji $ p $  i neka je $ P $ skup svih particija za graf $ G = (V, E) $
+            
+            Tada je mera gubitka strukturnih informacija $ L $ definisana kao
+            
+            $$ L = 1-\frac{\sum_{p \in P} |E_p|}{|E|} $$
+            
+            , gde je $ |E_p| $ broj grana koje sadrže čvorove iz particije $ p $, a $ |E| $ ukupan broj grana u grafu $ G $.
+		\end{column}
+	\end{columns}
+\end{frame}
 
 \section{Korišćeni skupovi podataka}
 \begin{frame}{Skupovi podataka}
@@ -190,6 +207,8 @@ Univerzitet u Novom Sadu \\
         \item AstroPh
         \item Cit-HepPh
         \item Cit-HepTh
+        \item Twitch 
+        \item Sintetički grafovi generisani korišćenjem Stochastic Block Model (SBM)
     \end{itemize}
 \end{frame}
 
@@ -277,7 +296,25 @@ Broj particija &  &  &  \\
 \end{table}
 \end{frame}
 
-\begin{frame}{F1 rezultati za LFM threshold = 0, $\alpha = 1$}
+\begin{frame}{Balance i Edge Cut poređenje: LPA vs. LFM}
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc}
+\hline
+\textbf{Network} & \textbf{Balance (LPA)} & \textbf{Edge cut (LPA)} & \textbf{Balance (LFM)} & \textbf{Edge cut (LFM)} \\
+\hline
+CITESEER   & 0.000612 & 22\%    & 0.0016  & 68.8\%  \\
+AstroPh    & 0.824    & 8.4\%   & 0.00085 & 74.5\%  \\
+Cit-HepPh  & 0.00005  & 20.6\%  & 0.00147 & 73.8\%  \\
+Cit-HepTh  & 0.483    & 11.74\% & 0.0023  & 74.14\% \\
+\hline
+\end{tabular}
+\caption*{Balance and edge cut for label propagation and modified LFM partitioning on real-world networks.}
+\end{table}
+\end{frame}
+
+
+\begin{frame}{F1 ocene za LFM threshold = 0, $\alpha = 1$}
 \begin{table}[h]
 \centering
 \begin{tabular}{lccc}
@@ -294,7 +331,7 @@ Cit-HepTh  & 100 & 2.9\% & 3.2\% \\
 \end{table}
 \end{frame}
 
-\begin{frame}{Rezultati za 4 particije (threshold = 0)}
+\begin{frame}{F1 ocene za 4 particije (threshold = 0)}
 \begin{table}[h]
 \centering
 \begin{tabular}{lc}
@@ -311,7 +348,7 @@ Cit-HepTh  & 4.33\%  \\
 \end{table}
 \end{frame}
 
-\begin{frame}{Rezultati za 4 particije (threshold = 0.5)}
+\begin{frame}{F1 ocene za 4 particije (threshold = 0.5)}
 Table 9: F1 scores when 50\% unassigned vertices threshold is used.
 \begin{table}[h]
 \centering
@@ -329,7 +366,7 @@ Cit-HepTh  & 4.30\%  \\
 \end{table}
 \end{frame}
 
-\begin{frame}{Rezultati za slučajno particionisanje (threshold = 1)}
+\begin{frame}{F1 ocene za slučajno particionisanje (threshold = 1)}
 \begin{table}[h]
 \centering
 \begin{tabular}{lc}
@@ -346,7 +383,7 @@ Cit-HepTh  & 3.76\%  \\
 \end{table}
 \end{frame}
 
-\begin{frame}{Rezultati za Label Propagation particionisanje}
+\begin{frame}{F1 ocene za Label Propagation particionisanje}
 \begin{table}[h]
 \centering
 \begin{tabular}{lc}
@@ -363,24 +400,14 @@ Cit-HepTh  & 5.1\%   \\
 \end{table}
 \end{frame}
 
-
-\section{Zaključak}
 \begin{frame}{Zaključak}
-    \begin{itemize}
-        \item Pokazano je da:
-        \begin{itemize}
-            \item Paralelna implementacija algoritma jeste brža od serijske, nakon određenog broja šetnji, dok zadržava kvalitet rekonstrukcije grafa
-            \item Klasterovanje dobijeno paralelnim ugrađivanjem jeste slično klasterovanju dobijenom serijskim ugrađivanjem
-        \end{itemize}
-        \item \textbf{Predloženi metod se može koristiti da ubrza ugrađivanje čvorova ili da, uz dodatno vreme particionisanja, uveća tačnost zbog većeg broja mogućih slučajnih šetnji}
-        \item Unapređenja:
-        \begin{itemize}
-            \item Upotreba specifične baze podataka koja bi indeksirala čvorove tako da particionisanje bude brže
-            \item Poređenje paralelne i serijske implementacije na drugim primenama
-            \item fino podešavanje parametara modela za velike mreže 
-        \end{itemize}
-    \end{itemize}
+\begin{itemize}
+  \item Eksperimentalni rezultati pokazuju da predloženi sistem efikasno čuva strukturu zajednica unutar particija, što dovodi do visokokvalitetnih ugrađivanja koja dobro hvataju odnose između čvorova u originalnom grafu.
+  \item Modifikovani LFM algoritam sa kriterijumom ranog zaustavljanja značajno smanjuje vreme particionisanja, a pritom zadržava kvalitet particija.
+  \item \emph{Label propagation} pokazuje potencijal u generisanju uravnoteženih particija sa manjim presekom grana (edge cut), što dodatno poboljšava kvalitet urezivanja.
+\end{itemize}
 \end{frame}
+
 
 
 
