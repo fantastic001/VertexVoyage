@@ -26,6 +26,29 @@ datasets = {
     "AstroPh": lambda: FileEventSequence("data/AstroPh.txt"),
 }
 
+dataset_params = {
+    "CITESEER": dict(
+        p=.5,
+        q=.25,
+        dim=50,
+    ),
+    "AstroPh": dict(
+        p=2,
+        q=.25,
+        dim=50,
+    ),
+    "Cit-HepPh": dict(
+        p=4,
+        q=.25,
+        dim=100,
+    ),
+    "Cit-HepTh": dict(
+        p=2,
+        q=.25,
+        dim=100,
+    ),
+}
+
 def create_benchmark_class(partitioner_class, *args):
     class _Benchmark(Benchmark):
         NAME = "Benchmark for partitioner " + partitioner_class.__name__ + " on large datasets"

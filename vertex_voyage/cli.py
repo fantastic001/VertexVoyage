@@ -17,7 +17,7 @@ from vertex_voyage.partitioning import (
     calculate_partitioning_corruption,
     get_partition_average_balance,
 )
-from experiments.datasets import datasets
+from experiments.datasets import datasets, dataset_params
 from vertex_voyage.temporal import to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
@@ -327,6 +327,7 @@ class Commands:
              default_q: float = 0,
              epochs: int = 1,
              long_run : bool = False,
+             use_dataset_params: bool = False,
              use_lpa: bool = False
     ):
 
@@ -365,6 +366,7 @@ class Commands:
             log("Average clustering: ", nx.average_clustering(gg))
             log("Partition number of edges: ", pg.number_of_edges())
             all_nodes = list(dataset.nodes)
+            alg = Node2Vec
             for p in [0.25, 0.5, 1, 2, 4]:
                 for q in [0.25, 0.5, 1, 2, 4]:
                     if ((default_p > 0 and default_q > 0) and 
@@ -378,7 +380,24 @@ class Commands:
                         n_walks = 1
                         walk_size = 10
                         window_size = 3
-                    model = Node2Vec(dim=dim, p=p, q=q, n_walks=n_walks, walk_size=walk_size, window_size=window_size, epochs=epochs)
+                    if use_dataset_params:
+                        params: dict = dataset_params.get(name, {})
+                        n_walks = params.get('n_walks', n_walks)
+                        walk_size = params.get('walk_size', walk_size)
+                        window_size = params.get('window_size', window_size)
+                        epochs = params.get('epochs', epochs)
+                        dim = params.get('dim', dim)
+                        p = params.get('p', p)
+                        q = params.get('q', q)
+                    model = alg(
+                        p=p,
+                        q=q,
+                        dim=dim,
+                        walk_size=walk_size,
+                        n_walks=n_walks,
+                        window_size=window_size,
+                        epochs=epochs,
+                    )
                     model.fit(pg, dataset.nodes)
                     emb = model.embed_nodes(part)
                     g = reconstruct(pg.number_of_edges(), emb, part)
