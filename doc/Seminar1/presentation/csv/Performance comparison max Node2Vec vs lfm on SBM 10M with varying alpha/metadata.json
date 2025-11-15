@@ -1,0 +1,16 @@
+{
+    "columns": {
+        "partition_time": "Vreme particionisanja",
+        "max_embedding_time": "Vreme ugrađivanja na 16",
+        "alpha": "Alpha parametar",
+        "embedding_time": "Vreme ugrađivanja na 1"
+
+    },
+    "groupby": "Alpha parametar",
+    "plot": {
+        "kind": "latex",
+        "ylabel" : "Vreme (s)",
+        "xlabel" : "Alpha parametar",
+        "title" : "Uporedna analiza performansi za LFM algoritam particionisanja"
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "columns": {
+        "partition_time": "Vreme particionisanja",
+        "max_embedding_time": "Paralelna implementacija",
+        "partition_num": "Broj particija",
+        "embedding_time": "Sekvencijalna implementacija"
+    },
+    "groupby": "Broj particija",
+    "plot": {
+        "kind": "latex",
+        "ylabel" : "Vreme (s)",
+        "xlabel" : "Broj particija",
+        "title" : "Uporedna analiza performansi za LFM algoritam particionisanja"
+    }
+}

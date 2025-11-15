@@ -1,0 +1,10 @@
+Parametar,Vrednost
+Veličina šetnje (walk_size),800
+Dimenzija (dim),128
+Veličina prozora (window_size),10
+Broj epoha (epochs),10
+Parametar p,0.25
+Parametar q,4
+Broj negativnih uzoraka (negative_sample_num),10
+Stopa učenja (learning_rate),0.01
+Broj šetnji,400

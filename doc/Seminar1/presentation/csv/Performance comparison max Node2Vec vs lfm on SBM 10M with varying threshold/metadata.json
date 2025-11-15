@@ -1,0 +1,15 @@
+{
+    "columns": {
+        "partition_time": "Vreme particionisanja",
+        "max_embedding_time": "Vreme ugrađivanja na 16",
+        "threshold": "Prag",
+        "embedding_time": "Vreme ugrađivanja na 1"
+    },
+    "groupby": "Prag",
+    "plot": {
+        "kind": "latex",
+        "ylabel" : "Vreme (s)",
+        "xlabel" : "Prag",
+        "title" : "Uporedna analiza performansi za LFM algoritam particionisanja"
+    }
+}
