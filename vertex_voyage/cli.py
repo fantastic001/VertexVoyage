@@ -32,6 +32,11 @@ from vertex_voyage.config import get_config_str
 
 GS_LOCATION = get_config_str("gs_cache_location", "gs_cache", "Location to store grid search results")
 
+ALGS = {
+    "node2vec": Node2Vec,
+    "distger": DistGER,
+}
+
 def perform_embedding(cls, alg: str, p: float, q: float, dim: int, dataset_name: str, part_num: int):
     gsp = GridSearchPersistence(GS_LOCATION)
     print("Processing dataset ", dataset_name)
@@ -328,7 +333,8 @@ class Commands:
              epochs: int = 1,
              long_run : bool = False,
              use_dataset_params: bool = False,
-             use_lpa: bool = False
+             use_lpa: bool = False,
+             algorithm: str = "node2vec"
     ):
 
         import networkx as nx
@@ -366,7 +372,7 @@ class Commands:
             log("Average clustering: ", nx.average_clustering(gg))
             log("Partition number of edges: ", pg.number_of_edges())
             all_nodes = list(dataset.nodes)
-            alg = Node2Vec
+            alg = ALGS[algorithm]
             for p in [0.25, 0.5, 1, 2, 4]:
                 for q in [0.25, 0.5, 1, 2, 4]:
                     if ((default_p > 0 and default_q > 0) and 
