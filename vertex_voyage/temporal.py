@@ -6,6 +6,7 @@ from struct import pack, unpack
 
 from vertex_voyage.vv_graph import VVGraph
 
+from typing import Union
 class EventType(Enum):
     ADD = 1
     REMOVE = 2
@@ -13,8 +14,8 @@ class EventType(Enum):
 class Event:
     def __init__(
             self, 
-            src: str, 
-            dest: str, 
+            src: Union[str, int], 
+            dest: Union[str, int], 
             timestamp: int,
             type: EventType = EventType.ADD,
             attrs: dict = None
