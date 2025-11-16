@@ -1,7 +1,7 @@
 
 
 from vertex_voyage.node2vec import Node2Vec
-from vertex_voyage.word2vec import word2vec
+import vertex_voyage.word2vec as w2v
 from vertex_voyage.temporal import Event 
 from vertex_voyage.vv_graph import VVGraph
 
@@ -40,7 +40,35 @@ class DynNode2Vec(Node2Vec):
         self.is_weighted = False
         self.G = nx.Graph()
         self.g_nodes = []  # list of nodes in the graph
-        self.w2v_model: Word2Vec = None
+        self.w2v_model = None
+    def update_model(self, walks, old_model=None):
+        if old_model is not None:
+            # continue training from old model
+            model = w2v.word2vec(
+                embedding_dim=self.dim,
+                vocab_size=len(self.g_nodes),
+                training_data=walks,
+                learning_rate=self.learning_rate,
+                epochs=self.epochs,
+                window_size=self.window_size,
+                num_ns=self.negative_sample_num,
+                seed=self.seed,
+                epoch_callbacks=[]
+            )
+        else:
+            # train new model
+            model = w2v.word2vec(
+                embedding_dim=self.dim,
+                vocab_size=len(self.g_nodes),
+                training_data=walks,
+                learning_rate=self.learning_rate,
+                epochs=self.epochs,
+                window_size=self.window_size,
+                num_ns=self.negative_sample_num,
+                seed=self.seed,
+                epoch_callbacks=[]
+            )
+        return model
     def update(self, event: Event):
         if not self.G.has_node(event.src):
             self.G.add_node(event.src)
@@ -56,33 +84,8 @@ class DynNode2Vec(Node2Vec):
         for _ in range(self.n_walks):
             walks.append(self._random_walk(event.src))
             walks.append(self._random_walk(event.dest))
-        # train/update word2vec model
-        if self.w2v_model is None:
-            self.w2v_model = word2vec(
-                embedding_dim=self.dim,
-                vocab_size=len(self.g_nodes),
-                training_data=walks,
-                learning_rate=self.learning_rate,
-                epochs=self.epochs,
-                window_size=self.window_size,
-                num_ns=self.negative_sample_num,
-                seed=self.seed,
-                epoch_callbacks=[]
-            )
-        else:
-            self.w2v_model = word2vec(
-                embedding_dim=self.dim,
-                vocab_size=len(self.g_nodes),
-                training_data=walks,
-                learning_rate=self.learning_rate,
-                epochs=self.epochs,
-                window_size=self.window_size,
-                num_ns=self.negative_sample_num,
-                seed=self.seed,
-                epoch_callbacks=[]
-            ) 
+        self.w2v_model = self.update_model(walks, self.w2v_model)
         self.W = self.w2v_model
-                
 
         
     
