@@ -518,7 +518,10 @@ class Commands:
             for u,v in original_graph.edges:
                 if u in nodes and v in nodes:
                     G.add_edge(u, v)
-            f1_score = get_f1_score(G, g)
+            try:
+                f1_score = get_f1_score(G, g)
+            except ZeroDivisionError:
+                f1_score = 0.0
             log(f"Timestamp: {event.timestamp}, F1 score: {f1_score}")
             i += 1
         log("Event stream processing completed")
