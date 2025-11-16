@@ -1,25 +1,35 @@
 
-from vertex_voyage.temporal import Event, EventSequence
+from abc import abstractmethod
+from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random
 import numpy as np 
 class TemporalGraphPartitioner:
+    @abstractmethod
     def partition(self, event: Event):
         """
         Partitions an event into a partition number
         """
         pass
 
-    def get_partition(self, vertex):
+    @abstractmethod
+    def get_partition(self, vertex) -> int:
         """
         Returns the partition of a vertex
         """
         pass
-    def get_partition_num(self):
+    @abstractmethod
+    def get_partition_num(self) -> int:
         """
         Returns the number of partitions
         """
         pass
-
+    
+    @abstractmethod
+    def get_subgraph(self, partition_id: int) -> EventSequence:
+        """
+        Returns the subgraph of a partition
+        """
+        pass
 
 
 def partition_temporal_graph(tg: EventSequence, partitioner: TemporalGraphPartitioner):
@@ -71,6 +81,7 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
         self.partition_map = dict()
         self.neighbor_map = dict()
         self.p = p
+        self.subgraphs = [[] for _ in range(num_partitions)]
 
     def partition(self, event: Event):
         if event.src not in self.partition_map:
@@ -90,12 +101,20 @@ class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
             return 
         self.partition_map[event.src] = get_most_common_partition(event.src, self.partition_map, self.neighbor_map)
         self.partition_map[event.dest] = get_most_common_partition(event.dest, self.partition_map, self.neighbor_map)
-    def get_partition(self, vertex):
+        if self.partition_map[event.src] == self.partition_map[event.dest]:
+            self.subgraphs[self.partition_map[event.src]].append(event)
+
+    def get_partition(self, vertex) -> int:
         if vertex not in self.partition_map:
             return 0 
         return self.partition_map[vertex]
-    def get_partition_num(self):
+    def get_partition_num(self) -> int:
         return self.num_partitions
+
+    def get_subgraph(self, partition_id: int) -> EventSequence:
+        if partition_id < 0 or partition_id >= self.num_partitions:
+            raise ValueError("Invalid partition ID")
+        return FromIterable(self.subgraphs[partition_id])
     def __str__(self):
         return f"LabelPropagationTemporalGraphPartitioner(num_partitions={self.num_partitions})"
     def __repr__(self):
@@ -182,6 +201,9 @@ class DummyPartitioner(TemporalGraphPartitioner):
     def get_partition_num(self):
         return self.num_partitions
 
+    def get_subgraph(self, partition_id: int) -> EventSequence:
+        return FromIterable([])
+
 class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
     def __init__(self, num_partitions: int, window_size: int):
         """
@@ -194,6 +216,7 @@ class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner)
         self.partition_map = dict()
         self.neighbor_map = dict()
         self.window = [] 
+        self.subgraphs = [[] for _ in range(num_partitions)]
 
     def partition_vertex(self, vertex):
         if vertex not in self.partition_map:
@@ -233,6 +256,8 @@ class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner)
             self.partition_map[event.src] = randint(0, self.num_partitions - 1)
         if event.dest not in self.partition_map:
             self.partition_map[event.dest] = randint(0, self.num_partitions - 1)
+        if self.partition_map[event.src] == self.partition_map[event.dest]:
+            self.subgraphs[self.partition_map[event.src]].append(event)
 
 
     def get_partition(self, vertex):
@@ -242,6 +267,11 @@ class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner)
 
     def get_partition_num(self):
         return self.num_partitions
+    
+    def get_subgraph(self, partition_id: int) -> EventSequence:
+        if partition_id < 0 or partition_id >= self.num_partitions:
+            raise ValueError("Invalid partition ID")
+        return FromIterable(self.subgraphs[partition_id])
     
 class CommonNeighborsPartitioner(TemporalGraphPartitioner):
     def __init__(self, num_partitions: int, threshold: int):
@@ -254,6 +284,7 @@ class CommonNeighborsPartitioner(TemporalGraphPartitioner):
         self.threshold = threshold
         self.partition_map = dict()
         self.neighbor_map = dict()
+        self.subgraphs = [[] for _ in range(num_partitions)]
 
     def partition_vertex(self, vertex):
         if vertex not in self.partition_map:
@@ -272,6 +303,8 @@ class CommonNeighborsPartitioner(TemporalGraphPartitioner):
         self.neighbor_map[event.dest].add(event.src)
         self.partition_vertex(event.src)
         self.partition_vertex(event.dest)
+        if self.partition_map[event.src] == self.partition_map[event.dest]:
+            self.subgraphs[self.partition_map[event.src]].append(event)
         
 
     def get_partition(self, vertex):
@@ -282,3 +315,7 @@ class CommonNeighborsPartitioner(TemporalGraphPartitioner):
     def get_partition_num(self):
         return self.num_partitions
     
+    def get_subgraph(self, partition_id: int) -> EventSequence:
+        if partition_id < 0 or partition_id >= self.num_partitions:
+            raise ValueError("Invalid partition ID")
+        return FromIterable(self.subgraphs[partition_id])
