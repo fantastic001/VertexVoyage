@@ -120,26 +120,101 @@ def generate_skip_grams(sequences, window_size, num_ns, vocab_size, seed):
     return dataset
 
 class Word2Vec(tf.keras.Model):
-  def __init__(self, vocab_size, embedding_dim):
-    super(Word2Vec, self).__init__()
-    self.target_embedding = layers.Embedding(vocab_size,
-                                      embedding_dim,
-                                      name="w2v_embedding")
-    self.context_embedding = layers.Embedding(vocab_size,
-                                       embedding_dim)
+    def __init__(
+            self, 
+            vocab_size, 
+            embedding_dim,
+            target_weights = None,
+            context_weights = None
+        ):
+        super(Word2Vec, self).__init__()
+        if target_weights is not None:
+            self.target_embedding = layers.Embedding(
+                vocab_size,
+                embedding_dim,
+                name="w2v_embedding",
+                weights = [target_weights]
+            )
+        else:
+            self.target_embedding = layers.Embedding(vocab_size,
+                                        embedding_dim,
+                                        name="w2v_embedding")
+        if context_weights is not None:
+            self.context_embedding = layers.Embedding(
+                vocab_size,
+                embedding_dim,
+                name="w2v_embedding",
+                weights = [context_weights]
+            )
+        else:
+            self.context_embedding = layers.Embedding(vocab_size,
+                                        embedding_dim,
+                                        name="w2v_embedding")
 
-  def call(self, pair):
-    target, context = pair
-    # target: (batch,)
-    word_emb = self.target_embedding(target)
-    # word_emb: (batch, embed)
-    context_emb = self.context_embedding(context)
-    # context_emb: (batch, context, embed)
-    dots = tf.einsum('be,bce->bc', word_emb, context_emb)
-    # dots: (batch, context)
-    return dots
+    def call(self, pair):
+        target, context = pair
+        # target: (batch,)
+        word_emb = self.target_embedding(target)
+        # word_emb: (batch, embed)
+        context_emb = self.context_embedding(context)
+        # context_emb: (batch, context, embed)
+        dots = tf.einsum('be,bce->bc', word_emb, context_emb)
+        # dots: (batch, context)
+        return dots
 
-def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks):
+    def insert_weights(self, positions) -> "Word2Vec":
+        """
+        Insert weights at specified positions in the embedding matrix.
+
+        New nodes will have their embeddings initialized randomly.
+        """
+        old_weights = self.target_embedding.get_weights()[0]
+        embedding_dim = old_weights.shape[1]
+        old_vocab_size = old_weights.shape[0]
+        new_vocab_size = old_vocab_size + len(positions)
+        new_weights = np.zeros((new_vocab_size, embedding_dim))
+        new_idx = 0
+        pos_set = set(positions)
+        for i in range(new_vocab_size):
+            if i in pos_set:
+                # new node, initialize randomly
+                new_weights[i] = np.random.uniform(
+                    low=-0.5 / embedding_dim,
+                    high=0.5 / embedding_dim,
+                    size=(embedding_dim,)
+                )
+            else:
+                new_weights[i] = old_weights[new_idx]
+                new_idx += 1
+        target_weights = new_weights
+        
+        old_weights = self.context_embedding.get_weights()[0]
+        new_weights = np.zeros((new_vocab_size, embedding_dim))
+        new_idx = 0
+        for i in range(new_vocab_size):
+            if i in pos_set:
+                # new node, initialize randomly
+                new_weights[i] = np.random.uniform(
+                    low=-0.5 / embedding_dim,
+                    high=0.5 / embedding_dim,
+                    size=(embedding_dim,)
+                )
+            else:
+                new_weights[i] = old_weights[new_idx]
+                new_idx += 1
+        context_weights = new_weights
+        return Word2Vec(
+            vocab_size=new_vocab_size,
+            embedding_dim=embedding_dim,
+            target_weights=target_weights,
+            context_weights=context_weights
+        )
+        
+
+
+
+
+def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks, old_model=None):
     """
     Train a Word2Vec model using the skip-gram approach.
 
@@ -149,14 +224,19 @@ def train_word2vec_model(training_data, vocab_size, embedding_dim, learning_rate
     embedding_dim: dimensionality of word embeddings
     learning_rate: learning rate for optimizer
     epochs: number of training epochs
+    epoch_callbacks: list of callback functions to be called at the end of each epoch
+    old_model: previously trained Word2Vec model to continue training from
 
     Returns:
     model: trained Word2Vec model
     """
-    model = Word2Vec(vocab_size, embedding_dim)
+    if old_model is not None:
+        model = old_model
+    else:
+        model = Word2Vec(vocab_size, embedding_dim)
     loss_fn = loss=tf.keras.losses.BinaryCrossentropy(from_logits=True)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
+    
     model.compile(optimizer=optimizer, loss=loss_fn)
     
     model.fit(training_data, epochs=epochs, verbose=0, callbacks=[CustomCallback(epoch_callbacks)])
@@ -203,7 +283,7 @@ class CustomCallback(tf.keras.callbacks.Callback):
         for callback in self.epoch_callbacks:
             callback(epoch, logs, self.model)
 
-def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed = None, epoch_callbacks = None):
+def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, window_size, num_ns, seed = None, epoch_callbacks = None, old_model = None):
     """
     Word2Vec implementation using a simple neural network with one hidden layer.
 
@@ -213,6 +293,11 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     embedding_dim: dimensionality of word embeddings
     learning_rate: learning rate for gradient descent
     epochs: number of training epochs
+    window_size: size of the context window
+    num_ns: number of negative samples
+    seed: random seed for reproducibility
+    epoch_callbacks: list of callback functions to be called at the end of each epoch
+    old_model: previously trained Word2Vec model to continue training from
     """
     # use GPU if available
     gpus = tf.config.list_physical_devices('GPU')
@@ -235,9 +320,9 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
     # if training is None, then return zero weights
     if training is None:
         return np.zeros((vocab_size, embedding_dim))
-    model = train_word2vec_model(training, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks)
+    model = train_word2vec_model(training, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks, old_model)
     weights = model.get_layer('w2v_embedding').get_weights()[0]
-    return weights
+    return weights, model
 
 if __name__ == "__main__":
   from vertex_voyage.node2vec import Node2Vec

@@ -44,7 +44,7 @@ class DynNode2Vec(Node2Vec):
     def update_model(self, walks, old_model=None):
         if old_model is not None:
             # continue training from old model
-            model = w2v.word2vec(
+            self.W, model = w2v.word2vec(
                 embedding_dim=self.dim,
                 vocab_size=len(self.g_nodes),
                 training_data=walks,
@@ -53,11 +53,12 @@ class DynNode2Vec(Node2Vec):
                 window_size=self.window_size,
                 num_ns=self.negative_sample_num,
                 seed=self.seed,
-                epoch_callbacks=[]
+                epoch_callbacks=[],
+                old_model=old_model
             )
         else:
             # train new model
-            model = w2v.word2vec(
+            self.W, model = w2v.word2vec(
                 embedding_dim=self.dim,
                 vocab_size=len(self.g_nodes),
                 training_data=walks,
@@ -73,9 +74,17 @@ class DynNode2Vec(Node2Vec):
         if not self.G.has_node(event.src):
             self.G.add_node(event.src)
             self.g_nodes.append(event.src)
+            if self.w2v_model is not None:
+                self.w2v_model = self.w2v_model.insert_weights(
+                    [self._encode(event.src)]
+                )
         if not self.G.has_node(event.dest):
             self.G.add_node(event.dest)
             self.g_nodes.append(event.dest)
+            if self.w2v_model is not None:
+                self.w2v_model = self.w2v_model.insert_weights(
+                    [self._encode(event.dest)]
+                )
         self.G.add_edge(event.src, event.dest)
         self.node_to_neightbours_map.setdefault(event.src, list()).append(event.dest)
         self.node_to_neightbours_map.setdefault(event.dest, list()).append(event.src)
@@ -85,7 +94,6 @@ class DynNode2Vec(Node2Vec):
             walks.append(self._random_walk(event.src))
             walks.append(self._random_walk(event.dest))
         self.w2v_model = self.update_model(walks, self.w2v_model)
-        self.W = self.w2v_model
 
         
     

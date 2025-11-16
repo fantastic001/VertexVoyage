@@ -155,7 +155,7 @@ class Node2Vec:
             window_size=self.window_size,
             num_ns=self.negative_sample_num,
             seed=self.seed
-        )
+        )[0]
 
     def __repr__(self) -> str:
         return f"Node2Vec(dim={self.dim}, walk_size={self.walk_size}, n_walks={self.n_walks}, window_size={self.window_size}, epochs={self.epochs}, p={self.p}, q={self.q}, negative_sample_num={self.negative_sample_num}, learning_rate={self.learning_rate}, seed={self.seed}, use_threads={self.use_threads})"

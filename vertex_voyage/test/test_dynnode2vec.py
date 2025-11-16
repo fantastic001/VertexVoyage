@@ -7,7 +7,7 @@ from vertex_voyage import model
 from vertex_voyage.dynnode2vec import DynNode2Vec
 from vertex_voyage.temporal import FirstN, ForestFireEventSequence, Event 
 from unittest.mock import MagicMock
-from vertex_voyage import word2vec
+from vertex_voyage.word2vec import word2vec
 
 class TestDynNode2Vec(unittest.TestCase):
     def test_construction(self):
@@ -44,6 +44,7 @@ class TestDynNode2Vec(unittest.TestCase):
     @mock.patch('vertex_voyage.word2vec.word2vec')
     def test_if_word2vec_called_on_previous_models(self, mock_word2vec):
         model = DynNode2Vec()
+        mock_word2vec.side_effect = word2vec
         model.update_model = MagicMock(side_effect=model.update_model)
         events = [
             Event(src=1, dest=2, timestamp=0),
