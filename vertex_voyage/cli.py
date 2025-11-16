@@ -395,14 +395,23 @@ class Commands:
                         dim = params.get('dim', dim)
                         p = params.get('p', p)
                         q = params.get('q', q)
+                    if alg == DistGER:
+                        P = {
+                            "min_walk_size": walk_size // 2,
+                            "max_walk_size": walk_size * 2,
+                        }
+                    else:
+                        P = {
+                            "walk_size": walk_size,
+                        }
                     model = alg(
                         p=p,
                         q=q,
                         dim=dim,
-                        walk_size=walk_size,
                         n_walks=n_walks,
                         window_size=window_size,
                         epochs=epochs,
+                        **P
                     )
                     model.fit(pg, dataset.nodes)
                     emb = model.embed_nodes(part)
