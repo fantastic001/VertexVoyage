@@ -32,6 +32,8 @@ from vertex_voyage.config import get_config_str
 
 from vertex_voyage.dynnode2vec import DynNode2Vec
 
+from vertex_voyage.temporal_partitioning import WindowedLabelPropagationTemporalGraphPartitioner
+
 GS_LOCATION = get_config_str("gs_cache_location", "gs_cache", "Location to store grid search results")
 
 ALGS = {
@@ -493,7 +495,7 @@ class Commands:
             type=x.type,
             attrs=x.attrs,
         ))
-        model = DynNode2Vec(
+        models = [DynNode2Vec(
             dim=dim,
             epochs=epochs,
             p= default_p if default_p > 0 else 0.5,
@@ -501,17 +503,30 @@ class Commands:
             n_walks=10 if long_run else 1,
             walk_size=80 if long_run else 10,
             window_size=10 if long_run else 3,
-        )
+        ) for _ in range(partitions)]
         events = list(dataset)
         original_graph = to_nx_graph(events)
         nodes = set()
         i = 0
+        partitioner = WindowedLabelPropagationTemporalGraphPartitioner(
+            num_partitions=partitions,
+            window_size=100
+        )
         for event in events:
             log(f"Processing event {i+1} / timestamp {event.timestamp}")
+            partitioner.partition(event)
             nodes.add(event.src)
             nodes.add(event.dest)
-            model.update(event)
-            embeddings = model.embed_nodes(list(nodes))
+            # determine partition
+            part_id = partitioner.get_partition(event.src)
+            if part_id != partitioner.get_partition(event.dest):
+                continue 
+            models[part_id].update(event)
+            embeddings = []
+            for node in nodes:
+                embeddings.append(
+                    models[partitioner.get_partition(node)].embed_node(node)
+                )
             # reconstruct graph and compute F1 score
             g = reconstruct(i + 1, embeddings, list(nodes))
             G = nx.Graph()
