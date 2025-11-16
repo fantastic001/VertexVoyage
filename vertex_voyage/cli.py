@@ -470,7 +470,7 @@ class Commands:
     
     def temporal_test(self, *, 
              name: str = "CITESEER", 
-             partitions: int = 2, 
+             partitions: int = 1, 
              alpha: float = 1.0, 
              threshold: float = 0.0,
              break_early: bool = False,
@@ -508,25 +508,36 @@ class Commands:
         original_graph = to_nx_graph(events)
         nodes = set()
         i = 0
-        partitioner = WindowedLabelPropagationTemporalGraphPartitioner(
-            num_partitions=partitions,
-            window_size=100
-        )
+        if partitions > 1:
+            partitioner = WindowedLabelPropagationTemporalGraphPartitioner(
+                num_partitions=partitions,
+                window_size=100
+            )
+        else:
+            partitioner = None
         for event in events:
             log(f"Processing event {i+1} / timestamp {event.timestamp}")
-            partitioner.partition(event)
+            if partitions > 1:
+                partitioner.partition(event)
             nodes.add(event.src)
             nodes.add(event.dest)
             # determine partition
-            part_id = partitioner.get_partition(event.src)
-            if part_id != partitioner.get_partition(event.dest):
-                continue 
+            if partitions > 1:
+                part_id = partitioner.get_partition(event.src)
+            else:
+                part_id = 0
+            if partitioner is not None:
+                if part_id != partitioner.get_partition(event.dest):
+                    continue 
             models[part_id].update(event)
-            embeddings = []
-            for node in nodes:
-                embeddings.append(
-                    models[partitioner.get_partition(node)].embed_node(node)
-                )
+            if partitioner is not None:
+                embeddings = []
+                for node in nodes:
+                    embeddings.append(
+                        models[partitioner.get_partition(node)].embed_node(node)
+                    )
+            else:
+                embeddings = models[0].embed_nodes(nodes)
             # reconstruct graph and compute F1 score
             g = reconstruct(i + 1, embeddings, list(nodes))
             G = nx.Graph()
