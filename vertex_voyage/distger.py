@@ -141,7 +141,7 @@ class DistGER(Node2Vec):
         epochs=1, 
         p = .5, 
         q = .5,
-        negative_sample_num = 50,
+        negative_sample_num = 1,
         learning_rate = 0.01,
         seed = None,
         use_threads = True,
