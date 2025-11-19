@@ -62,6 +62,11 @@ def get_most_common_partition(vertex, partition_map: dict, neighbor_map: dict):
     :return: Most common partition
     """       
     freq = dict()
+    if vertex not in neighbor_map:
+        if vertex not in partition_map:
+            return 0
+        else:
+            return partition_map[vertex]
     for neighbor in neighbor_map[vertex]:
         if neighbor in partition_map:
             partition = partition_map[neighbor]
