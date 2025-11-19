@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple
 from vertex_voyage import node2vec
 from vertex_voyage.node2vec import Node2Vec
 import networkx as nx
-
+import vertex_voyage_native as native 
 class Walker:
     def __init__(self, id):
         self.id = id
@@ -150,11 +150,16 @@ class DistGER(Node2Vec):
         
         self.threshold = threshold
         self.min_walk_size = min_walk_size
+        self.adjacency = None
         super().__init__(dim, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
 
     def _random_walk(self, node):
-        walker = Walker(node)
-        graph = Graph(self.G)
-        walk_ = list(self._encode(n) for n in walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
+        walker = native.Walker(node)
+        if self.adjacency is None:
+            self.adjacency = {v: [
+                (n, len(set(self.G.neighbors(v)) & set(self.G.neighbors(n)))) 
+                for n in self.G.neighbors(v)] for v in self.G.nodes}
+        graph = native.Graph(self.adjacency)
+        walk_ = list(self._encode(n) for n in native.walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
         return walk_
         

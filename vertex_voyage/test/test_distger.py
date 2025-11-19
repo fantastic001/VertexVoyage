@@ -157,3 +157,6 @@ class TestDistGER(unittest.TestCase):
         f1 = 2 * (precision * recall) / (precision + recall)
         self.assertGreaterEqual(f1, 0.5)
     
+
+if __name__ == '__main__':
+    unittest.main()

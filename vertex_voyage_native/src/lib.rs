@@ -6,7 +6,8 @@ use pyo3::{prelude::*};
 use rayon::prelude::*;
 use rand::{Rng};
 use rand_chacha::{ChaCha20Rng, ChaChaRng, rand_core::{RngCore, SeedableRng}};
-
+use std::collections::HashMap;
+use rand::prelude::IndexedRandom;
 
 struct Edge {
     dist: f64,
@@ -266,11 +267,244 @@ fn generate_skip_grams(
     Ok(Some((targets, contexts, labels)))
 }
 
+
+
+// --------------- DistGER -------------------
+
+/// Equivalent of Python's Walker class
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct Walker {
+    pub id: usize,
+    pub step: usize,
+    pub Hn: f64,
+    pub Sn: f64,
+    pub EnH: f64,
+    pub EnS: f64,
+    pub EnHS: f64,
+    pub EnHH: f64,
+    pub EnSS: f64,
+    pub N: f64,
+    pub R: f64,
+    pub last_vertex: Option<usize>,
+    pub trace_flag: bool,
+}
+
+#[pymethods]
+impl Walker {
+    #[new]
+    pub fn new(id: usize) -> Self {
+        Walker {
+            id,
+            step: 0,
+            Hn: 0.0,
+            Sn: 1.0,
+            EnH: 0.0,
+            EnS: 1.0,
+            EnHS: 0.0,
+            EnHH: 0.0,
+            EnSS: 1.0,
+            N: 1.0,
+            R: 1.0,
+            last_vertex: None,
+            trace_flag: false,
+        }
+    }
+}
+
+/// Equivalent of Python's Graph class (but without networkx).
+/// adjacency: vertex -> Vec<(neighbor, common_neighbors)>
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct Graph {
+    pub adjacency: HashMap<usize, Vec<(usize, usize)>>,
+    pub out_degree: HashMap<usize, usize>,
+}
+
+#[pymethods]
+impl Graph {
+    #[new]
+    pub fn new(adjacency: HashMap<usize, Vec<(usize, usize)>>) -> Self {
+        let mut out_degree = HashMap::new();
+        for (v, neigh) in &adjacency {
+            out_degree.insert(*v, neigh.len());
+        }
+        Graph { adjacency, out_degree }
+    }
+
+    /// Equivalent of random_neighbor(self, vertex)
+    /// Returns Some((dst, common_neighbors)) or None
+    pub fn random_neighbor(&self, vertex: usize) -> Option<(usize, usize)> {
+        let mut rng = rand::thread_rng();
+        self.adjacency
+            .get(&vertex)
+            .and_then(|neighbors| neighbors.choose(&mut rng).copied())
+    }
+
+    /// Placeholder for is_remote (always false, as in Python)
+    pub fn is_remote(&self, _vertex: usize) -> bool {
+        // TODO: define proper logic
+        false
+    }
+}
+
+/// Equivalent of log2_safe in Python
+fn log2_safe(x: f64) -> f64 {
+    if x > 0.0 {
+        x.log2()
+    } else {
+        f64::NEG_INFINITY
+    }
+}
+
+/// Equivalent of iterate_stats(walker, fi, step_k=1.0)
+pub fn iterate_stats(walker: &mut Walker, fi: f64, step_k: f64) {
+    let Sn = walker.Sn;
+    let Hn = walker.Hn;
+
+    let Snp1 = Sn + step_k;
+
+    // t = log2_safe((Sn / Snp1)**Sn * (1 / Snp1)**step_k)
+    let base = (Sn / Snp1).powf(Sn) * (1.0 / Snp1).powf(step_k);
+    let mut t = log2_safe(base);
+
+    if fi > 0.0 {
+        // fj = fi + step_k
+        let fj = fi + step_k;
+        // t = log2_safe((Sn / Snp1)**Sn * (1 / Snp1)**step_k *
+        //               (fj / fi)**fi * fj**step_k)
+        let base2 = base * (fj / fi).powf(fi) * fj.powf(step_k);
+        t = log2_safe(base2);
+    }
+
+    // Hnp1 = (Sn * Hn - t) / Snp1
+    let Hnp1 = (Sn * Hn - t) / Snp1;
+
+    let Np1 = walker.N + 1.0;
+    let EnH = walker.EnH + (Hnp1 - walker.EnH) / Np1;
+    let EnS = walker.EnS + (Snp1 - walker.EnS) / Np1;
+    let EnHS = walker.EnHS + (Hnp1 * Snp1 - walker.EnHS) / Np1;
+    let EnHH = walker.EnHH + (Hnp1.powi(2) - walker.EnHH) / Np1;
+    let EnSS = walker.EnSS + (Snp1.powi(2) - walker.EnSS) / Np1;
+
+    let D_H = EnHH - EnH.powi(2);
+    let D_S = EnSS - EnS.powi(2);
+
+    let R = if D_H > 0.0 && D_S > 0.0 {
+        (EnHS - EnH * EnS) / (D_H * D_S).sqrt()
+    } else {
+        0.0
+    };
+
+    // Update walker
+    walker.Hn = Hnp1;
+    walker.Sn = Snp1;
+    walker.EnH = EnH;
+    walker.EnS = EnS;
+    walker.EnHS = EnHS;
+    walker.EnHH = EnHH;
+    walker.EnSS = EnSS;
+    walker.N = Np1;
+    walker.R = R;
+    walker.step += 1;
+}
+
+#[pyfunction]
+pub fn walk(
+    graph: &Graph,
+    walker: &mut Walker,
+    threshold: f64,
+    min_length: usize,
+    max_length: usize,
+) -> Vec<usize> {
+    let mut rng = rand::thread_rng();
+    let mut walker_to_path_count: HashMap<usize, usize> = HashMap::new();
+
+    let mut path = Vec::new();
+
+    let mut current_v = walker.last_vertex.unwrap_or(walker.id);
+    walker.step = 1;
+
+    loop {
+        // yield current_v
+        path.push(current_v);
+
+        if walker.step == max_length {
+            break;
+        }
+
+        let fi_u = walker_to_path_count.get(&current_v).copied().unwrap_or(0);
+        walker_to_path_count.insert(current_v, fi_u + 1);
+
+        if walker.step > 0 {
+            let fi = fi_u as f64;
+            iterate_stats(walker, fi, 1.0);
+        }
+
+        if walker.step > min_length
+            && (walker.R.powi(2) < threshold || walker.R < 0.0)
+        {
+            break;
+        }
+
+        let degree = *graph.out_degree.get(&current_v).unwrap_or(&0);
+        if degree == 0 {
+            break;
+        }
+
+        let candidate = graph.random_neighbor(current_v);
+        let (dst, common_neighbors) = match candidate {
+            Some(c) => c,
+            None => break,
+        };
+
+        let src_deg = *graph.out_degree.get(&current_v).unwrap_or(&1);
+        let dst_deg = *graph.out_degree.get(&dst).unwrap_or(&1);
+
+        let p_accept = if src_deg == 0 || dst_deg == 0 {
+            0.0
+        } else if src_deg == common_neighbors {
+            0.0
+        } else {
+            // (1 / (src_deg - common_neighbors)) * max(src_deg, dst_deg) / min(src_deg, dst_deg)
+            let src_deg_f = src_deg as f64;
+            let dst_deg_f = dst_deg as f64;
+            let common_f = common_neighbors as f64;
+            let denom = src_deg_f - common_f;
+            if denom == 0.0 {
+                0.0
+            } else {
+                (1.0 / denom) * src_deg_f.max(dst_deg_f) / src_deg_f.min(dst_deg_f)
+            }
+        };
+
+        let p_norm = (p_accept as f64).tanh();
+        let p: f64 = rng.gen();
+
+        if p_norm < p && walker.step > min_length {
+            walker.trace_flag = true;
+            walker.last_vertex = Some(current_v);
+            break; // emit trace
+        }
+
+        if graph.is_remote(dst) {
+            break; // emit remote walker
+        }
+
+        current_v = dst; // continue walking locally
+    }
+
+    path
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn vertex_voyage_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_next, m)?)?;
     m.add_function(wrap_pyfunction!(generate_skip_grams, m)?)?;
     m.add_function(wrap_pyfunction!(get_reconstructed_edges, m)?)?;
+    m.add_class::<Walker>()?;
+    m.add_class::<Graph>()?;
+    m.add_function(wrap_pyfunction!(walk, m)?)?;
     Ok(())
 }
