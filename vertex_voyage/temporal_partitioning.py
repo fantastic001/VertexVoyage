@@ -224,6 +224,8 @@ class WindowedLabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner)
         self.subgraphs = [[] for _ in range(num_partitions)]
 
     def partition_vertex(self, vertex):
+        if vertex not in self.neighbor_map:
+            self.neighbor_map[vertex] = set()
         if vertex not in self.partition_map:
             if vertex in self.window and len(self.window) >= self.window_size:
                 self.window.remove(vertex)
