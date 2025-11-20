@@ -3,8 +3,11 @@ from functools import wraps
 import unittest
 from unittest import mock
 
+from networkx import karate_club_graph
+
 from vertex_voyage import model
 from vertex_voyage.dynnode2vec import DynNode2Vec
+from vertex_voyage.reconstruction import reconstruct, get_f1_score
 from vertex_voyage.temporal import FirstN, ForestFireEventSequence, Event 
 from unittest.mock import MagicMock
 from vertex_voyage.word2vec import word2vec
@@ -69,6 +72,24 @@ class TestDynNode2Vec(unittest.TestCase):
                 self.assertIsNone(kwargs.get('old_model', None))
             model.update_model.reset_mock()
             mock_word2vec.reset_mock()
+    
+    def test_zacharys_karate_club(self):
+        G = karate_club_graph()
+        model = DynNode2Vec()
+        t = 0
+        for u, v in G.edges():
+            event = Event(src=u, dest=v, timestamp=t)
+            model.update(event)
+            t += 1
+        embeddings = model.embed_nodes(list(G.nodes()))
+        self.assertEqual(len(embeddings), len(G.nodes()))
+        reconstructed = reconstruct(
+            G.number_of_edges(), 
+            embeddings, 
+            list(G.nodes())
+        )
+        f1 = get_f1_score(G, reconstructed)
+        self.assertGreater(f1, 0.5)
 
 if __name__ == "__main__":
     unittest.main()
