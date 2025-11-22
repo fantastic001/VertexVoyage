@@ -179,8 +179,8 @@ $$
 
 This guarantees (0 < Z(x) < 1) for all (x>0), and:
 
-* larger ($\alpha(u,v)$) ⇒ larger acceptance probability
-* small ($\alpha(u,v)$) ⇒ small acceptance probability
+* larger ($\alpha(u,v)$) leads to larger acceptance probability
+* small ($\alpha(u,v)$) leads to small acceptance probability
 
 At node ($u$), the random walk transition is as follows:
 
