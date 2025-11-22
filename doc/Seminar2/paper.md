@@ -2,7 +2,7 @@
 title: "Evaluation and analysis of graph vertex embeddings based on information-oriented random walks in distributed environment with community-aware vertex partitioning"
 author: "Stefan Nožinić"
 abstract: |
-  This paper explores the evaluation and analysis of graph vertex embeddings in a distributed environment, focusing on community-aware vertex partitioning to enhance the time efficiency of embeddings and reduce the need for network communication during the embedding generation process. The study investigates various partitioning algorithms and embedding methods, assessing their effectiveness in capturing community structures and generating meaningful embeddings for large-scale graphs. Experimental results demonstrate the benefits of community-aware partitioning in improving embedding quality and efficiency in distributed settings.
+  This paper presents an evaluation and analysis of graph vertex embeddings generated using information-oriented random walks in a distributed environment with community-aware vertex partitioning. The study focuses on the effectiveness of community-aware partitioning methods in preserving the structural properties of the graph while generating high-quality embeddings. The performance of the proposed approach is assessed through various metrics, including embedding quality, partition quality, and balance of partitions. The results demonstrate that community-aware partitioning significantly improves the quality of embeddings and reduces the need for network communication during the embedding generation process. This work contributes to the understanding of distributed graph embedding techniques and highlights the importance of considering community structures in large-scale graph processing.
 bibliography: ./refs.bib
 ---
 
@@ -294,8 +294,9 @@ The system is evaluated on larger networks from literature to assess the perform
 | CITESEER| 3264    | 4532    | 0.14                   |
 | AstroPh | 18772   | 198110  | 0.63                   |
 | Cit-HepPh| 34546  | 420921  | 0.28                   |
-| Cit-HepTh| 27770  | 352324  | 0.31                   |
 Table: Characteristics of networks used in experiments.
+
+<!-- | Cit-HepTh| 27770  | 352324  | 0.31                   | -->
 
 For networks from literature, F1 score of reconstruction remains relatively stable when using distributed Node2Vec with modified LFM partitioning compared to sequential Node2Vec when number of partitions is set to 2 and number of walks per node is set to 10 with walk size 80.
 
@@ -304,15 +305,59 @@ For networks from literature, F1 score of reconstruction remains relatively stab
 | CITESEER| 50  | 24%            | 33%           |
 | AstroPh | 100 | 5.1%           | 6.6%          |
 | Cit-HepPh | 100 | 2.5%         | 2.8%         |
-| Cit-HepTh | 100 | 2.9%         | 3.2%        |
+Table: F1 scores for embeddings generated using distributed Node2Vec with LFM partitioning on larger networks when number of partitions is set to 2.
+<!-- | Cit-HepTh | 100 | 2.9%         | 3.2%        | -->
 
 It was observed that LFM algorithm produces uniformly balanced partitions on these networks. Even when number of partitions is set higher than 2, partitions remain balanced within 10% of average partition size.
 
+In table 3, results of Node2Vec with label propagation partitioning are shown. It can be observed that F1 score of reconstruction remains stable even when number of partitions is increased to 4.
 
+| Network | F1 score on 4 nodes |
+|---------|---------------------|
+| CITESEER|  44.34%             |
+| AstroPh | 19.48%              |
+| Cit-HepPh | 4.8%             |
+Table: F1 scores for embeddings generated using distributed Node2Vec with label propagation partitioning on larger networks when number of partitions is set to 4.
 
+<!-- | Cit-HepTh | 5.1%              | -->
+
+In table 4, results of DistGER with label propagation partitioning are shown. It can be observed that F1 score of reconstruction remains stable even when number of partitions is increased to 4 and is slightly better than Node2Vec results.
+
+| Network | F1 score on 1 node | F1 score on 2 nodes | F1 score on 4 nodes |
+|---------|--------------------|---------------------|---------------------|
+| CITESEER|  22.14%            | 43.83%              | 60.66%              |
+| AstroPh |  5.53%             | 8.05%               | 29.77%              |
+| Cit-HepPh| 2.68%             | 4.04%               | 4.39%               |
+Table: F1 scores for embeddings generated using distributed DistGER with label propagation partitioning on larger networks when number of partitions is set to 2 and 4.
+
+<!-- | Cit-HepTh|                   |                     |                     | -->
+
+In experiments, it was observed that label propagation algorithm can produce balanced partitions which also 
+preserves community structure to some extent. In the Table 5, average balance and edge cut for label propagation algorithm are shown for various real world networks when number of partitions is set to 4.
+
+| Network | Balance - LPA | Edge cut - LPA | 
+|---------|---------------|----------------|
+| CITESEER | 0.000612     | 22%            |
+| AstroPh  | 0.824        | 8.4%        |
+| Cit-HepPh| 0.00005      | 20.6%          |
+Table: Balance and edge cut for label propagation algorithm on various real world networks
+
+<!-- | Cit-HepTh| 0.483        | 11.74%       | -->
+
+Label propagation algorithm consistently produced balanced partitions for certain networks like CITESEER and Cit-HepPh, with balance values close to zero, indicating that the partitions are nearly equal in size. For other networks like AstroPh and Cit-HepTh, the balance values were higher, suggesting some imbalance in partition sizes. However, the edge cut values remained relatively low across all networks, indicating that the partitions preserved community structures effectively.
+
+Overall, distributed graph vertex embedding with community-aware partitioning done
+using label propagation algorithm has shown to be the most effective, consistently
+outperforming other methods in terms of embedding quality, partition quality, and balance of partitions as well as reconstruction F1 scores.
+
+Partitioned graphs with community-aware label propagation partitioning have shown to produce high-quality embeddings in distributed environment with minimal loss in embedding quality compared to sequential implementations. DistGER method has shown to outperform Node2Vec in terms of reconstruction F1 scores when used with community-aware partitioning.
 
 
 # Conclusion 
+
+In this paper, it was demonstrated that distributed graph vertex embedding with community-aware partitioning can effectively generate high-quality embeddings while preserving the community structure of the graph. The label propagation algorithm proved to be an effective method for partitioning graphs in a way that balances partition sizes and minimizes edge cuts, leading to improved embedding quality. 
+
+DistGER method showed superior performance compared to Node2Vec in terms of reconstruction F1 scores, indicating that maximizing information gain during random walk generation can lead to better embeddings.
 
 # References 
 
