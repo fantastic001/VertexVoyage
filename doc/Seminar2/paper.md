@@ -172,9 +172,7 @@ $$
 The paper defines (Z(x)) explicitly as the scaled hyperbolic tangent:
 
 $$
-\boxed{
 Z(x) = \frac{e^{x} - e^{-x}}{e^{x} + e^{-x}} = \tanh(x)
-}
 $$
 
 This guarantees (0 < Z(x) < 1) for all (x>0), and:

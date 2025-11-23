@@ -1,0 +1,16 @@
+{
+    "results_file": "dataset_stats.csv",
+    "columns": {
+        "dataset": "Dataset",
+        "nodes": "Broj čvorova",
+        "edges": "Broj ivica",
+        "avg_degree": "Prosečan stepen"
+
+    },
+    "plot": {
+        "kind": "latex",
+        "xlabel": "Dataset",
+        "ylabel": "Broj čvorova",
+        "title": "Broj čvorova po datasetu"
+    }
+}
