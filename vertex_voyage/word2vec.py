@@ -161,6 +161,28 @@ class Word2Vec(tf.keras.Model):
         dots = tf.einsum('be,bce->bc', word_emb, context_emb)
         # dots: (batch, context)
         return dots
+    
+    def __getitem__(self, target_index):
+        """
+        Get the embedding vector for a given target index.
+        """
+        target_index = tf.constant([target_index], dtype=tf.int32)
+        embedding_vector = self.target_embedding(target_index)
+        return tf.squeeze(embedding_vector, axis=0)
+    
+    def __iter__(self):
+        """
+        Iterate over all embedding vectors in the target embedding matrix.
+        """
+        vocab_size = self.target_embedding.input_dim
+        for i in range(vocab_size):
+            yield self[i]
+    
+    def __len__(self):
+        """
+        Get the number of target embeddings.
+        """
+        return self.target_embedding.input_dim
 
     def insert_weights(self, positions) -> "Word2Vec":
         """
@@ -322,7 +344,7 @@ def word2vec(training_data, vocab_size, embedding_dim, learning_rate, epochs, wi
         return np.zeros((vocab_size, embedding_dim))
     model = train_word2vec_model(training, vocab_size, embedding_dim, learning_rate, epochs, epoch_callbacks, old_model)
     weights = model.get_layer('w2v_embedding').get_weights()[0]
-    return weights, model
+    return model, model
 
 if __name__ == "__main__":
   from vertex_voyage.node2vec import Node2Vec
