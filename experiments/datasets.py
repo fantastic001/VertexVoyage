@@ -86,6 +86,11 @@ dataset_params = {
         q=.25,
         dim=100,
     ),
+    "zachary": dict(
+        p=.25,
+        q=4,
+        dim=100,
+    ),
 }
 
 def create_benchmark_class(partitioner_class, *args):
