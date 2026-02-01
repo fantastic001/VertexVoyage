@@ -334,7 +334,7 @@ class Commands:
              dim: int = 100,
              default_p: float = 0,
              default_q: float = 0,
-             epochs: int = 1,
+             epochs: int = 10,
              long_run : bool = False,
              use_dataset_params: bool = False,
              use_lpa: bool = False,
@@ -362,6 +362,9 @@ class Commands:
         embs = {}
         for part in parts:
             log("Partition size: %d" % len(part))
+            if len(part) == 0:
+                print("Skipping empty partition")
+                continue
             best = None
             best_f1 = -1
             pg = dataset.subgraph(part)
