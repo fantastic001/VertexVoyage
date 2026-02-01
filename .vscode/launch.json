@@ -19,7 +19,13 @@
             "request": "launch",
             "module": "vertex_voyage",
             "args": [
-                "test"
+                "test",
+                "--name",
+                "AstroPh",
+                "--partitions",
+                "1",
+                "--break-early",
+                "--skip-global"
             ],
             "env": {
                 "FAILFAST": "1",
