@@ -66,17 +66,17 @@ class TestVVGraph(TestCase):
         for u, v in G.edges():
             vv_graph.add_edge(u, v)
         node2vec = Node2Vec(
-            dim=128, 
+            use_threads=False,
+            dim=100, 
             walk_size=80, 
             n_walks=10, 
             window_size=10,
-            epochs=1, 
+            epochs=10, 
             p = .25,
             q = 4,
-            negative_sample_num=1, # in practice, should be 500
+            negative_sample_num=50, # in practice, should be 500
             seed=42,
-            learning_rate=0.01,
-            use_threads=False
+            learning_rate=0.01
         )
         node2vec.fit(vv_graph)
         # calculate embeddings

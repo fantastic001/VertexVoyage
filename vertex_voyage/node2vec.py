@@ -141,21 +141,25 @@ class Node2Vec:
 
     
     def _train(self):
+        from gensim.models import Word2Vec
         walks = [
             [n.argmax() if hasattr(n, "argmax") and n.ndim > 0 else n for n in walk] for walk in self.walks
         ]
         if len(walks) == 0:
             return np.zeros((len(self.nodes), self.dim))
-        return word2vec(
-            training_data=walks,
-            vocab_size=len(self.g_nodes),
-            embedding_dim=self.dim,
-            learning_rate=self.learning_rate,
+        x = Word2Vec(
+            sentences=walks,
+            vector_size=self.dim,
+            window=self.window_size,
+            null_word=-1,
+            sg=1,
+            negative=self.negative_sample_num,
             epochs=self.epochs,
-            window_size=self.window_size,
-            num_ns=self.negative_sample_num,
-            seed=self.seed
-        )[0]
+            alpha=self.learning_rate,
+            seed=self.seed,
+            workers=cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self.use_threads else 1
+        )
+        return x.wv
 
     def __repr__(self) -> str:
         return f"Node2Vec(dim={self.dim}, walk_size={self.walk_size}, n_walks={self.n_walks}, window_size={self.window_size}, epochs={self.epochs}, p={self.p}, q={self.q}, negative_sample_num={self.negative_sample_num}, learning_rate={self.learning_rate}, seed={self.seed}, use_threads={self.use_threads})"

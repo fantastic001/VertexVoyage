@@ -31,7 +31,6 @@ class TestPartitioning(unittest.TestCase):
         self.assertLessEqual(len(communities[0]), len(G.nodes) * 0.60)
     
     def test_partitioned_n2v(self):
-        dim = 128
         zachary = nx.karate_club_graph()
         nodes = list(zachary.nodes())
         # rename nodes to be 0,...,N-1
@@ -41,13 +40,24 @@ class TestPartitioning(unittest.TestCase):
         zachary = nx.relabel_nodes(zachary, mapping)
         partition_num = 2
         communities = partition_graph(zachary, partition_num, use_modified_lfm=True, threshold=0)
-        n2v_full = Node2Vec(dim=dim, negative_sample_num=1)
+        n2v_full = Node2Vec(
+            dim=100, 
+            walk_size=80, 
+            n_walks=10, 
+            window_size=10,
+            epochs=10, 
+            p = .25,
+            q = 4,
+            negative_sample_num=50, # in practice, should be 500
+            seed=42,
+            learning_rate=0.01,
+        )
         n2v_full.fit(zachary)
 
         n2v_partitioned = []
         for community in communities:
             n2v_partitioned.append(Node2Vec(
-                dim=dim,
+                dim=n2v_full.dim,
                 walk_size=n2v_full.walk_size,
                 n_walks=n2v_full.n_walks,
                 epochs=n2v_full.epochs,

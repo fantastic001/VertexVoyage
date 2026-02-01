@@ -118,14 +118,14 @@ class TestNode2Vec(unittest.TestCase):
         nodes = list(G.nodes())
         # fit node2vec model
         node2vec = Node2Vec(
-            dim=128, 
+            dim=100, 
             walk_size=80, 
             n_walks=10, 
             window_size=10,
-            epochs=1, 
+            epochs=10, 
             p = .25,
             q = 4,
-            negative_sample_num=1, # in practice, should be 500
+            negative_sample_num=50, # in practice, should be 500
             seed=42,
             learning_rate=0.01,
             use_threads=False
