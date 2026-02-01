@@ -333,3 +333,7 @@ output.txt
 
 results*
 gs_cache
+target/
+doc/*/csv
+profile 
+profile.csv
