@@ -1,5 +1,5 @@
 
-from vertex_voyage.temporal import CSVEventSequence, FileEventSequence, FirstN
+from vertex_voyage.temporal import CSVEventSequence, Event, FileEventSequence, FirstN, ListEventSequence
 from experiments.utils import display_benchmark_results, benchmark_partitioner, is_full_benchmark
 from vertex_voyage.benchmark_base import Benchmark
 import pandas as pd 
@@ -10,6 +10,43 @@ from vertex_voyage.temporal_partitioning import (
     CommonNeighborsPartitioner,
     WindowedLabelPropagationTemporalGraphPartitioner
 )
+import numpy as np 
+import scipy.sparse as sp
+import networkx as nx
+
+class NPZLoader:
+    """
+    Loads npz file and returns edges as event sequence
+    """
+
+    def __init__(self, 
+        path: str,
+        adj_data_label: str = "adj_data",
+        adj_indices_label: str = "adj_indices",
+        adj_indptr_label: str = "adj_indptr",
+        adj_shape_label: str = "adj_shape",
+    ):
+        self.path = path
+        self.adj_data_label = adj_data_label
+        self.adj_indices_label = adj_indices_label
+        self.adj_indptr_label = adj_indptr_label
+        self.adj_shape_label = adj_shape_label
+
+    def __call__(self):
+        npz = np.load(self.path)
+        matrix = sp.csr_matrix(
+            (npz[self.adj_data_label], npz[self.adj_indices_label], npz[self.adj_indptr_label]), 
+            shape=npz[self.adj_shape_label]
+        )
+        g = nx.from_scipy_sparse_array(matrix, create_using = nx.Graph)
+        edges = list(g.edges())
+        return ListEventSequence([
+            Event(src=u, dest=v, timestamp=i)
+            for i, (u, v) in enumerate(edges)
+        ])
+
+
+
 
 datasets = {
     "Twitch": lambda: FileEventSequence("data/twitch.txt"),
@@ -23,8 +60,10 @@ datasets = {
     "CITESEER": lambda: FileEventSequence("data/citeseer.txt"),
     "les_mis": lambda: FileEventSequence("data/les_mis.txt"),
     "zachary": lambda: FileEventSequence("data/zachary.txt"),
-    "AstroPh": lambda: FileEventSequence("data/AstroPh.txt"),
+    # "AstroPh": lambda: FileEventSequence("data/AstroPh.txt"),
+    "AstroPh": NPZLoader("data/AstroPh.npz"),
 }
+
 
 dataset_params = {
     "CITESEER": dict(
