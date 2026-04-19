@@ -4,7 +4,7 @@ from gensim.models import Word2Vec
 import matplotlib.pyplot as plt
 import logging
 
-logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.INFO)
+# logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.INFO)
 
 
 if __name__ == "__main__":
@@ -179,24 +179,25 @@ if __name__ == "__main__":
     say_meow_distance_ranks = []
     total_vocabulary = set(word for sentence in sentences for word in sentence)
     model = Word2Vec(
-        sentences=sentences[:2], 
         min_count=0,
         vector_size=10,
         null_word=None,
         window=5,
         sg=1,
         epochs=10,
+        alpha=0.025,
     )
-    for i in range(2, len(sentences)):
+    for i in range(0, len(sentences)):
         # This is nice test because in dynnode2vec we usually have a lot of sentences and only a few new ones at each step, so we can see how the model updates with new data without forgetting old data. 
         # In this scenario, we assume that sentences will be similar to one 
         # already seen by the model, so we expect the model to be able to learn from the new sentences without forgetting the old ones.
-        samples = sentences[i]
-        training = [
-            t for t in sentences[:i+1] if any(word in t for word in samples)
-        ]
+        # samples = sentences[i]
+        # training = [
+        #     t for t in sentences[:i+1] if any(word in t for word in samples)
+        # ]
+        training = [sentences[i]]
         # in dynnode2vec - training is newly generated walks from affected nodes (delta nodes = added nodes + nodes on edge ends)
-        model.build_vocab(training, update=True)
+        model.build_vocab(training, update= i > 0)
         model.train(
             corpus_iterable=training,
             total_examples=model.corpus_count,
@@ -204,6 +205,14 @@ if __name__ == "__main__":
             epochs=model.epochs,
         )
         
+        if "dog" not in model.wv or "cat" not in model.wv:
+            cat_dog_similarities.append(0)
+            cat_meow_similarities.append(0)
+            say_meow_similarities.append(0)
+            cat_dog_distance_ranks.append(0)
+            say_meow_distance_ranks.append(0)
+            continue
+
         print(f"{i}: Top 5 similar to cat: ", model.wv.most_similar("cat", topn=5))
         cat_dog_similarities.append(model.wv.similarity("cat", "dog"))
         cat_meow_similarities.append(model.wv.similarity("cat", "meow"))
@@ -221,9 +230,9 @@ if __name__ == "__main__":
         say_distances.sort(key=lambda x: x[1])
         cat_dog_distance_ranks.append(next((rank for rank, (word, _) in enumerate(distances) if word == "dog"), None))
         say_meow_distance_ranks.append(next((rank for rank, (word, _) in enumerate(say_distances) if word == "meow"), None))
-    plt.plot(range(2, len(sentences)), cat_dog_similarities, label="cat-dog")
-    plt.plot(range(2, len(sentences)), cat_meow_similarities, label="cat-meow")
-    plt.plot(range(2, len(sentences)), say_meow_similarities, label="say-meow")
+    plt.plot(range(0, len(sentences)), cat_dog_similarities, label="cat-dog")
+    plt.plot(range(0, len(sentences)), cat_meow_similarities, label="cat-meow")
+    plt.plot(range(0, len(sentences)), say_meow_similarities, label="say-meow")
     plt.ylim(-1, 1)
     plt.title("Similarity over time")
     plt.xlabel("Number of sentences")
@@ -234,7 +243,7 @@ if __name__ == "__main__":
     plt.title("Distance rank of dog to cat over time")
     plt.xlabel("Number of sentences")
     plt.ylabel("Distance rank")
-    plt.bar(range(2, len(sentences)), cat_dog_distance_ranks)
+    plt.bar(range(0, len(sentences)), cat_dog_distance_ranks)
     plt.grid()
     plt.show()
     plt.title("Distance rank of meow to say over time")
@@ -242,7 +251,7 @@ if __name__ == "__main__":
     plt.ylabel("Distance rank")
     say_counts = [sum(1 for sentence in sentences[:i] for word in sentence if word == "say") for i in range(2, len(sentences))]
     intensities = [count / max(say_counts) for count in say_counts]
-    plt.bar(range(2, len(sentences)), say_meow_distance_ranks, color=[(intensity, 1-intensity, 0, 1) for intensity in intensities])
+    plt.bar(range(0, len(sentences)), say_meow_distance_ranks, color=[(intensity, 1-intensity, 0, 1) for intensity in intensities])
     # plt.bar(range(2, len(sentences)), say_meow_distance_ranks)
     plt.grid()
     plt.show()
