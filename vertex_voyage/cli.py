@@ -1,4 +1,5 @@
 
+import random
 import sys
 import numpy as np
 from vertex_voyage import dynnode2vec
@@ -485,7 +486,8 @@ class Commands:
              long_run : bool = False,
              use_dataset_params: bool = False,
              use_lpa: bool = False,
-             algorithm: str = "node2vec"
+             algorithm: str = "node2vec",
+             track_seen: bool = False
     ):
 
         import networkx as nx
@@ -498,6 +500,10 @@ class Commands:
             type=x.type,
             attrs=x.attrs,
         ))
+        events = list(dataset)
+        original_graph = to_nx_graph(events)
+        if track_seen:
+            random.shuffle(events)
         models = [DynNode2Vec(
             dim=dim,
             epochs=epochs,
@@ -506,9 +512,8 @@ class Commands:
             n_walks=10 if long_run else 1,
             walk_size=80 if long_run else 10,
             window_size=10 if long_run else 3,
+            retrain_threshold=int(0.1 * original_graph.number_of_nodes())
         ) for _ in range(partitions)]
-        events = list(dataset)
-        original_graph = to_nx_graph(events)
         nodes = set()
         i = 0
         if partitions > 1:
@@ -518,8 +523,28 @@ class Commands:
             )
         else:
             partitioner = None
-        for event in events:
-            log(f"Processing event {i+1} / timestamp {event.timestamp}")
+        seen = set()
+        seen.add(events[0].src)
+        seen.add(events[0].dest)
+        while(len(events) > 0):
+            seen_status = "maybe seen"
+            if track_seen:
+                # find event with smallest timestamp among events that are connected to seen nodes
+                event = None
+                for e in events:
+                    if e.src in seen or e.dest in seen:
+                        event = e
+                        seen_status = "seen"
+                        break
+                if event is None:
+                    event = events[0]
+                    seen_status = "not seen"
+                events.remove(event)
+                seen.add(event.src)
+                seen.add(event.dest)
+            else:
+                event = events.pop(0)
+            log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
             if partitions > 1:
                 partitioner.partition(event)
             nodes.add(event.src)
