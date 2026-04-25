@@ -43,7 +43,7 @@ class TestDynNode2Vec(unittest.TestCase):
         for event in events:
             model.update(event)
             # for src and dest, we should have called _random_walk n_walks times each
-            expected_calls = model.n_walks * 2
+            expected_calls = model.n_walks * 2 if len(model.G.nodes()) >= model.retrain_threshold else len(model.G.nodes()) * model.n_walks
             self.assertEqual(model._random_walk.call_count, expected_calls)
             model._random_walk.reset_mock()
     
@@ -70,8 +70,11 @@ class TestDynNode2Vec(unittest.TestCase):
         for i, event in enumerate(events):
             model.update(event)
             # either gensim Word2Vec or our custom word2vec should have been called
-            self.assertTrue((i>0 and not mock_gensim_word2vec.called) or mock_word2vec.called or (i == 0 and mock_gensim_word2vec.called))
-            if i > 0:
+            retrain = len(model.G.nodes()) < model.retrain_threshold or i == 0
+            self.assertTrue(
+                (not retrain and not mock_gensim_word2vec.called) or mock_word2vec.called or 
+                (retrain and mock_gensim_word2vec.called))
+            if not retrain:
                 model.update_model.assert_called_once()
                 # word2vec should have been called with old_model not None
                 if mock_word2vec.called:
@@ -123,9 +126,6 @@ class TestDynNode2Vec(unittest.TestCase):
             event = Event(src=u, dest=v, timestamp=t)
             model.update(event)
             t += 1
-            print("====")
-            for node in G.nodes():
-                print(f"Node {node} embedding: {model.embed_node(node)}")
         embeddings = model.embed_nodes(list(G.nodes()))
         self.assertEqual(len(embeddings), len(G.nodes()))
         reconstructed = reconstruct(

@@ -23,7 +23,8 @@ class DynNode2Vec(Node2Vec):
         negative_sample_num=1,
         learning_rate=0.01,
         seed=None,
-        use_threads=True
+        use_threads=True,
+        retrain_threshold=30
     ) -> None:
         super().__init__(
             dim=dim,
@@ -36,7 +37,7 @@ class DynNode2Vec(Node2Vec):
             negative_sample_num=negative_sample_num,
             learning_rate=learning_rate,
             seed=seed,
-            use_threads=use_threads
+            use_threads=use_threads,
         )
         self.node_embeddings = {}
         self.node_to_neightbours_map = {}
@@ -44,6 +45,7 @@ class DynNode2Vec(Node2Vec):
         self.G = nx.Graph()
         self.g_nodes = []  # list of nodes in the graph
         self.w2v_model = None
+        self.retrain_threshold = retrain_threshold
     def update_model(self, walks, old_model=None):
         from gensim.models import Word2Vec
         if old_model is not None:
@@ -121,11 +123,15 @@ class DynNode2Vec(Node2Vec):
         self.node_to_neightbours_map.setdefault(event.src, list()).append(event.dest)
         self.node_to_neightbours_map.setdefault(event.dest, list()).append(event.src)
         # generate random walks for src and dest
-        walks = [] 
-        for _ in range(self.n_walks):
-            walks.append(self._random_walk(event.src))
-            walks.append(self._random_walk(event.dest))
-        self.w2v_model = self.update_model(walks, self.w2v_model)
+        if len(self.G.nodes()) < self.retrain_threshold:
+            walks = self._random_walks()
+            self.w2v_model = self.update_model(walks, None)
+        else:
+            walks = [] 
+            for _ in range(self.n_walks):
+                walks.append(self._random_walk(event.src))
+                walks.append(self._random_walk(event.dest))
+            self.w2v_model = self.update_model(walks, self.w2v_model)
 
         
     
