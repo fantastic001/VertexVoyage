@@ -35,6 +35,29 @@ from vertex_voyage.dynnode2vec import DynNode2Vec
 
 from vertex_voyage.temporal_partitioning import WindowedLabelPropagationTemporalGraphPartitioner
 
+import logging 
+
+logger = logging.getLogger("CLI")
+
+def setup_logging():
+    logging.basicConfig(
+        level = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL
+        }[get_config_str(
+            "log_level", "INFO", 
+            "Log level for the VV (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
+        ).upper()],
+        format = '[%(asctime)s] %(levelname)s: %(name)s: %(message)s',
+        datefmt = '%Y-%m-%d %H:%M:%S',
+        filename=get_config_str(
+            "log_file", "vv.log", "Log file for the VV"
+        )
+    )
+
 GS_LOCATION = get_config_str("gs_cache_location", "gs_cache", "Location to store grid search results")
 
 ALGS = {
@@ -113,6 +136,7 @@ class VertexEnumerator:
 def log(*messages):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {' '.join(map(str, messages))}")
     sys.stdout.flush()
+    logger.info(' '.join(map(str, messages)))
 
 
 class Commands:
@@ -526,6 +550,7 @@ class Commands:
         seen = set()
         seen.add(events[0].src)
         seen.add(events[0].dest)
+        old_f1_score = 0
         while(len(events) > 0):
             seen_status = "maybe seen"
             if track_seen:
@@ -577,6 +602,9 @@ class Commands:
             except ZeroDivisionError:
                 f1_score = 0.0
             log(f"Timestamp: {event.timestamp}, F1 score: {f1_score}")
+            if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
+                logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at timestamp {event.timestamp}")
+            old_f1_score = f1_score
             i += 1
         log("Event stream processing completed")
         return 

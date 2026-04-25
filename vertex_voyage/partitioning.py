@@ -9,7 +9,9 @@ import vertex_voyage.config as cfg
 import vertex_voyage_native as vvn
 
 from vertex_voyage.vv_graph import VVGraph 
+import logging 
 
+logger = logging.getLogger(__name__)
 
 class __NativeGraph:
     def __init__(self, G):
@@ -24,6 +26,7 @@ def remove_vertex_from_community(c: Community, v):
     return c.remove_vertex(v)
 
 def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int = None, pm_k: int  = None) -> list:
+    logger.info(f"Running modified LFM with alpha={alpha}, threshold={threshold}, seed={seed}, pm_k={pm_k}")
     if seed is not None:
         random.seed(seed)
     communities = []
@@ -73,12 +76,14 @@ def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: floa
     for node in node_not_include:
         random_comm = random.choice(communities)
         random_comm.append(node)
+    logger.info(f"Finished modified LFM with {len(communities)} communities, {len(node_not_include)} nodes not included in any community")
     return list(communities)
 
 def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = False, threshold: float = 0.5, alpha: float = 1, seed = None) -> list:
     """
     Partition the graph into a given number of partitions using LFM algorithm.
     """
+    logger.info(f"Partitioning graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges into {partition_num} partitions using {'modified LFM' if use_modified_lfm else 'LFM'} with alpha={alpha}, threshold={threshold}, seed={seed}")
     # create a LFM object
     communities = None 
     if use_modified_lfm:
@@ -254,6 +259,7 @@ def random_partitioning(G: nx.Graph, partition_num: int):
     """
     Randomly partition the graph into a given number of partitions.
     """
+    logger.info(f"Randomly partitioning graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges into {partition_num} partitions")
     nodes = list(G.nodes)
     random.shuffle(nodes)
     partitions = to_constant_bin_number(nodes, partition_num, key= lambda x: 1)
@@ -320,6 +326,7 @@ def label_propagation_partitioner(G: nx.Graph, partition_num: int):
     """
     Partition the graph using label propagation algorithm.
     """
+    logger.info(f"Partitioning graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges into {partition_num} partitions using label propagation")
     partitions = {i: [] for i in range(partition_num)}
     if isinstance(G, VVGraph):
         labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=None)

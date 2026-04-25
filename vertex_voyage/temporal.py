@@ -7,6 +7,10 @@ from struct import pack, unpack
 from vertex_voyage.vv_graph import VVGraph
 
 from typing import Union
+
+import logging
+
+logger = logging.getLogger(__name__)
 class EventType(Enum):
     ADD = 1
     REMOVE = 2
@@ -86,6 +90,7 @@ class CSVEventSequence(EventSequence):
     def head(self) -> Event:
         line = next(self.file).strip()
         src, dest, timestamp, type, *attrs = line.split(",")
+        logger.info(f"Reading event from CSV: src={src}, dest={dest}, timestamp={timestamp}, type={type}, attrs={attrs}")
         return Event(src, dest, int(timestamp), EventType[type], dict([attr.split("=") for attr in attrs]))
     
     def tail(self) -> "CSVEventSequence":
@@ -113,6 +118,7 @@ class FileEventSequence(EventSequence):
         if fileptr:
             self.file = fileptr
         else:
+            logger.info(f"Opening file {file} for FileEventSequence")
             self.file = open(file, "r")
         self.is_empty = False 
         try:
@@ -286,6 +292,7 @@ class ForestFireEventSequence(FromIterable):
         generating an edge is p. The probability of generating a
         node is 1 - p.
         """
+        logger.info(f"Generating forest fire event sequence with p={self.p}")
         vertices = [0]
         i = 1 
         time = 0
@@ -308,6 +315,7 @@ class ForestFireEventSequence(FromIterable):
                 )
                 time += 1
                 burn_fwd = sample(vertices, int(self.p * len(vertices)))
+                logger.debug(f"Forest fire event: current={current}, new_node={i}, burn_fwd={burn_fwd}")
                 to_visit.extend(burn_fwd)
             i += 1
     def __init__(self, p: float):
@@ -433,6 +441,7 @@ class FirstN(FromIterable):
     def __init__(self, sequence: EventSequence, n: int):
         self.sequence = sequence
         self.n = n
+        logger.info(f"Drawing first {n} events from sequence")
         super().__init__(self._draw_first(sequence, n))
 
 class Transform(FromIterable):

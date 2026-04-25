@@ -9,6 +9,10 @@ import vertex_voyage.config as cfg
 import multiprocessing.pool as mpp
 import vertex_voyage_native
 
+import logging 
+
+logger = logging.getLogger(__name__)
+
 class Node2Vec:
 
     def __init__(self, 
@@ -41,6 +45,7 @@ class Node2Vec:
         else:
             np.random.seed()
             random.seed()
+        logger.info(f"Initialized Node2Vec with parameters: {self}")
     
     def _weighted__get_next(self, prev, current):
         neighbors = self.node_to_neightbours_map[current]
@@ -76,6 +81,9 @@ class Node2Vec:
 
     def fit(self, G, nodes = None):
         self.G = G
+        logger.info(f"Fitting Node2Vec on graph with {self.G.number_of_nodes()} nodes and {self.G.number_of_edges()} edges.")
+        if nodes is not None:
+            logger.info(f"Using provided nodes for embedding: {len(nodes)} nodes.")
         if isinstance(G, VVGraph):
             self.is_weighted = False 
         else:
@@ -89,6 +97,7 @@ class Node2Vec:
         else:
             self.nodes = self.g_nodes
         self.walks = self._random_walks()
+        logger.info(f"Generated {len(self.walks)} random walks.")
         self.W = self._train() 
         W = np.zeros((len(self.g_nodes), self.dim))
         for i, node in enumerate(self.g_nodes):
@@ -128,6 +137,7 @@ class Node2Vec:
         return walks
     
     def _random_walk(self, node):
+        logger.debug(f"Starting random walk from node: {node}")
         walk = [node]
         current = node
         prev = None
@@ -136,8 +146,9 @@ class Node2Vec:
             walk.append(next_node)
             prev = current
             current = next_node
-        return [self._encode(n) for n in walk]
-    
+        result = [self._encode(n) for n in walk]
+        logger.debug(f"Completed random walk: {result}")
+        return result
 
     
     def _train(self):
@@ -159,6 +170,11 @@ class Node2Vec:
             seed=self.seed,
             workers=cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self.use_threads else 1
         )
+        logger.info(f"Trained Word2Vec model with {len(x.wv)} unique nodes in vocabulary.")
+        for node in self.nodes:
+            if node not in x.wv:
+                logger.warning(f"Node {node} not found in Word2Vec vocabulary. This may indicate an issue with the random walks or encoding.")
+            logger.debug(f"Node {node} has embedding: {x.wv[node] if node in x.wv else 'Not found'}")
         return x.wv
 
     def __repr__(self) -> str:

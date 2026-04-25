@@ -3,6 +3,10 @@ from abc import abstractmethod
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random
 import numpy as np 
+
+import logging
+
+logger = logging.getLogger(__name__)
 class TemporalGraphPartitioner:
     @abstractmethod
     def partition(self, event: Event):
@@ -40,6 +44,7 @@ def partition_temporal_graph(tg: EventSequence, partitioner: TemporalGraphPartit
     :param partitioner: Partitioner
     :return: List of partitions
     """
+    logger.info(f"Partitioning temporal graph with {partitioner}...")
     partitions = dict()
     vertices = set()
     for event in tg:
@@ -51,6 +56,7 @@ def partition_temporal_graph(tg: EventSequence, partitioner: TemporalGraphPartit
         if partition not in partitions:
             partitions[partition] = []
         partitions[partition].append(vertex)
+        logger.debug(f"Vertex {vertex} assigned to partition {partition}")
     return partitions.values()
 
 def get_most_common_partition(vertex, partition_map: dict, neighbor_map: dict):
@@ -73,7 +79,9 @@ def get_most_common_partition(vertex, partition_map: dict, neighbor_map: dict):
             if partition not in freq:
                 freq[partition] = 0
             freq[partition] += 1
-    return max(freq, key=freq.get) if freq else partition_map[vertex]
+    most_common = max(freq, key=freq.get) if freq else partition_map[vertex]
+    logger.debug(f"Vertex {vertex} most common partition among neighbors: {most_common}")
+    return most_common
 
 class LabelPropagationTemporalGraphPartitioner(TemporalGraphPartitioner):
     def __init__(self, num_partitions: int, p: float = 0.5):
