@@ -105,6 +105,7 @@ class DynNode2Vec(Node2Vec):
             self.W = W
         return model
     def update(self, event: Event):
+        has_existing_node = self.G.has_node(event.src) or self.G.has_node(event.dest)
         if not self.G.has_node(event.src):
             self.G.add_node(event.src)
             self.g_nodes.append(event.src)
@@ -128,10 +129,13 @@ class DynNode2Vec(Node2Vec):
             self.w2v_model = self.update_model(walks, None)
         else:
             walks = [] 
-            for _ in range(self.n_walks):
-                walks.append(self._random_walk(event.src))
-                walks.append(self._random_walk(event.dest))
+            if not has_existing_node:
+                # if both nodes are new, we need to generate random walks for a 
+                # whole graph in order to get same distribution of walks as 
+                # before. 
+                walks = self._random_walks()
+            else:
+                for _ in range(self.n_walks):
+                    walks.append(self._random_walk(event.src))
+                    walks.append(self._random_walk(event.dest))
             self.w2v_model = self.update_model(walks, self.w2v_model)
-
-        
-    
