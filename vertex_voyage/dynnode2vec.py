@@ -1,12 +1,15 @@
 
 
+import random
+
 from vertex_voyage.node2vec import Node2Vec
 import vertex_voyage.word2vec as w2v
 from vertex_voyage.temporal import Event 
 from vertex_voyage.vv_graph import VVGraph
 
 import networkx as nx
-
+import vertex_voyage.config as cfg
+import numpy as np
 class DynNode2Vec(Node2Vec):
     def __init__(
         self,
@@ -42,46 +45,75 @@ class DynNode2Vec(Node2Vec):
         self.g_nodes = []  # list of nodes in the graph
         self.w2v_model = None
     def update_model(self, walks, old_model=None):
+        from gensim.models import Word2Vec
         if old_model is not None:
             # continue training from old model
-            self.W, model = w2v.word2vec(
-                embedding_dim=self.dim,
-                vocab_size=len(self.g_nodes),
-                training_data=walks,
-                learning_rate=self.learning_rate,
-                epochs=self.epochs,
-                window_size=self.window_size,
-                num_ns=self.negative_sample_num,
-                seed=self.seed,
-                epoch_callbacks=[],
-                old_model=old_model
-            )
+            if isinstance(old_model, w2v.Word2Vec):
+                self.W, model = w2v.word2vec(
+                    embedding_dim=self.dim,
+                    vocab_size=len(self.g_nodes),
+                    training_data=walks,
+                    learning_rate=self.learning_rate,
+                    epochs=self.epochs,
+                    window_size=self.window_size,
+                    num_ns=self.negative_sample_num,
+                    seed=self.seed,
+                    epoch_callbacks=[],
+                    old_model=old_model
+                )
+            else:
+                old_model.build_vocab(walks, update=True)
+                old_model.train(
+                    corpus_iterable = walks,
+                    total_examples=old_model.corpus_count,
+                    epochs=self.epochs,
+                    callbacks=[],
+                )
+                self.W = old_model.wv
+                W = np.zeros((len(self.g_nodes), self.dim))
+                for i, node in enumerate(self.g_nodes):
+                    W[i] = self.embed_node(node)
+                self.W = W
+                model = old_model
         else:
             # train new model
-            self.W, model = w2v.word2vec(
-                embedding_dim=self.dim,
-                vocab_size=len(self.g_nodes),
-                training_data=walks,
-                learning_rate=self.learning_rate,
+            model = Word2Vec(
+                vector_size=self.dim,
+                window=self.window_size,
+                min_count=0,
+                sg=1,
+                negative=self.negative_sample_num,
+                alpha=self.learning_rate,
                 epochs=self.epochs,
-                window_size=self.window_size,
-                num_ns=self.negative_sample_num,
-                seed=self.seed,
-                epoch_callbacks=[]
+                seed=self.seed if self.seed is not None else random.randint(0, 10000),
+                null_word=-1,
+                workers=cfg.get_config_int("dynnode2vec_workers", 6, "Number of workers during word2vec training for DynNode2Vec") if self.use_threads else 1
             )
+            model.build_vocab(walks)
+            model.train(
+                corpus_iterable=walks,
+                total_examples=model.corpus_count,
+                epochs=model.epochs,
+                callbacks=[],
+            )
+            self.W = model.wv
+            W = np.zeros((len(self.g_nodes), self.dim))
+            for i, node in enumerate(self.g_nodes):
+                W[i] = self.embed_node(node)
+            self.W = W
         return model
     def update(self, event: Event):
         if not self.G.has_node(event.src):
             self.G.add_node(event.src)
             self.g_nodes.append(event.src)
-            if self.w2v_model is not None:
+            if self.w2v_model is not None and isinstance(self.w2v_model, w2v.Word2Vec):
                 self.w2v_model = self.w2v_model.insert_weights(
                     [self._encode(event.src)]
                 )
         if not self.G.has_node(event.dest):
             self.G.add_node(event.dest)
             self.g_nodes.append(event.dest)
-            if self.w2v_model is not None:
+            if self.w2v_model is not None and isinstance(self.w2v_model, w2v.Word2Vec):
                 self.w2v_model = self.w2v_model.insert_weights(
                     [self._encode(event.dest)]
                 )
