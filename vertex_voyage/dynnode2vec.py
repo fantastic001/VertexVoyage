@@ -115,45 +115,41 @@ class DynNode2Vec(Node2Vec):
                 W[i] = self.embed_node(node)
             self.W = W
         return model
-    def update(self, event: Event):
-        has_existing_node = self.G.has_node(event.src) or self.G.has_node(event.dest)
-        if not self.G.has_node(event.src):
-            logger.debug(f"Adding new node {event.src} to the graph")
-            self.G.add_node(event.src)
-            self.g_nodes.append(event.src)
+    def update(self, events: list[Event]):
+        affected_nodes = {event.src for event in events} | {event.dest for event in events}
+        for event in events:
+            if not self.G.has_node(event.src):
+                logger.debug(f"Adding new node {event.src} to the graph")
+                self.G.add_node(event.src)
+                self.g_nodes.append(event.src)
             if self.w2v_model is not None and isinstance(self.w2v_model, w2v.Word2Vec):
                 self.w2v_model = self.w2v_model.insert_weights(
                     [self._encode(event.src)]
                 )
-        if not self.G.has_node(event.dest):
-            logger.debug(f"Adding new node {event.dest} to the graph")
-            self.G.add_node(event.dest)
-            self.g_nodes.append(event.dest)
-            if self.w2v_model is not None and isinstance(self.w2v_model, w2v.Word2Vec):
-                self.w2v_model = self.w2v_model.insert_weights(
-                    [self._encode(event.dest)]
-                )
-        self.G.add_edge(event.src, event.dest)
-        logger.debug(f"Added edge ({event.src}, {event.dest}) to the graph")
+            if not self.G.has_node(event.dest):
+                logger.debug(f"Adding new node {event.dest} to the graph")
+                self.G.add_node(event.dest)
+                self.g_nodes.append(event.dest)
+                if self.w2v_model is not None and isinstance(self.w2v_model,    w2v.Word2Vec):
+                    self.w2v_model = self.w2v_model.insert_weights(
+                        [self._encode(event.dest)]
+                    )
+            self.G.add_edge(event.src, event.dest)
+            self.node_to_neightbours_map.setdefault(event.src, list()).append(event.dest)
+            self.node_to_neightbours_map.setdefault(event.dest, list()).append(event.src)
+        logger.debug(f"Added {len(events)} edges to the graph")
         logger.debug(f"Current number of nodes: {len(self.G.nodes())}, edges: {len(self.G.edges())}")
-        self.node_to_neightbours_map.setdefault(event.src, list()).append(event.dest)
-        self.node_to_neightbours_map.setdefault(event.dest, list()).append(event.src)
+        
         # generate random walks for src and dest
         if len(self.G.nodes()) < self.retrain_threshold:
             logger.debug(f"Graph has {len(self.G.nodes())} nodes, which is less than retrain_threshold={self.retrain_threshold}. Retraining model from scratch.")
             walks = self._random_walks()
             self.w2v_model = self.update_model(walks, None)
         else:
-            walks = [] 
-            if not has_existing_node:
-                # if both nodes are new, we need to generate random walks for a 
-                # whole graph in order to get same distribution of walks as 
-                # before. 
-                logger.debug(f"Both nodes {event.src} and {event.dest} are new. Generating random walks for the entire graph to maintain walk distribution.")
-                walks = self._random_walks()
-            else:
-                logger.debug(f"At least one of the nodes {event.src} or {event.dest} already exists. Generating random walks only for the new nodes.")
-                for _ in range(self.n_walks):
-                    walks.append(self._random_walk(event.src))
-                    walks.append(self._random_walk(event.dest))
+            walks = []
+            logger.debug(f"Graph has {len(self.G.nodes())} nodes, which is greater than or equal to retrain_threshold={self.retrain_threshold}. Updating model with new walks for affected nodes.")
+            for _ in range(self.n_walks):
+                for node in affected_nodes:
+                    walk = self._random_walk(node)
+                    walks.append(walk)
             self.w2v_model = self.update_model(walks, self.w2v_model)

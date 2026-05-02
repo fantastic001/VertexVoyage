@@ -20,7 +20,7 @@ from vertex_voyage.partitioning import (
     get_partition_average_balance,
 )
 from experiments.datasets import datasets, dataset_params
-from vertex_voyage.temporal import EventStream, to_nx_graph, to_vv_graph, Transform, Event
+from vertex_voyage.temporal import EventStream, batched, to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
@@ -513,7 +513,8 @@ class Commands:
              algorithm: str = "node2vec",
              track_seen: bool = False,
              iterations: int = 1,
-             limit: int = -1
+             limit: int = -1,
+             batch_size: int = 100
     ):
 
         import networkx as nx
@@ -531,41 +532,33 @@ class Commands:
         else:
             og_events = list(dataset)
         original_graph = to_nx_graph(og_events)
+        if use_dataset_params:
+            params: dict = dataset_params.get(name, {})
+            alpha = params.get('alpha', alpha)
+            threshold = params.get('threshold', threshold)
+            dim = params.get('dim', dim)
+            default_p = params.get('p', default_p)
+            default_q = params.get('q', default_q)
+        models = [DynNode2Vec(
+            dim=dim,
+            epochs=epochs,
+            p= default_p if default_p > 0 else 0.5,
+            q= default_q if default_q > 0 else 0.5,
+            n_walks=10 if long_run else 1,
+            walk_size=80 if long_run else 10,
+            window_size=10 if long_run else 3,
+            retrain_threshold=int(0.1 * original_graph.number_of_nodes())
+        ) for _ in range(partitions)]
         for it in range(iterations):
             log(f"Iteration {it+1} / {iterations}: Processing dataset {name}")
             events = og_events.copy()
             if track_seen:
                 random.shuffle(events)
-            if use_dataset_params:
-                params: dict = dataset_params.get(name, {})
-                alpha = params.get('alpha', alpha)
-                threshold = params.get('threshold', threshold)
-                dim = params.get('dim', dim)
-                default_p = params.get('p', default_p)
-                default_q = params.get('q', default_q)
-            models = [DynNode2Vec(
-                dim=dim,
-                epochs=epochs,
-                p= default_p if default_p > 0 else 0.5,
-                q= default_q if default_q > 0 else 0.5,
-                n_walks=10 if long_run else 1,
-                walk_size=80 if long_run else 10,
-                window_size=10 if long_run else 3,
-                retrain_threshold=int(0.1 * original_graph.number_of_nodes())
-            ) for _ in range(partitions)]
             nodes = set()
-            i = 0
-            if partitions > 1:
-                partitioner = WindowedLabelPropagationTemporalGraphPartitioner(
-                    num_partitions=partitions,
-                    window_size=100
-                )
-            else:
-                partitioner = None
             seen = set()
-            seen.add(events[0].src)
-            seen.add(events[0].dest)
+            i = 0
             old_f1_score = 0
+            sorted_events = []
             while(len(events) > 0):
                 seen_status = "maybe seen"
                 if track_seen:
@@ -585,29 +578,18 @@ class Commands:
                 else:
                     event = events.pop(0)
                 log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
-                if partitions > 1:
-                    partitioner.partition(event)
                 nodes.add(event.src)
                 nodes.add(event.dest)
-                # determine partition
-                if partitions > 1:
-                    part_id = partitioner.get_partition(event.src)
-                else:
-                    part_id = 0
-                if partitioner is not None:
-                    if part_id != partitioner.get_partition(event.dest):
-                        continue 
-                models[part_id].update(event)
-                if partitioner is not None:
-                    embeddings = []
-                    for node in nodes:
-                        embeddings.append(
-                            models[partitioner.get_partition(node)].embed_node(node)
-                        )
-                else:
+                sorted_events.append(event)
+            total_edges = 0
+            for bi, batch in enumerate(batched(sorted_events, batch_size)):
+                total_edges += len(batch)
+                models_to_update = set([0])
+                for model_id in models_to_update:
+                    models[model_id].update(batch)
                     embeddings = models[0].embed_nodes(nodes)
                 # reconstruct graph and compute F1 score
-                g = reconstruct(i + 1, embeddings, list(nodes))
+                g = reconstruct(total_edges, embeddings, list(nodes))
                 G = nx.Graph()
                 for u,v in original_graph.edges:
                     if u in nodes and v in nodes:
@@ -616,11 +598,10 @@ class Commands:
                     f1_score = get_f1_score(G, g)
                 except ZeroDivisionError:
                     f1_score = 0.0
-                log(f"Timestamp: {event.timestamp}, F1 score: {f1_score}")
+                log(f"Batch: {bi+1}, F1 score: {f1_score}")
                 if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
-                    logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at timestamp {event.timestamp}")
+                    logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at batch {bi+1}")
                 old_f1_score = f1_score
-                i += 1
             log("Event stream processing completed")
             scores.append(old_f1_score)
         log("Average F1 score: ", np.mean(scores))

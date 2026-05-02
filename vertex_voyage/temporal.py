@@ -6,7 +6,7 @@ from struct import pack, unpack
 
 from vertex_voyage.vv_graph import VVGraph
 
-from typing import Union
+from typing import Iterable, Union
 
 import logging
 
@@ -529,7 +529,21 @@ def write_to_binary_file(sequence: EventSequence, file: str):
     with open(file, "wb") as f:
         for event in sequence:
             f.write(pack("iii", int(event.src), int(event.dest), event.timestamp))
-            
+
+
+def batched(sequence: Iterable, batch_size: int):
+    """
+    Returns a generator that yields batches of events from an event sequence
+    """
+    batch = []
+    for event in sequence:
+        batch.append(event)
+        if len(batch) == batch_size:
+            yield batch
+            batch = []
+    if len(batch) > 0:
+        yield batch
+
 if __name__ == "__main__":
     # sequence = ShuffledSequence(FileEventSequence("data/wiki-talks/wiki.txt"), 2)
     # sequence = ShuffledSequence(BarabasiAlbertEventSequence(), 10)

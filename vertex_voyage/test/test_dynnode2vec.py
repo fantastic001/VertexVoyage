@@ -9,7 +9,12 @@ from networkx import karate_club_graph
 from vertex_voyage import model
 from vertex_voyage.dynnode2vec import DynNode2Vec
 from vertex_voyage.reconstruction import reconstruct, get_f1_score
-from vertex_voyage.temporal import FirstN, ForestFireEventSequence, Event 
+from vertex_voyage.temporal import (
+    FirstN, 
+    ForestFireEventSequence, 
+    Event, 
+    batched
+)
 from unittest.mock import MagicMock
 from vertex_voyage.word2vec import word2vec
 
@@ -25,10 +30,11 @@ class TestDynNode2Vec(unittest.TestCase):
         model = DynNode2Vec()
         nodes = set()
         event: Event
-        for event in event_sequence:
-            nodes.add(event.src)
-            nodes.add(event.dest)
-            model.update(event)
+        for batch in batched(event_sequence, batch_size=2):
+            for event in batch:
+                nodes.add(event.src)
+                nodes.add(event.dest)
+            model.update(batch)
         embeddings = model.embed_nodes(list(nodes))
         self.assertEqual(len(embeddings), len(nodes))
 
@@ -40,8 +46,8 @@ class TestDynNode2Vec(unittest.TestCase):
             Event(src=2, dest=3, timestamp=1),
             Event(src=3, dest=4, timestamp=2)
         ]
-        for event in events:
-            model.update(event)
+        for btch in batched(events, batch_size=1):
+            model.update(btch)
             # for src and dest, we should have called _random_walk n_walks times each
             expected_calls = model.n_walks * 2 if len(model.G.nodes()) >= model.retrain_threshold else len(model.G.nodes()) * model.n_walks
             self.assertEqual(model._random_walk.call_count, expected_calls)
@@ -67,8 +73,8 @@ class TestDynNode2Vec(unittest.TestCase):
             Event(src=3, dest=4, timestamp=2)
         ]
         model.embed_node = MagicMock(return_value=np.zeros(model.dim))
-        for i, event in enumerate(events):
-            model.update(event)
+        for i, btch in enumerate(batched(events, batch_size=1)):
+            model.update(btch)
             # either gensim Word2Vec or our custom word2vec should have been called
             retrain = len(model.G.nodes()) < model.retrain_threshold or i == 0
             self.assertTrue(
@@ -125,8 +131,41 @@ class TestDynNode2Vec(unittest.TestCase):
         t = 0
         for u, v in G.edges():
             event = Event(src=u, dest=v, timestamp=t)
-            model.update(event)
+            model.update([event])
             t += 1
+        embeddings = model.embed_nodes(list(G.nodes()))
+        self.assertEqual(len(embeddings), len(G.nodes()))
+        reconstructed = reconstruct(
+            G.number_of_edges(), 
+            embeddings, 
+            list(G.nodes())
+        )
+        f1 = get_f1_score(G, reconstructed)
+        self.assertGreater(f1, 0.5)
+    
+    def test_zacharys_karate_club_batched(self):
+        G = karate_club_graph()
+        model = DynNode2Vec(
+            dim=100, 
+            walk_size=80, 
+            n_walks=10, 
+            window_size=10,
+            epochs=10, 
+            p = .25,
+            q = 4,
+            negative_sample_num=1, # in practice, should be 500
+            seed=42,
+            learning_rate=0.01,
+            use_threads=False
+        )
+        t = 0
+        events = []
+        for u, v in G.edges():
+            event = Event(src=u, dest=v, timestamp=t)
+            events.append(event)
+            t += 1
+        for batch in batched(events, batch_size=5):
+            model.update(batch)
         embeddings = model.embed_nodes(list(G.nodes()))
         self.assertEqual(len(embeddings), len(G.nodes()))
         reconstructed = reconstruct(
