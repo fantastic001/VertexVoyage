@@ -100,6 +100,7 @@ class TestDynNode2Vec(unittest.TestCase):
                         alpha=model.learning_rate,
                         epochs=model.epochs,
                         seed=mock.ANY,
+                        shrink_windows=False,
                         workers=mock.ANY
                     )
             model.update_model.reset_mock()

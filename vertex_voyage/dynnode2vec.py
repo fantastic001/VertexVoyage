@@ -99,6 +99,7 @@ class DynNode2Vec(Node2Vec):
                 epochs=self.epochs,
                 seed=self.seed if self.seed is not None else random.randint(0, 10000),
                 null_word=-1,
+                shrink_windows=False,
                 workers=cfg.get_config_int("dynnode2vec_workers", 6, "Number of workers during word2vec training for DynNode2Vec") if self.use_threads else 1
             )
             model.build_vocab(walks)
