@@ -532,6 +532,7 @@ class Commands:
         else:
             og_events = list(dataset)
         original_graph = to_nx_graph(og_events)
+        logger.debug(f"Original graph has {original_graph.number_of_nodes()} nodes and {original_graph.number_of_edges()} edges")
         if use_dataset_params:
             params: dict = dataset_params.get(name, {})
             alpha = params.get('alpha', alpha)
