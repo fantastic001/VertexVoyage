@@ -2,7 +2,7 @@
 import random
 import sys
 import numpy as np
-from vertex_voyage import dynnode2vec
+from vertex_voyage import data, dynnode2vec
 from vertex_voyage.grid_search import (
     GridSearchPersistence, 
     grid_search, 
@@ -511,11 +511,13 @@ class Commands:
              use_dataset_params: bool = False,
              use_lpa: bool = False,
              algorithm: str = "node2vec",
-             track_seen: bool = False
+             track_seen: bool = False,
+             iterations: int = 1,
+             limit: int = -1
     ):
 
         import networkx as nx
-        log("Processing dataset ")
+        scores = []
         t = VertexEnumerator()
         dataset = Transform(datasets[name](), lambda x: Event(
             src=t(int(x.src)),
@@ -524,89 +526,121 @@ class Commands:
             type=x.type,
             attrs=x.attrs,
         ))
-        events = list(dataset)
-        original_graph = to_nx_graph(events)
-        if track_seen:
-            random.shuffle(events)
-        models = [DynNode2Vec(
-            dim=dim,
-            epochs=epochs,
-            p= default_p if default_p > 0 else 0.5,
-            q= default_q if default_q > 0 else 0.5,
+        if limit > 0:
+            og_events = list(dataset)[:limit]
+        else:
+            og_events = list(dataset)
+        original_graph = to_nx_graph(og_events)
+        for it in range(iterations):
+            log(f"Iteration {it+1} / {iterations}: Processing dataset {name}")
+            events = og_events.copy()
+            if track_seen:
+                random.shuffle(events)
+            if use_dataset_params:
+                params: dict = dataset_params.get(name, {})
+                alpha = params.get('alpha', alpha)
+                threshold = params.get('threshold', threshold)
+                dim = params.get('dim', dim)
+                default_p = params.get('p', default_p)
+                default_q = params.get('q', default_q)
+            models = [DynNode2Vec(
+                dim=dim,
+                epochs=epochs,
+                p= default_p if default_p > 0 else 0.5,
+                q= default_q if default_q > 0 else 0.5,
+                n_walks=10 if long_run else 1,
+                walk_size=80 if long_run else 10,
+                window_size=10 if long_run else 3,
+                retrain_threshold=int(0.1 * original_graph.number_of_nodes())
+            ) for _ in range(partitions)]
+            nodes = set()
+            i = 0
+            if partitions > 1:
+                partitioner = WindowedLabelPropagationTemporalGraphPartitioner(
+                    num_partitions=partitions,
+                    window_size=100
+                )
+            else:
+                partitioner = None
+            seen = set()
+            seen.add(events[0].src)
+            seen.add(events[0].dest)
+            old_f1_score = 0
+            while(len(events) > 0):
+                seen_status = "maybe seen"
+                if track_seen:
+                    # find event with smallest timestamp among events that are connected to seen nodes
+                    event = None
+                    for e in events:
+                        if e.src in seen or e.dest in seen:
+                            event = e
+                            seen_status = "seen"
+                            break
+                    if event is None:
+                        event = events[0]
+                        seen_status = "not seen"
+                    events.remove(event)
+                    seen.add(event.src)
+                    seen.add(event.dest)
+                else:
+                    event = events.pop(0)
+                log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
+                if partitions > 1:
+                    partitioner.partition(event)
+                nodes.add(event.src)
+                nodes.add(event.dest)
+                # determine partition
+                if partitions > 1:
+                    part_id = partitioner.get_partition(event.src)
+                else:
+                    part_id = 0
+                if partitioner is not None:
+                    if part_id != partitioner.get_partition(event.dest):
+                        continue 
+                models[part_id].update(event)
+                if partitioner is not None:
+                    embeddings = []
+                    for node in nodes:
+                        embeddings.append(
+                            models[partitioner.get_partition(node)].embed_node(node)
+                        )
+                else:
+                    embeddings = models[0].embed_nodes(nodes)
+                # reconstruct graph and compute F1 score
+                g = reconstruct(i + 1, embeddings, list(nodes))
+                G = nx.Graph()
+                for u,v in original_graph.edges:
+                    if u in nodes and v in nodes:
+                        G.add_edge(u, v)
+                try:
+                    f1_score = get_f1_score(G, g)
+                except ZeroDivisionError:
+                    f1_score = 0.0
+                log(f"Timestamp: {event.timestamp}, F1 score: {f1_score}")
+                if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
+                    logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at timestamp {event.timestamp}")
+                old_f1_score = f1_score
+                i += 1
+            log("Event stream processing completed")
+            scores.append(old_f1_score)
+        log("Average F1 score: ", np.mean(scores))
+        log("Standard deviation of F1 score: ", np.std(scores))
+        node2vec = Node2Vec(
+            dim=dim, 
+            p=default_p if default_p > 0 else 0.5, 
+            q=default_q if default_q > 0 else 0.5,
             n_walks=10 if long_run else 1,
             walk_size=80 if long_run else 10,
             window_size=10 if long_run else 3,
-            retrain_threshold=int(0.1 * original_graph.number_of_nodes())
-        ) for _ in range(partitions)]
-        nodes = set()
-        i = 0
-        if partitions > 1:
-            partitioner = WindowedLabelPropagationTemporalGraphPartitioner(
-                num_partitions=partitions,
-                window_size=100
-            )
-        else:
-            partitioner = None
-        seen = set()
-        seen.add(events[0].src)
-        seen.add(events[0].dest)
-        old_f1_score = 0
-        while(len(events) > 0):
-            seen_status = "maybe seen"
-            if track_seen:
-                # find event with smallest timestamp among events that are connected to seen nodes
-                event = None
-                for e in events:
-                    if e.src in seen or e.dest in seen:
-                        event = e
-                        seen_status = "seen"
-                        break
-                if event is None:
-                    event = events[0]
-                    seen_status = "not seen"
-                events.remove(event)
-                seen.add(event.src)
-                seen.add(event.dest)
-            else:
-                event = events.pop(0)
-            log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
-            if partitions > 1:
-                partitioner.partition(event)
-            nodes.add(event.src)
-            nodes.add(event.dest)
-            # determine partition
-            if partitions > 1:
-                part_id = partitioner.get_partition(event.src)
-            else:
-                part_id = 0
-            if partitioner is not None:
-                if part_id != partitioner.get_partition(event.dest):
-                    continue 
-            models[part_id].update(event)
-            if partitioner is not None:
-                embeddings = []
-                for node in nodes:
-                    embeddings.append(
-                        models[partitioner.get_partition(node)].embed_node(node)
-                    )
-            else:
-                embeddings = models[0].embed_nodes(nodes)
-            # reconstruct graph and compute F1 score
-            g = reconstruct(i + 1, embeddings, list(nodes))
-            G = nx.Graph()
-            for u,v in original_graph.edges:
-                if u in nodes and v in nodes:
-                    G.add_edge(u, v)
-            try:
-                f1_score = get_f1_score(G, g)
-            except ZeroDivisionError:
-                f1_score = 0.0
-            log(f"Timestamp: {event.timestamp}, F1 score: {f1_score}")
-            if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
-                logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at timestamp {event.timestamp}")
-            old_f1_score = f1_score
-            i += 1
-        log("Event stream processing completed")
+            epochs=epochs, 
+        )
+        # Fit on the full graph for an upper bound on performance
+        node2vec.fit(original_graph, original_graph.nodes)
+        # Compute F1 score for the full graph        full_emb =
+        full_emb = node2vec.embed_nodes(original_graph.nodes)
+        full_g = reconstruct(original_graph.number_of_edges(), full_emb, list(original_graph.nodes))
+        full_f1_score = get_f1_score(original_graph, full_g)
+        log("F1 score for full graph using Node2Vec: ", full_f1_score)
         return 
         dataset = to_nx_graph(dataset)
         if not use_lpa:
