@@ -589,7 +589,11 @@ class Commands:
                 nodes.add(event.dest)
                 sorted_events.append(event)
             total_edges = 0
+            nodes = set()
             for bi, batch in enumerate(batched(sorted_events, batch_size)):
+                for event in batch:
+                    nodes.add(event.src)
+                    nodes.add(event.dest)
                 partitioner.push(batch)
 
                 total_edges += len(batch)
