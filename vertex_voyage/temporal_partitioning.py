@@ -98,8 +98,9 @@ class DiffPartition(Partition):
 
 
 class InMemoryPartition(Partition):
-    def __init__(self):
+    def __init__(self, id):
         self.g = nx.Graph()
+        self.id = id 
     def add(self, node):
         self.g.add_node(node)
     def connect(self, node1, node2, directed=False):
@@ -118,8 +119,11 @@ class InMemoryPartition(Partition):
         self.g.remove_edge(node1, node2)
     
     @staticmethod
-    def empty():
-        return InMemoryPartition()
+    def empty(id=0):
+        return InMemoryPartition(id)
+    
+    def __hash__(self) -> int:
+        return hash(self.id)
 
 
 class TemporalGraphPartitioner:
@@ -136,6 +140,27 @@ class TemporalGraphPartitioner:
         Returns the partition of a vertex
         """
         pass
+
+    def get_partition_batches(self, batch: EventSequence) -> list[tuple[Partition, list[Event]]]:
+        partition_batches = {}
+        for event in batch:
+            src_partitions = self.get(event.src)
+            dest_partitions = self.get(event.dest)
+            for partition in src_partitions.intersection(dest_partitions):
+                partition_batches.setdefault(partition, []).append(event)
+        return list(partition_batches.items())
+
+    def get_distributed_embedding(self, models, nodes):
+        results = []
+        for node in nodes:
+            node_partitions = self.get(node)
+            if not node_partitions:
+                logger.warning(f"Node {node} is not in any partition, returning zero embedding")
+                results.append(np.zeros(models[next(iter(models))].dim))
+            else:
+                results.append(np.mean([models[partition].embed_node(node) for partition in node_partitions], axis=0))
+                logger.debug(f"Node {node} is in partitions {[partition.id for partition in node_partitions]}, embedding dim: {results[-1].shape}")
+        return results
 
 class CatchAllPartitioner(TemporalGraphPartitioner):
     """
@@ -273,3 +298,4 @@ class PartitionerProfile(TemporalGraphPartitioner):
         print(f"Total time taken to process events: {self.total_time:.2f} seconds")
         print(f"Partition sizes after processing every batch: {self.partition_sizes}")
         print(f"Edge cuts after processing every batch: {self.edge_cuts}")
+

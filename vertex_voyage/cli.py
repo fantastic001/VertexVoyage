@@ -31,7 +31,9 @@ from vertex_voyage.config import get_config_str
 
 from vertex_voyage.dynnode2vec import DynNode2Vec
 
-import logging 
+import logging
+
+from vertex_voyage.temporal_partitioning import InMemoryPartition, Partition, RandomPartitioner 
 
 logger = logging.getLogger("CLI")
 
@@ -59,6 +61,7 @@ GS_LOCATION = get_config_str("gs_cache_location", "gs_cache", "Location to store
 ALGS = {
     "node2vec": Node2Vec,
     "distger": DistGER,
+    "dynnode2vec": DynNode2Vec,
 }
 
 def perform_embedding(cls, alg: str, p: float, q: float, dim: int, dataset_name: str, part_num: int):
@@ -495,6 +498,7 @@ class Commands:
     def temporal_test(self, *, 
              name: str = "CITESEER", 
              partitions: int = 1, 
+             partitioner_name: str = "random",
              alpha: float = 1.0, 
              threshold: float = 0.0,
              break_early: bool = False,
@@ -506,7 +510,7 @@ class Commands:
              long_run : bool = False,
              use_dataset_params: bool = False,
              use_lpa: bool = False,
-             algorithm: str = "node2vec",
+             algorithm: str = "dynnode2vec",
              track_seen: bool = False,
              iterations: int = 1,
              limit: int = -1,
@@ -536,18 +540,24 @@ class Commands:
             dim = params.get('dim', dim)
             default_p = params.get('p', default_p)
             default_q = params.get('q', default_q)
-        models = [DynNode2Vec(
-            dim=dim,
-            epochs=epochs,
-            p= default_p if default_p > 0 else 0.5,
-            q= default_q if default_q > 0 else 0.5,
-            n_walks=10 if long_run else 1,
-            walk_size=80 if long_run else 10,
-            window_size=10 if long_run else 3,
-            retrain_threshold=int(0.1 * original_graph.number_of_nodes())
-        ) for _ in range(partitions)]
         for it in range(iterations):
             log(f"Iteration {it+1} / {iterations}: Processing dataset {name}")
+            models = {InMemoryPartition.empty(id=p) : ALGS[algorithm](
+                dim=dim,
+                epochs=epochs,
+                p= default_p if default_p > 0 else 0.5,
+                q= default_q if default_q > 0 else 0.5,
+                n_walks=10 if long_run else 1,
+                walk_size=80 if long_run else 10,
+                window_size=10 if long_run else 3,
+                retrain_threshold=int(0.1 * original_graph.number_of_nodes())
+            ) for p in range(partitions)}
+            parts: set[Partition] = set(models.keys())
+            partitioner = {
+                "random": lambda **kw: RandomPartitioner.uniform(parts)
+            }[partitioner_name](
+                # Parameters will be passed here
+            )
             events = og_events.copy()
             if track_seen:
                 random.shuffle(events)
@@ -574,17 +584,19 @@ class Commands:
                     seen.add(event.dest)
                 else:
                     event = events.pop(0)
-                log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
+                # log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
                 nodes.add(event.src)
                 nodes.add(event.dest)
                 sorted_events.append(event)
             total_edges = 0
             for bi, batch in enumerate(batched(sorted_events, batch_size)):
+                partitioner.push(batch)
+
                 total_edges += len(batch)
-                models_to_update = set([0])
-                for model_id in models_to_update:
-                    models[model_id].update(batch)
-                    embeddings = models[0].embed_nodes(nodes)
+                for part, pb in partitioner.get_partition_batches(batch):
+                    models[part].update(pb)
+                
+                embeddings = partitioner.get_distributed_embedding(models, nodes)
                 # reconstruct graph and compute F1 score
                 g = reconstruct(total_edges, embeddings, list(nodes))
                 G = nx.Graph()
@@ -619,103 +631,7 @@ class Commands:
         full_g = reconstruct(original_graph.number_of_edges(), full_emb, list(original_graph.nodes))
         full_f1_score = get_f1_score(original_graph, full_g)
         log("F1 score for full graph using Node2Vec: ", full_f1_score)
-        return 
-        dataset = to_nx_graph(dataset)
-        if not use_lpa:
-            parts = partition_graph(dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
-        else:
-            parts = label_propagation_partitioner(dataset, partitions)
-        log("Total number of nodes: ", dataset.number_of_nodes())
-        log("Graph partitioned")
-        embs = {}
-        for part in parts:
-            log("Partition size: %d" % len(part))
-            best = None
-            best_f1 = -1
-            pg = dataset.subgraph(part)
-            gg = nx.Graph()
-            gg.add_edges_from(pg.edges)
-            cs = nx.connected_components(gg)
-            cs = list(reversed(sorted(cs, key=len)))
-            log("Biggest components: ", [len(x) for x in cs[:3]])
-            log("Isolated nodes: ", len(list(nx.isolates(gg))))
-            log("Number of connected components: ", nx.number_connected_components(gg))
-            log("Degree distribution: ", nx.degree_histogram(gg)[:5])
-            log("Average clustering: ", nx.average_clustering(gg))
-            log("Partition number of edges: ", pg.number_of_edges())
-            all_nodes = list(dataset.nodes)
-            alg = ALGS[algorithm]
-            for p in [0.25, 0.5, 1, 2, 4]:
-                for q in [0.25, 0.5, 1, 2, 4]:
-                    if ((default_p > 0 and default_q > 0) and 
-                        not (p == default_p and q == default_q)):
-                        continue
-                    if long_run:
-                        n_walks = 10
-                        walk_size = 80
-                        window_size = 10
-                    else:
-                        n_walks = 1
-                        walk_size = 10
-                        window_size = 3
-                    if use_dataset_params:
-                        params: dict = dataset_params.get(name, {})
-                        n_walks = params.get('n_walks', n_walks)
-                        walk_size = params.get('walk_size', walk_size)
-                        window_size = params.get('window_size', window_size)
-                        epochs = params.get('epochs', epochs)
-                        dim = params.get('dim', dim)
-                        p = params.get('p', p)
-                        q = params.get('q', q)
-                    if alg == DistGER:
-                        P = {
-                            "min_walk_size": walk_size // 2,
-                            "max_walk_size": walk_size * 2,
-                        }
-                    else:
-                        P = {
-                            "walk_size": walk_size,
-                        }
-                    model = alg(
-                        p=p,
-                        q=q,
-                        dim=dim,
-                        n_walks=n_walks,
-                        window_size=window_size,
-                        epochs=epochs,
-                        **P
-                    )
-                    model.fit(pg, dataset.nodes)
-                    emb = model.embed_nodes(part)
-                    g = reconstruct(pg.number_of_edges(), emb, part)
-                    PG = nx.Graph()
-                    PG.add_edges_from(pg.edges)
-                    f1 = get_f1_score(PG, g)
-                    if f1 > best_f1:
-                        best_f1 = f1
-                        best = emb
-                        log("New best: ", p, q, best_f1)
-                    if break_early:
-                        break
-                if break_early:
-                    break
-            log("Best achieved F1 score: ", best_f1)
-            for node, e in zip(part, best):
-                if node not in embs:
-                    embs[node] = []
-                embs[node].append(e)
-        if skip_global:
-            log("Skipping global F1 computation")
-            return
-        for n in dataset.nodes:
-            embs[n] = np.mean(embs[n], axis=0)
-        embs = [embs[n] for n in dataset.nodes]
-        g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
-        G = nx.Graph()
-        G.add_edges_from(dataset.edges)
-        log("Global F1 score: ", get_f1_score(G, g))
-
-
+        
 
 if __name__ == "__main__":
     command_executor_main(Commands)
