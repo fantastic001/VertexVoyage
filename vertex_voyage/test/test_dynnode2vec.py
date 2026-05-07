@@ -6,7 +6,6 @@ from unittest import mock
 import gensim
 from networkx import karate_club_graph
 
-from vertex_voyage import model
 from vertex_voyage.dynnode2vec import DynNode2Vec
 from vertex_voyage.reconstruction import reconstruct, get_f1_score
 from vertex_voyage.temporal import (
