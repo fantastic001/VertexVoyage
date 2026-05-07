@@ -12,6 +12,10 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v2
 
+            - name: Set up Rust
+              uses: actions/setup-rust@v1
+              with:
+                    rust-version: stable
             - name: Set up Python
               uses: actions/setup-python@v2
               with:
@@ -19,6 +23,10 @@ jobs:
 
             - name: Install dependencies
               run: pip install -r requirements.txt
+            
+            - name: Build Rust project
+              run: maturin develop
+              working-directory: ./vertex_voyage_native
 
             - name: Run smoke test
               run: |
