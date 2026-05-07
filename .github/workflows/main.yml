@@ -23,7 +23,7 @@ jobs:
               run: pip install -r requirements.txt
             
             - name: Build Rust project
-              run: maturin develop
+              run: virtualenv venv && source venv/bin/activate && pip install maturin && maturin develop
               working-directory: ./vertex_voyage_native
 
             - name: Run smoke test
