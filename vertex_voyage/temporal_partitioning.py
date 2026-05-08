@@ -1,5 +1,6 @@
 
 from abc import ABC, abstractmethod
+from turtle import st
 from typing import Any, Callable, Iterable, Set
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random, choice
@@ -299,3 +300,72 @@ class PartitionerProfile(TemporalGraphPartitioner):
         print(f"Partition sizes after processing every batch: {self.partition_sizes}")
         print(f"Edge cuts after processing every batch: {self.edge_cuts}")
 
+class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
+    """
+    Partition of vertex is the partition that contains the most neighbors of the vertex from sample.
+
+    Sampling is done according to a distribution P(event), which can be based on the number of neighbors in the partition, partition size, etc.
+    """
+    def __init__(self, partitions: Set[Partition], distribution: Callable[[Event], float]):
+        """
+        distribution: P(event | vertex) is a function that takes an event and returns a probability of sampling that event. The partitioner will sample an event according to the distribution, and assign the vertex to the partition that contains the most neighbors of the vertex in the sampled event.
+        """
+        self.partitions = partitions
+        self.distribution = distribution
+    
+    def sample_events(self, vertex, batch: EventSequence) -> set[Event]:
+        events = [event for event in batch if event.src == vertex or event.dest == vertex]
+        probabilities = [self.distribution(event) for event in events]
+        total = sum(probabilities)
+        if total == 0:
+            probabilities = [1 / len(events) for _ in events]
+        else:
+            probabilities = [p / total for p in probabilities]
+        sampled_events = []
+        for event, p in zip(events, probabilities):
+            if random() < p:
+                sampled_events.append(event)
+        return set(sampled_events)
+
+    def push(self, batch: EventSequence):
+        """
+        Assign each vertex to the partition that contains the most neighbors of the vertex in the sampled events. Then connect the vertices in the same partition according to the events in the batch.
+        """
+        batch = list(batch)
+        for event in batch:
+            for vertex in [event.src, event.dest]:
+                if any(partition.has(vertex) for partition in self.partitions):
+                    continue
+                sampled_events = self.sample_events(vertex, batch)
+                neighbor_counts = {partition: sum(1 for event in sampled_events if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex)) for partition in self.partitions}
+                best_partition = None 
+                best_count = -1
+                for partition, count in neighbor_counts.items():
+                    if count > best_count:
+                        best_partition = partition
+                        best_count = count
+                if best_partition:
+                    best_partition.add(vertex)
+        for event in batch:
+            for partition in self.partitions:
+                if partition.has(event.src) and partition.has(event.dest):
+                    partition.connect(event.src, event.dest)
+    def get(self, vertex) -> Set[Partition]:
+        return {partition for partition in self.partitions if partition.has(vertex)}
+    
+    @staticmethod
+    def all_neighbors(partitions: Set[Partition]):
+        def all_neighbors_distribution(event):
+            return 1.0
+        return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution)
+    
+    @staticmethod
+    def degree_based(partitions: Set[Partition]):
+        def degree_based_distribution(event):
+            degree_src = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.src))
+            degree_dest = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.dest))
+            total_degree = degree_src + degree_dest
+            if total_degree == 0:
+                return 0.5
+            return degree_src / total_degree
+        return MostCommonNeighborPartitioner(partitions, degree_based_distribution)
