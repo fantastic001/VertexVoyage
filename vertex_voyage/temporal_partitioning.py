@@ -119,6 +119,11 @@ class InMemoryPartition(Partition):
     def disconnect(self, node1, node2, directed=False):
         self.g.remove_edge(node1, node2)
     
+    def __str__(self):
+        return f"P{self.id}"
+    def __repr__(self):
+        return str(self)
+    
     @staticmethod
     def empty(id=0):
         return InMemoryPartition(id)
@@ -293,12 +298,15 @@ class PartitionerProfile(TemporalGraphPartitioner):
         return self.partitioner.get(vertex)
     
     def print_profile(self):
-        print(f"Number of events processed: {self.num_events}")
-        print(f"Number of batches processed: {self.num_batches}")
-        print(f"Number of unique vertices seen: {len(self.unique_vertices)}")
-        print(f"Total time taken to process events: {self.total_time:.2f} seconds")
-        print(f"Partition sizes after processing every batch: {self.partition_sizes}")
-        print(f"Edge cuts after processing every batch: {self.edge_cuts}")
+        def p(msg):
+            logger.info(msg)
+            print(msg)
+        p(f"Number of events processed: {self.num_events}")
+        p(f"Number of batches processed: {self.num_batches}")
+        p(f"Number of unique vertices seen: {len(self.unique_vertices)}")
+        p(f"Total time taken to process events: {self.total_time:.2f} seconds")
+        p(f"Partition sizes after processing every batch: {self.partition_sizes}")
+        p(f"Edge cuts after processing every batch: {self.edge_cuts}")
 
 class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     """
@@ -306,7 +314,7 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
 
     Sampling is done according to a distribution P(event), which can be based on the number of neighbors in the partition, partition size, etc.
     """
-    def __init__(self, partitions: Set[Partition], distribution: Callable[[Event], float]):
+    def __init__(self, partitions: Set[Partition], distribution: Callable[[Any, Event], float]):
         """
         distribution: P(event | vertex) is a function that takes an event and returns a probability of sampling that event. The partitioner will sample an event according to the distribution, and assign the vertex to the partition that contains the most neighbors of the vertex in the sampled event.
         """
@@ -315,7 +323,7 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     
     def sample_events(self, vertex, batch: EventSequence) -> set[Event]:
         events = [event for event in batch if event.src == vertex or event.dest == vertex]
-        probabilities = [self.distribution(event) for event in events]
+        probabilities = [self.distribution(vertex, event) for event in events]
         total = sum(probabilities)
         if total == 0:
             probabilities = [1 / len(events) for _ in events]
@@ -355,13 +363,13 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     
     @staticmethod
     def all_neighbors(partitions: Set[Partition]):
-        def all_neighbors_distribution(event):
+        def all_neighbors_distribution(vertex, event):
             return 1.0
         return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution)
     
     @staticmethod
     def degree_based(partitions: Set[Partition]):
-        def degree_based_distribution(event):
+        def degree_based_distribution(vertex, event):
             degree_src = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.src))
             degree_dest = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.dest))
             total_degree = degree_src + degree_dest
@@ -369,3 +377,24 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
                 return 0.5
             return degree_src / total_degree
         return MostCommonNeighborPartitioner(partitions, degree_based_distribution)
+
+    @staticmethod
+    def size_based(partitions: Set[Partition]):
+        def size_based_distribution(vertex, event):
+            partition_sizes = {partition: partition.size() for partition in partitions}
+            total_size = sum(partition_sizes.values())
+            if total_size == 0:
+                return 0.5
+            if vertex == event.src:
+                dest_partition = self.get(event.dest)
+                if dest_partition:
+                    return sum(partition_sizes[partition] for partition in dest_partition) / total_size
+                else:
+                    return 0.5
+            else:
+                src_partition = self.get(event.src)
+                if src_partition:
+                    return sum(partition_sizes[partition] for partition in src_partition) / total_size
+                else:
+                    return 0.5
+        return MostCommonNeighborPartitioner(partitions, size_based_distribution)
