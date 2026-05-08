@@ -33,7 +33,7 @@ from vertex_voyage.dynnode2vec import DynNode2Vec
 
 import logging
 
-from vertex_voyage.temporal_partitioning import InMemoryPartition, Partition, RandomPartitioner 
+from vertex_voyage.temporal_partitioning import InMemoryPartition, MostCommonNeighborPartitioner, Partition, PartitionerProfile, RandomPartitioner 
 
 logger = logging.getLogger("CLI")
 
@@ -554,10 +554,15 @@ class Commands:
             ) for p in range(partitions)}
             parts: set[Partition] = set(models.keys())
             partitioner = {
-                "random": lambda **kw: RandomPartitioner.uniform(parts)
+                "random": lambda **kw: RandomPartitioner.uniform(parts),
+                "random.degree": lambda **kw: RandomPartitioner.degree_based(parts),
+                "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(parts),
+                "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(parts),
+                "neighbors.size": lambda **kw: MostCommonNeighborPartitioner.size_based(parts)
             }[partitioner_name](
                 # Parameters will be passed here
             )
+            partitioner = PartitionerProfile(partitioner)
             events = og_events.copy()
             if track_seen:
                 random.shuffle(events)
@@ -617,6 +622,7 @@ class Commands:
                 old_f1_score = f1_score
             log("Event stream processing completed")
             scores.append(old_f1_score)
+            partitioner.print_profile()
         log("Average F1 score: ", np.mean(scores))
         log("Standard deviation of F1 score: ", np.std(scores))
         node2vec = Node2Vec(
