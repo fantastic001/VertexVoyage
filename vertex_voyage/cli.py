@@ -514,7 +514,10 @@ class Commands:
              track_seen: bool = False,
              iterations: int = 1,
              limit: int = -1,
-             batch_size: int = 100
+             batch_size: int = 100,
+
+             #  Parameters for partitioner (if needed
+             min_neighbors: int = 1
     ):
 
         import networkx as nx
@@ -556,11 +559,11 @@ class Commands:
             partitioner = {
                 "random": lambda **kw: RandomPartitioner.uniform(parts),
                 "random.degree": lambda **kw: RandomPartitioner.degree_based(parts),
-                "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(parts),
-                "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(parts),
-                "neighbors.size": lambda **kw: MostCommonNeighborPartitioner.size_based(parts)
+                "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(parts, kw["min_neighbors"]),
+                "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(parts, kw["min_neighbors"]),
+                "neighbors.size": lambda **kw: MostCommonNeighborPartitioner.size_based(parts, kw["min_neighbors"])
             }[partitioner_name](
-                # Parameters will be passed here
+                min_neighbors=min_neighbors
             )
             partitioner = PartitionerProfile(partitioner)
             events = og_events.copy()
