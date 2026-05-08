@@ -20,17 +20,19 @@ jobs:
                     python-version: 3.9
 
             - name: Install dependencies
-              run: pip install -r requirements.txt
+              run: |
+                    pip install virtualenv
+                    virtualenv venv
+                    source venv/bin/activate
+                    pip install -r requirements.txt
             
             - name: Build Rust project
               run: |
-                    pip install virtualenv
-                    virtualenv venv 
                     source venv/bin/activate 
                     pip install maturin 
                     pip install -r requirements.txt
+                    cd vertex_voyage_native
                     maturin develop
-              working-directory: ./vertex_voyage_native
 
             - name: Run smoke test
               run: |
