@@ -37,14 +37,4 @@ jobs:
             - name: Run smoke test
               run: |
                     source venv/bin/activate
-                    python -m vertex_voyage &
-                    sleep 10
-
-            - name: Check process termination
-              run: |
-                    if [ -f smoke_test_passed ]; then
-                        echo "Smoke test passed"
-                    else
-                        echo "Smoke test failed"
-                        exit 1
-                    fi
+                    python -m vertex_voyage.test
