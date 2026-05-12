@@ -499,10 +499,6 @@ class Commands:
              name: str = "CITESEER", 
              partitions: int = 1, 
              partitioner_name: str = "random",
-             alpha: float = 1.0, 
-             threshold: float = 0.0,
-             break_early: bool = False,
-             skip_global: bool = False,
              dim: int = 100,
              default_p: float = 0,
              default_q: float = 0,
@@ -517,8 +513,10 @@ class Commands:
              batch_size: int = 100,
 
              #  Parameters for partitioner (if needed
-             min_neighbors: int = 1,
-             replication_factor: int = 1
+             replication_factor: int = 1,
+             mu: float = 0,
+             epsilon: float = 0.1,
+             alpha: float = 1.0
     ):
 
         import networkx as nx
@@ -539,8 +537,6 @@ class Commands:
         logger.debug(f"Original graph has {original_graph.number_of_nodes()} nodes and {original_graph.number_of_edges()} edges")
         if use_dataset_params:
             params: dict = dataset_params.get(name, {})
-            alpha = params.get('alpha', alpha)
-            threshold = params.get('threshold', threshold)
             dim = params.get('dim', dim)
             default_p = params.get('p', default_p)
             default_q = params.get('q', default_q)
@@ -564,22 +560,23 @@ class Commands:
                 ),
                 "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(
                     parts, 
-                    kw["min_neighbors"],
-                    replication_factor=kw["replication_factor"]
+                    replication_factor=kw["replication_factor"],
+                    mu=kw["mu"],
+                    epsilon=kw["epsilon"],
+                    alpha=kw["alpha"]
                 ),
                 "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(
                     parts, 
-                    kw["min_neighbors"],
-                    replication_factor=kw["replication_factor"]
-                ),
-                "neighbors.size": lambda **kw: MostCommonNeighborPartitioner.size_based(
-                    parts, 
-                    kw["min_neighbors"],
-                    replication_factor=kw["replication_factor"]
+                    replication_factor=kw["replication_factor"],
+                    mu=kw["mu"],
+                    epsilon=kw["epsilon"],
+                    alpha=kw["alpha"]
                 ),
             }[partitioner_name](
-                min_neighbors=min_neighbors,
-                replication_factor=replication_factor
+                replication_factor=replication_factor,
+                mu=mu,
+                epsilon=epsilon,
+                alpha=alpha
             )
             partitioner = PartitionerProfile(partitioner)
             events = og_events.copy()
