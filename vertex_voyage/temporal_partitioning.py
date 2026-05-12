@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from turtle import st
 from typing import Any, Callable, Iterable, Set
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
-from random import randint, random, choice
+from random import randint, random, choice, shuffle
 import numpy as np 
 import networkx as nx
 
@@ -381,18 +381,24 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         batch = self.sample_events(batch=batch)
         for event in batch:
             for vertex in [event.src, event.dest]:
-                best_partitions = sorted(self.partitions, key=lambda partition: self.score_partition(vertex, partition, batch), reverse=True)
-                for partition in best_partitions[:self.replication_factor]:
+                best_partitions = sorted(self.partitions, key=lambda partition: self.score_partition(vertex, partition, batch), reverse=True)[:self.replication_factor]
+                for partition in best_partitions:
+                    logger.debug(f"Assigning vertex {vertex} to partition {partition} based on score: {self.score_partition(vertex, partition, batch)}")
                     partition.add(vertex)
                 shuffled_partitions = self.partitions.copy()
                 shuffled_partitions = list(shuffled_partitions)
                 shuffled_partitions = [partition for partition in shuffled_partitions if partition not in best_partitions]
                 np.random.shuffle(shuffled_partitions)
-                for partition in shuffled_partitions[:self.replication_factor - len(best_partitions)]:
+                shuffled_partitions = shuffled_partitions[:self.replication_factor - len(best_partitions)]
+                for partition in shuffled_partitions:
                     if vertex not in self.randomly_assigned:
                         logger.debug(f"Randomly assigning vertex {vertex} to partition {partition.id} due to replication factor")
                         partition.add(vertex)
                         self.randomly_assigned.add(vertex)
+                for partition in self.partitions:
+                    if partition not in best_partitions and partition not in shuffled_partitions and partition.has(vertex):
+                        logger.debug(f"Removing vertex {vertex} from partition {partition} due to repartitioning")
+                        partition.remove(vertex)
         for event in batch:
             for partition in self.partitions:
                 if partition.has(event.src) and partition.has(event.dest):
