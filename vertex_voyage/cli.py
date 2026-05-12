@@ -516,7 +516,8 @@ class Commands:
              replication_factor: int = 1,
              mu: float = 0,
              epsilon: float = 0.1,
-             alpha: float = 1.0
+             alpha: float = 1.0,
+             decay: float = 0
     ):
 
         import networkx as nx
@@ -563,20 +564,23 @@ class Commands:
                     replication_factor=kw["replication_factor"],
                     mu=kw["mu"],
                     epsilon=kw["epsilon"],
-                    alpha=kw["alpha"]
+                    alpha=kw["alpha"],
+                    decay=kw["decay"]
                 ),
                 "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(
                     parts, 
                     replication_factor=kw["replication_factor"],
                     mu=kw["mu"],
                     epsilon=kw["epsilon"],
-                    alpha=kw["alpha"]
+                    alpha=kw["alpha"],
+                    decay=kw["decay"]
                 ),
             }[partitioner_name](
                 replication_factor=replication_factor,
                 mu=mu,
                 epsilon=epsilon,
-                alpha=alpha
+                alpha=alpha,
+                decay=decay if decay > 0 else None
             )
             partitioner = PartitionerProfile(partitioner)
             events = og_events.copy()

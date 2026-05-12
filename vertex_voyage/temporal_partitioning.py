@@ -1,7 +1,7 @@
 
 from abc import ABC, abstractmethod
 from turtle import st
-from typing import Any, Callable, Iterable, Set
+from typing import Any, Callable, Iterable, Optional, Set
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random, choice, shuffle
 import numpy as np 
@@ -339,7 +339,8 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
             replication_factor: int = 1,
             mu: float = 0,
             epsilon: float = 0.1,
-            alpha: float = 1.0
+            alpha: float = 1.0,
+            decay: Optional[float] = None
         ):
         """
         distribution: P(event | vertex) is a function that takes an event and returns a probability of sampling that event. The partitioner will sample an event according to the distribution, and assign the vertex to the partition that contains the most neighbors of the vertex in the sampled event.
@@ -352,6 +353,10 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         self.epsilon = epsilon
         self.alpha = alpha
         self.previous_capacity_estimate = 0
+        self.decay = decay
+        if decay is not None:
+            self.full_graph = nx.Graph()
+            self.time = 0
     def sample_events(self, batch: EventSequence) -> set[Event]:
         events = list(batch)
         probabilities = [
@@ -366,7 +371,20 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         return set(sampled_events)
 
     def score_partition(self, vertex, partition, batch):
-        neighbor_count = sum(1 for event in batch if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex))
+        if self.decay is None:
+            neighbor_count = sum(1 for event in batch if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex))
+        else:
+            neighbor_count = 0 
+            for event in batch:
+                self.full_graph.add_edge(event.src, event.dest, timestamp=self.time)
+            for u, v in self.full_graph.edges():
+                if self.full_graph.has_edge(u, v):
+                    timestamp = self.full_graph[u][v]['timestamp']
+                    if partition.has(u) and u != vertex:
+                        neighbor_count += np.exp(-self.decay * (self.time - timestamp))
+                    if partition.has(v) and v != vertex:
+                        neighbor_count += np.exp(-self.decay * (self.time - timestamp))
+            self.time += 1
         average_capacity = self.alpha * (np.mean([partition.size() for partition in self.partitions]) if self.partitions else 0) * (1 + self.epsilon) + (1 - self.alpha) * self.previous_capacity_estimate
         self.previous_capacity_estimate = average_capacity
         capacity_penalty = self.mu * max(0, partition.size() - average_capacity)
@@ -412,11 +430,12 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         replication_factor: int = 1,
         mu: float = 0,
         epsilon: float = 0.1,
-        alpha: float = 1.0
+        alpha: float = 1.0,
+        decay: Optional[float] = None
     ):
         def all_neighbors_distribution(vertex, event):
             return 1.0
-        return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution, replication_factor, mu, epsilon, alpha)
+        return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution, replication_factor, mu, epsilon, alpha, decay)
     
     @staticmethod
     def degree_based(
@@ -424,7 +443,8 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         replication_factor: int = 1,
         mu: float = 0,
         epsilon: float = 0.1,
-        alpha: float = 1.0
+        alpha: float = 1.0,
+        decay: Optional[float] = None
     ):
         def degree_based_distribution(vertex, event):
             degree_src = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.src))
@@ -433,4 +453,4 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
             if total_degree == 0:
                 return 0.5
             return degree_src / total_degree
-        return MostCommonNeighborPartitioner(partitions, degree_based_distribution, replication_factor, mu, epsilon, alpha)
+        return MostCommonNeighborPartitioner(partitions, degree_based_distribution, replication_factor, mu, epsilon, alpha, decay)
