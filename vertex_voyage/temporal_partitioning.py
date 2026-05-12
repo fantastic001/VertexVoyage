@@ -261,8 +261,11 @@ class PartitionerProfile(TemporalGraphPartitioner):
         self.unique_vertices = set()
         self.partition_sizes = []
         self.edge_cuts = []
+        self.edge_cuts_percentage = []
         self.total_time = 0
         self.original_graph = nx.Graph()
+        self.lost_edges_per_batch = []
+        self.lost_edges_per_batch_percentage = []
     
     def push(self, batch: EventSequence):
         import time
@@ -281,7 +284,19 @@ class PartitionerProfile(TemporalGraphPartitioner):
             self.unique_vertices.add(event.src)
             self.unique_vertices.add(event.dest)
         self.partition_sizes.append({partition: partition.size() for partition in partitions})
-        self.edge_cuts.append(self.calculate_edge_cut())
+        edge_cut = self.calculate_edge_cut()
+        self.edge_cuts.append(edge_cut)
+        total_edges = self.original_graph.number_of_edges()
+        self.edge_cuts_percentage.append(edge_cut / total_edges if total_edges > 0 else 0)
+        
+        _lost_edges = 0
+        for event in batch:
+            src_partitions = {partition for partition in partitions if partition.has(event.src)}
+            dest_partitions = {partition for partition in partitions if partition.has(event.dest)}
+            if src_partitions.isdisjoint(dest_partitions):
+                _lost_edges += 1
+        self.lost_edges_per_batch.append(_lost_edges)
+        self.lost_edges_per_batch_percentage.append(_lost_edges / len(batch) if len(batch) > 0 else 0)
     
     def calculate_edge_cut(self) -> int:
         edge_cut = 0
@@ -307,6 +322,9 @@ class PartitionerProfile(TemporalGraphPartitioner):
         p(f"Total time taken to process events: {self.total_time:.2f} seconds")
         p(f"Partition sizes after processing every batch: {self.partition_sizes}")
         p(f"Edge cuts after processing every batch: {self.edge_cuts}")
+        p(f"Edge cuts percentage after processing every batch: {self.edge_cuts_percentage}")
+        p(f"Lost edges after processing every batch: {self.lost_edges_per_batch}")
+        p(f"Lost edges percentage after processing every batch: {self.lost_edges_per_batch_percentage}")
 
 class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     """
