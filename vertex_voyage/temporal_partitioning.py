@@ -336,7 +336,8 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
             self, 
             partitions: Set[Partition], 
             distribution: Callable[[Any, Event], float],
-            min_neighbors: int = 1
+            min_neighbors: int = 1,
+            replication_factor: int = 1
         ):
         """
         distribution: P(event | vertex) is a function that takes an event and returns a probability of sampling that event. The partitioner will sample an event according to the distribution, and assign the vertex to the partition that contains the most neighbors of the vertex in the sampled event.
@@ -344,18 +345,18 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         self.partitions = partitions
         self.distribution = distribution
         self.min_neighbors = min_neighbors
+        self.replication_factor = replication_factor
         self.randomly_assigned = set() # keep track of vertices that are randomly assigned to a partition due to not having enough neighbors in the sampled events
-    def sample_events(self, vertex, batch: EventSequence) -> set[Event]:
-        events = [event for event in batch if event.src == vertex or event.dest == vertex]
-        probabilities = [self.distribution(vertex, event) for event in events]
-        total = sum(probabilities)
-        if total == 0:
-            probabilities = [1 / len(events) for _ in events]
-        else:
-            probabilities = [p / total for p in probabilities]
+    def sample_events(self, batch: EventSequence) -> set[Event]:
+        events = list(batch)
+        probabilities = [
+            self.distribution(event.src, event) + 
+            self.distribution(event.dest, event) 
+            for event in events
+        ]
         sampled_events = []
         for event, p in zip(events, probabilities):
-            if random() < p:
+            if random() <= p:
                 sampled_events.append(event)
         return set(sampled_events)
 
@@ -364,22 +365,23 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         Assign each vertex to the partition that contains the most neighbors of the vertex in the sampled events. Then connect the vertices in the same partition according to the events in the batch.
         """
         batch = list(batch)
+        batch = self.sample_events(batch=batch)
         for event in batch:
             for vertex in [event.src, event.dest]:
-                sampled_events = self.sample_events(vertex, batch)
-                neighbor_counts = {partition: sum(1 for event in sampled_events if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex)) for partition in self.partitions}
-                best_partition = None 
-                best_count = -1
-                for partition, count in neighbor_counts.items():
-                    if count > best_count and count >= self.min_neighbors:
-                        best_partition = partition
-                        best_count = count
-                if best_partition:
-                    best_partition.add(vertex)
-                else:
+                
+                neighbor_counts = {partition: sum(1 for event in batch if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex)) for partition in self.partitions}
+                partitions_sorted = sorted(self.partitions, key=lambda partition: neighbor_counts[partition], reverse=True)
+                # Assign vertex to self.replication_factor partitions with the most neighbors, if they have at least self.min_neighbors neighbors in the sampled events, otherwise assign to a random partition
+                best_partitions = [partition for partition in partitions_sorted if neighbor_counts[partition] >= self.min_neighbors][:self.replication_factor]
+                for partition in best_partitions:
+                    partition.add(vertex)
+                shuffled_partitions = self.partitions.copy()
+                shuffled_partitions = list(shuffled_partitions)
+                shuffled_partitions = [partition for partition in shuffled_partitions if partition not in best_partitions]
+                np.random.shuffle(shuffled_partitions)
+                for partition in shuffled_partitions[:self.replication_factor - len(best_partitions)]:
                     if vertex not in self.randomly_assigned:
-                        random_partition = choice(list(self.partitions))
-                        random_partition.add(vertex)
+                        partition.add(vertex)
                         self.randomly_assigned.add(vertex)
         for event in batch:
             for partition in self.partitions:
@@ -389,13 +391,21 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         return {partition for partition in self.partitions if partition.has(vertex)}
     
     @staticmethod
-    def all_neighbors(partitions: Set[Partition], min_neighbors: int = 1):
+    def all_neighbors(
+        partitions: Set[Partition], 
+        min_neighbors: int = 1,
+        replication_factor: int = 1
+    ):
         def all_neighbors_distribution(vertex, event):
             return 1.0
-        return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution, min_neighbors)
+        return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution, min_neighbors, replication_factor)
     
     @staticmethod
-    def degree_based(partitions: Set[Partition], min_neighbors: int = 1):
+    def degree_based(
+        partitions: Set[Partition], 
+        min_neighbors: int = 1, 
+        replication_factor: int = 1
+    ):
         def degree_based_distribution(vertex, event):
             degree_src = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.src))
             degree_dest = sum(partition.has(neighbor) for partition in partitions for neighbor in partition.graph().neighbors(event.dest))
@@ -403,10 +413,10 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
             if total_degree == 0:
                 return 0.5
             return degree_src / total_degree
-        return MostCommonNeighborPartitioner(partitions, degree_based_distribution, min_neighbors)
+        return MostCommonNeighborPartitioner(partitions, degree_based_distribution, min_neighbors, replication_factor)
 
     @staticmethod
-    def size_based(partitions: Set[Partition], min_neighbors: int = 1):
+    def size_based(partitions: Set[Partition], min_neighbors: int = 1, replication_factor: int = 1):
         def size_based_distribution(vertex, event):
             partition_sizes = {partition: partition.size() for partition in partitions}
             total_size = sum(partition_sizes.values())
@@ -424,4 +434,4 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
                     return sum(partition_sizes[partition] for partition in src_partition) / total_size
                 else:
                     return 0.5
-        return MostCommonNeighborPartitioner(partitions, size_based_distribution, min_neighbors)
+        return MostCommonNeighborPartitioner(partitions, size_based_distribution, min_neighbors, replication_factor)

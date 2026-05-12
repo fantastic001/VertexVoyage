@@ -517,7 +517,8 @@ class Commands:
              batch_size: int = 100,
 
              #  Parameters for partitioner (if needed
-             min_neighbors: int = 1
+             min_neighbors: int = 1,
+             replication_factor: int = 1
     ):
 
         import networkx as nx
@@ -558,12 +559,27 @@ class Commands:
             parts: set[Partition] = set(models.keys())
             partitioner = {
                 "random": lambda **kw: RandomPartitioner.uniform(parts),
-                "random.degree": lambda **kw: RandomPartitioner.degree_based(parts),
-                "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(parts, kw["min_neighbors"]),
-                "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(parts, kw["min_neighbors"]),
-                "neighbors.size": lambda **kw: MostCommonNeighborPartitioner.size_based(parts, kw["min_neighbors"])
+                "random.degree": lambda **kw: RandomPartitioner.degree_based(
+                    parts
+                ),
+                "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(
+                    parts, 
+                    kw["min_neighbors"],
+                    replication_factor=kw["replication_factor"]
+                ),
+                "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(
+                    parts, 
+                    kw["min_neighbors"],
+                    replication_factor=kw["replication_factor"]
+                ),
+                "neighbors.size": lambda **kw: MostCommonNeighborPartitioner.size_based(
+                    parts, 
+                    kw["min_neighbors"],
+                    replication_factor=kw["replication_factor"]
+                ),
             }[partitioner_name](
-                min_neighbors=min_neighbors
+                min_neighbors=min_neighbors,
+                replication_factor=replication_factor
             )
             partitioner = PartitionerProfile(partitioner)
             events = og_events.copy()
