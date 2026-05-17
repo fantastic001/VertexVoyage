@@ -364,6 +364,25 @@ class Commands:
              use_lpa: bool = False,
              algorithm: str = "node2vec"
     ):
+        """
+        Runs a test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
+
+        Parameters:
+        - name: The name of the dataset to use.
+        - partitions: The number of partitions to create.
+        - alpha: The alpha parameter for the partitioning algorithm (if applicable).
+        - threshold: The threshold parameter for the partitioning algorithm (if applicable).
+        - break_early: If True, breaks after the first combination of p and q parameters is tested.
+        - skip_global: If True, skips the global F1 score computation.
+        - dim: The dimensionality of the embeddings.
+        - default_p: If > 0, uses this value for p in the embedding algorithm instead of testing multiple values.
+        - default_q: If > 0, uses this value for q in the embedding algorithm instead of testing multiple values.
+        - epochs: The number of epochs to train the embedding model for.
+        - long_run: If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute.
+        - use_dataset_params: If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available.
+        - use_lpa: If True, uses label propagation for partitioning instead of the default partitioning algorithm.
+        - algorithm: The embedding algorithm to use (e.g., "node2vec", "distger", "dynnode2vec").
+        """
 
         import networkx as nx
         gsp = GridSearchPersistence(GS_LOCATION)
@@ -502,7 +521,7 @@ class Commands:
              dim: int = 100,
              default_p: float = 0,
              default_q: float = 0,
-             epochs: int = 1,
+             epochs: int = 10,
              long_run : bool = False,
              use_dataset_params: bool = False,
              use_lpa: bool = False,
@@ -519,7 +538,26 @@ class Commands:
              alpha: float = 1.0,
              decay: float = 0
     ):
+        """
+        Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each batch of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
 
+        Parameters:
+        - name: The name of the dataset to use.
+        - partitions: The number of partitions to create.
+        - partitioner_name: The name of the partitioning algorithm to use (e.g., "random", "random.degree", "neighbors.all", "neighbors.degree").
+        - dim: The dimensionality of the embeddings.
+        - default_p: If > 0, uses this value for p in the embedding algorithm instead of testing multiple values.
+        - default_q: If > 0, uses this value for q in the embedding algorithm instead of testing multiple values.
+        - epochs: The number of epochs to train the embedding model for after each batch of events.
+        - long_run: If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute.
+        - use_dataset_params: If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available.
+        - use_lpa: If True, uses label propagation for partitioning instead of the default partitioning algorithm (not implemented in this method).
+        - algorithm: The embedding algorithm to use (e.g., "dynnode2vec").
+        - track_seen: If True, processes events in an order that prioritizes events connected to already seen nodes, which simulates a more realistic temporal scenario where new events are more likely to involve nodes that have already been observed.
+        - iterations: The number of times to repeat the entire process for averaging results.
+        - limit: If > 0, limits the number of events to process from the dataset for quicker testing.
+        - batch_size: The number of events to process in each batch before updating the embeddings and evaluating the F1 score.
+        """
         import networkx as nx
         scores = []
         t = VertexEnumerator()

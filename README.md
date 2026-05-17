@@ -228,6 +228,63 @@ srun python -m vertex_voyage.benchmark --no-display "$ARG_LINE"
 
 ```
 
+# Running experiments 
+
+To run experiment for partitioning and embedding on a specific dataset, run:
+
+    vv test --name Cit-HepPh --partitions 1  --break-early  --use-dataset-params --long-run  --epochs 10
+
+For temporal experiments, run:
+
+    vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-params  --batch-size 50 --partitions 5 --replication-factor 2 --partitioner neighbors.all  --mu 0.5
+
+## Test command flags
+
+ Runs a test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
+
+Parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `--name` |  The name of the dataset to use. |
+| `--partitions` | The number of partitions to create. |
+| `--alpha` | The alpha parameter for the partitioning algorithm (if applicable). |
+| `--threshold` | The threshold parameter for the partitioning algorithm (if applicable). |
+| `--break-early` | If True, breaks after the first combination of p and q parameters is tested. |
+| `--skip-global` | If True, skips the global F1 score computation. |
+| `--dim` | The dimensionality of the embeddings. |
+| `--default-p` | If > 0, uses this value for p in the embedding algorithm instead of testing multiple values. |
+| `--default-q` | If > 0, uses this value for q in the embedding algorithm instead of testing multiple values. |
+| `--epochs` | The number of epochs to train the embedding model for. |
+| `--long-run` | If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute. |
+| `--use-dataset-params` | If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available. |
+| `--use-lpa` | If True, uses label propagation for partitioning instead of the default partitioning algorithm. |
+| `--algorithm` | The embedding algorithm to use (e.g., "node2vec", "distger", "dynnode2vec"). |
+
+## Temporal test command flags
+
+Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each batch of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
+
+Parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `--name` | The name of the dataset to use. |
+| `--partitions` | The number of partitions to create. |
+| `--partitioner-name` | The name of the partitioning algorithm to use (e.g., "random", "random.degree", "neighbors.all", "neighbors.degree"). |
+| `--dim` | The dimensionality of the embeddings. |
+| `--default-p` | If > 0, uses this value for p in the embedding algorithm instead of testing multiple values. |
+| `--default-q` | If > 0, uses this value for q in the embedding algorithm instead of testing multiple values. |
+| `--epochs` | The number of epochs to train the embedding model for after each batch of events. |
+| `--long-run` | If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute. |
+| `--use-dataset-params` | If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available. |
+| `--use-lpa` | If True, uses label propagation for partitioning instead of the default partitioning algorithm (not implemented in this method). |
+| `--algorithm` | The embedding algorithm to use (e.g., "dynnode2vec"). |
+| `--track-seen` | If True, processes events in an order that prioritizes events connected to already seen nodes, which simulates a more realistic temporal scenario where new events are more likely to involve nodes that have already been observed. |
+| `--iterations` | The number of times to repeat the entire process for averaging results. |
+| `--limit` | If > 0, limits the number of events to process from the dataset for quicker testing. |
+| `--batch-size` | The number of events to process in each batch before updating the embeddings and evaluating the F1 score. |
+
 # Development 
 
 ## Conda setup
