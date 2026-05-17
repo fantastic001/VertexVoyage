@@ -20,10 +20,10 @@ class Node2Vec:
                  walk_size=80, 
                  n_walks=10, 
                  window_size=10,
-                 epochs=1, 
+                 epochs=10, 
                  p = .5, 
                  q = .5,
-                 negative_sample_num = 1,
+                 negative_sample_num = 5,
                  learning_rate = 0.01,
                  seed = None,
                  use_threads = True
