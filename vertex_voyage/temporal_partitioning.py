@@ -328,9 +328,21 @@ class PartitionerProfile(TemporalGraphPartitioner):
 
 class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     """
-    Partition of vertex is the partition that contains the most neighbors of the vertex from sample.
+    Partition of vertex is the partition that contains the most neighbors of the vertex in the sampled events. The partitioner samples a subset of events according to a distribution P(event | vertex), and assigns the vertex to the partition that contains the most neighbors of the vertex in the sampled events. The partitioner also has a replication factor, which allows it to assign a vertex to multiple partitions if there are multiple partitions that contain a similar number of neighbors of the vertex in the sampled events. The partitioner also has a capacity penalty, which penalizes partitions that have more vertices than the average partition size, to encourage more balanced partitions.
 
-    Sampling is done according to a distribution P(event), which can be based on the number of neighbors in the partition, partition size, etc.
+    Formally, the score of a partition for a vertex is defined as:
+
+    $$ S(P, v) = N(P, v) - \mu \cdot \max(0, |P| - \alpha \cdot (1 + \epsilon) \cdot \frac{1}{|P|} \sum_{P' \in P} |P'|) $$
+
+    where $N(P, v)$ is the number of neighbors of vertex $v$ in partition $P$ in the sampled events, $\mu$ is the capacity penalty coefficient, $\alpha$ is the weight of the average partition size in the capacity penalty, $\epsilon$ is the imbalance tolerance, and $|P|$ is the size of partition $P$. The partitioner assigns the vertex to the top $k$ partitions with the highest scores, where $k$ is the replication factor. If there are multiple partitions with similar scores, the partitioner randomly assigns the vertex to some of those partitions until it reaches the replication factor.
+
+    Also, if decay is not None, the partitioner will use an exponentially decaying weight for the neighbors in the sampled events, where the weight of a neighbor that was seen $t$ time steps ago is multiplied by $\exp(-\text{decay} \cdot t)$. This allows the partitioner to give more importance to recent neighbors when assigning vertices to partitions.
+
+    Formally, the score of a partition for a vertex with decay is defined as:
+
+    $$ S(P, v) = \sum_{u \in N(P, v)} \exp(-\text{decay} \cdot t(u)) - \mu \cdot \max(0, |P| - \alpha \cdot (1 + \epsilon) \cdot \frac{1}{|P|} \sum_{P' \in P} |P'|) $$
+
+    
     """
     def __init__(
             self, 
