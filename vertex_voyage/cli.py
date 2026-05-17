@@ -524,7 +524,6 @@ class Commands:
              epochs: int = 10,
              long_run : bool = False,
              use_dataset_params: bool = False,
-             use_lpa: bool = False,
              algorithm: str = "dynnode2vec",
              track_seen: bool = False,
              iterations: int = 1,
@@ -551,7 +550,6 @@ class Commands:
         - epochs: The number of epochs to train the embedding model for after each batch of events.
         - long_run: If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute.
         - use_dataset_params: If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available.
-        - use_lpa: If True, uses label propagation for partitioning instead of the default partitioning algorithm (not implemented in this method).
         - algorithm: The embedding algorithm to use (e.g., "dynnode2vec").
         - track_seen: If True, processes events in an order that prioritizes events connected to already seen nodes, which simulates a more realistic temporal scenario where new events are more likely to involve nodes that have already been observed.
         - iterations: The number of times to repeat the entire process for averaging results.
