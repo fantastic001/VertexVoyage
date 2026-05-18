@@ -337,6 +337,7 @@ Example of run:
 vv temporal_test --name CITESEER  --long-run --track-seen --iterations 10  --use-dataset-params  --batch-size 100
 ```
 
-| Dataset | Batch size | Average F1 score | Baseline |
-|---------|------------|------------------|----------|
-| CITESEER | 100 | 57.82% | 40.75% |
+| Dataset | Buffer size | # of parts | RF | Average F1 score | Baseline |
+|---------|-------------|------------|----|------------------|----------|
+| CITESEER | 50 | 5 | 2 | 55.57% | 34.82% | 
+| CITESEER | 50 | 5 | 1 | 56% | 34.82% |
