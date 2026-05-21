@@ -47,6 +47,8 @@ class NPZLoader:
 datasets = {
     "Twitch": lambda: FileEventSequence("data/twitch.txt"),
     "Wiki Talks": lambda: FileEventSequence("data/wiki-talks.txt"),
+    "AlphaCore": lambda: FileEventSequence("data/AlphaCore.txt"),
+    "Reddit": lambda: FileEventSequence("data/reddit.txt"),
     "UK2002": lambda: FileEventSequence("data/uk2002.txt"),
     "Live Journal": lambda: FileEventSequence("data/LiveJournal.txt"),
     "SBM 10M": lambda: FileEventSequence("data/sbm_10M.txt"),
@@ -85,6 +87,21 @@ dataset_params = {
     "zachary": dict(
         p=.25,
         q=4,
+        dim=100,
+    ),
+    "Wiki Talks": dict(
+        p=2,
+        q=.25,
+        dim=100,
+    ),
+    "Reddit": dict(
+        p=2,
+        q=.25,
+        dim=100,
+    ),
+    "AlphaCore": dict(
+        p=2,
+        q=.25,
         dim=100,
     ),
 }
