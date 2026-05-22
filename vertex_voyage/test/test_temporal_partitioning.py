@@ -96,7 +96,7 @@ class TestTemporalPartitioning(unittest.TestCase):
         profile.push(events)
         profile.print_profile()
         self.assertEqual(profile.num_events, 10)
-        self.assertEqual(profile.num_batches, 1)
+        self.assertEqual(profile.num_buffers, 1)
         self.assertEqual(len(profile.unique_vertices), 11)
         self.assertGreater(profile.total_time, 0)
         self.assertEqual(len(profile.partition_sizes), 1)

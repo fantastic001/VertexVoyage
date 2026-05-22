@@ -254,7 +254,7 @@ To run experiment for partitioning and embedding on a specific dataset, run:
 
 For temporal experiments, run:
 
-    vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-params  --batch-size 50 --partitions 5 --replication-factor 2 --partitioner neighbors.all  --mu 0.5
+    vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-params  --buffer-size 50 --partitions 5 --replication-factor 2 --partitioner neighbors.all  --mu 0.5
 
 ## Test command flags
 
@@ -281,7 +281,7 @@ Parameters:
 
 ## Temporal test command flags
 
-Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each batch of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
+Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each buffer of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
 
 Parameters:
 
@@ -293,7 +293,7 @@ Parameters:
 | `--dim` | The dimensionality of the embeddings. |
 | `--default-p` | If > 0, uses this value for p in the embedding algorithm instead of testing multiple values. |
 | `--default-q` | If > 0, uses this value for q in the embedding algorithm instead of testing multiple values. |
-| `--epochs` | The number of epochs to train the embedding model for after each batch of events. |
+| `--epochs` | The number of epochs to train the embedding model for after each buffer of events. |
 | `--long-run` | If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute. |
 | `--use-dataset-params` | If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available. |
 | `--use-lpa` | If True, uses label propagation for partitioning instead of the default partitioning algorithm (not implemented in this method). |
@@ -301,7 +301,7 @@ Parameters:
 | `--track-seen` | If True, processes events in an order that prioritizes events connected to already seen nodes, which simulates a more realistic temporal scenario where new events are more likely to involve nodes that have already been observed. |
 | `--iterations` | The number of times to repeat the entire process for averaging results. |
 | `--limit` | If > 0, limits the number of events to process from the dataset for quicker testing. |
-| `--batch-size` | The number of events to process in each batch before updating the embeddings and evaluating the F1 score. |
+| `--buffer-size` | The number of events to process in each buffer before updating the embeddings and evaluating the F1 score. |
 
 # Development 
 
@@ -329,12 +329,12 @@ maturin develop
 
 # Experimental results
 
-## Dynnode2vec with batched event processing 
+## Dynnode2vec with buffered event processing 
 
 Example of run:
 
 ```sh
-vv temporal_test --name CITESEER  --long-run --track-seen --iterations 10  --use-dataset-params  --batch-size 100
+vv temporal_test --name CITESEER  --long-run --track-seen --iterations 10  --use-dataset-params  --buffer-size 100
 ```
 
 | Dataset | Buffer size | # of parts | RF | Average F1 score | Baseline |

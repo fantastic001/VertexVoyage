@@ -12,7 +12,7 @@ from vertex_voyage.temporal import (
     FirstN, 
     ForestFireEventSequence, 
     Event, 
-    batched
+    buffered
 )
 from unittest.mock import MagicMock
 from vertex_voyage.word2vec import word2vec
@@ -29,11 +29,11 @@ class TestDynNode2Vec(unittest.TestCase):
         model = DynNode2Vec()
         nodes = set()
         event: Event
-        for batch in batched(event_sequence, batch_size=2):
-            for event in batch:
+        for buffer in buffered(event_sequence, buffer_size=2):
+            for event in buffer:
                 nodes.add(event.src)
                 nodes.add(event.dest)
-            model.update(batch)
+            model.update(buffer)
         embeddings = model.embed_nodes(list(nodes))
         self.assertEqual(len(embeddings), len(nodes))
 
@@ -45,8 +45,8 @@ class TestDynNode2Vec(unittest.TestCase):
             Event(src=2, dest=3, timestamp=1),
             Event(src=3, dest=4, timestamp=2)
         ]
-        for btch in batched(events, batch_size=1):
-            model.update(btch)
+        for buf in buffered(events, buffer_size=1):
+            model.update(buf)
             # for src and dest, we should have called _random_walk n_walks times each
             expected_calls = model.n_walks * 2 if len(model.G.nodes()) >= model.retrain_threshold else len(model.G.nodes()) * model.n_walks
             self.assertEqual(model._random_walk.call_count, expected_calls)
@@ -72,8 +72,8 @@ class TestDynNode2Vec(unittest.TestCase):
             Event(src=3, dest=4, timestamp=2)
         ]
         model.embed_node = MagicMock(return_value=np.zeros(model.dim))
-        for i, btch in enumerate(batched(events, batch_size=1)):
-            model.update(btch)
+        for i, buf in enumerate(buffered(events, buffer_size=1)):
+            model.update(buf)
             # either gensim Word2Vec or our custom word2vec should have been called
             retrain = len(model.G.nodes()) < model.retrain_threshold or i == 0
             self.assertTrue(
@@ -142,7 +142,7 @@ class TestDynNode2Vec(unittest.TestCase):
         f1 = get_f1_score(G, reconstructed)
         self.assertGreater(f1, 0.5)
     
-    def test_zacharys_karate_club_batched(self):
+    def test_zacharys_karate_club_buffered(self):
         G = karate_club_graph()
         model = DynNode2Vec(
             dim=100, 
@@ -163,8 +163,8 @@ class TestDynNode2Vec(unittest.TestCase):
             event = Event(src=u, dest=v, timestamp=t)
             events.append(event)
             t += 1
-        for batch in batched(events, batch_size=5):
-            model.update(batch)
+        for buffer in buffered(events, buffer_size=5):
+            model.update(buffer)
         embeddings = model.embed_nodes(list(G.nodes()))
         self.assertEqual(len(embeddings), len(G.nodes()))
         reconstructed = reconstruct(

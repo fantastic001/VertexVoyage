@@ -18,7 +18,7 @@ from vertex_voyage.partitioning import (
     get_partition_average_balance,
 )
 from experiments.datasets import datasets, dataset_params
-from vertex_voyage.temporal import batched, to_nx_graph, to_vv_graph, Transform, Event
+from vertex_voyage.temporal import buffered, to_nx_graph, to_vv_graph, Transform, Event
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.distger import DistGER
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
@@ -528,7 +528,7 @@ class Commands:
              track_seen: bool = False,
              iterations: int = 1,
              limit: int = -1,
-             batch_size: int = 100,
+             buffer_size: int = 100,
 
              #  Parameters for partitioner (if needed
              replication_factor: int = 1,
@@ -538,7 +538,7 @@ class Commands:
              decay: float = 0
     ):
         """
-        Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each batch of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
+        Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each buffer of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
 
         Parameters:
         - name: The name of the dataset to use.
@@ -547,14 +547,14 @@ class Commands:
         - dim: The dimensionality of the embeddings.
         - default_p: If > 0, uses this value for p in the embedding algorithm instead of testing multiple values.
         - default_q: If > 0, uses this value for q in the embedding algorithm instead of testing multiple values.
-        - epochs: The number of epochs to train the embedding model for after each batch of events.
+        - epochs: The number of epochs to train the embedding model for after each buffer of events.
         - long_run: If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute.
         - use_dataset_params: If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available.
         - algorithm: The embedding algorithm to use (e.g., "dynnode2vec").
         - track_seen: If True, processes events in an order that prioritizes events connected to already seen nodes, which simulates a more realistic temporal scenario where new events are more likely to involve nodes that have already been observed.
         - iterations: The number of times to repeat the entire process for averaging results.
         - limit: If > 0, limits the number of events to process from the dataset for quicker testing.
-        - batch_size: The number of events to process in each batch before updating the embeddings and evaluating the F1 score.
+        - buffer_size: The number of events to process in each buffer before updating the embeddings and evaluating the F1 score.
         """
         import networkx as nx
         scores = []
@@ -651,15 +651,15 @@ class Commands:
                 sorted_events.append(event)
             total_edges = 0
             nodes = set()
-            for bi, batch in enumerate(batched(sorted_events, batch_size)):
-                for event in batch:
+            for bi, buffer in enumerate(buffered(sorted_events, buffer_size)):
+                for event in buffer:
                     nodes.add(event.src)
                     nodes.add(event.dest)
-                partitioner.push(batch)
+                partitioner.push(buffer)
 
-                total_edges += len(batch)
-                for part, pb in partitioner.get_partition_batches(batch):
-                    models[part].update(pb)
+                total_edges += len(buffer)
+                for part, partition_buffer in partitioner.get_partition_buffers(buffer):
+                    models[part].update(partition_buffer)
                 
                 embeddings = partitioner.get_distributed_embedding(models, nodes)
                 # reconstruct graph and compute F1 score
@@ -672,9 +672,9 @@ class Commands:
                     f1_score = get_f1_score(G, g)
                 except ZeroDivisionError:
                     f1_score = 0.0
-                log(f"Batch: {bi+1}, F1 score: {f1_score}")
+                log(f"Buffer: {bi+1}, F1 score: {f1_score}")
                 if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
-                    logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at batch {bi+1}")
+                    logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
                 old_f1_score = f1_score
             log("Event stream processing completed")
             scores.append(old_f1_score)

@@ -531,18 +531,19 @@ def write_to_binary_file(sequence: EventSequence, file: str):
             f.write(pack("iii", int(event.src), int(event.dest), event.timestamp))
 
 
-def batched(sequence: Iterable, batch_size: int):
+def buffered(sequence: Iterable, buffer_size: int):
     """
-    Returns a generator that yields batches of events from an event sequence
+    Returns a generator that yields buffers of events from an event sequence
     """
-    batch = []
+    buffer = []
     for event in sequence:
-        batch.append(event)
-        if len(batch) == batch_size:
-            yield batch
-            batch = []
-    if len(batch) > 0:
-        yield batch
+        buffer.append(event)
+        if len(buffer) == buffer_size:
+            yield buffer
+            buffer = []
+    if len(buffer) > 0:
+        yield buffer
+
 
 if __name__ == "__main__":
     # sequence = ShuffledSequence(FileEventSequence("data/wiki-talks/wiki.txt"), 2)

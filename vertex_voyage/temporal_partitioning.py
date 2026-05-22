@@ -134,7 +134,7 @@ class InMemoryPartition(Partition):
 
 class TemporalGraphPartitioner:
     @abstractmethod
-    def push(self, batch: EventSequence):
+    def push(self, buffer: EventSequence):
         """
         Partitions an events into a partition number
         """
@@ -147,14 +147,14 @@ class TemporalGraphPartitioner:
         """
         pass
 
-    def get_partition_batches(self, batch: EventSequence) -> list[tuple[Partition, list[Event]]]:
-        partition_batches = {}
-        for event in batch:
+    def get_partition_buffers(self, buffer: EventSequence) -> list[tuple[Partition, list[Event]]]:
+        partition_buffers = {}
+        for event in buffer:
             src_partitions = self.get(event.src)
             dest_partitions = self.get(event.dest)
             for partition in src_partitions.intersection(dest_partitions):
-                partition_batches.setdefault(partition, []).append(event)
-        return list(partition_batches.items())
+                partition_buffers.setdefault(partition, []).append(event)
+        return list(partition_buffers.items())
 
     def get_distributed_embedding(self, models, nodes):
         results = []
@@ -175,8 +175,8 @@ class CatchAllPartitioner(TemporalGraphPartitioner):
     def __init__(self, partitions: Set[Partition]):
         self.partitions = partitions
 
-    def push(self, batch: EventSequence):
-        for event in batch:
+    def push(self, buffer: EventSequence):
+        for event in buffer:
             for partition in self.partitions:
                 partition.add(event.src)
                 partition.add(event.dest)
@@ -216,8 +216,8 @@ class RandomPartitioner(TemporalGraphPartitioner):
             total_size = sum(partition.size() for partition in partitions)
             return size / total_size if total_size > 0 else 1 / len(partitions)
         return RandomPartitioner(partitions, size_based_distribution)
-    def push(self, batch: EventSequence):
-        for event in batch:
+    def push(self, buffer: EventSequence):
+        for event in buffer:
             for vertex in [event.src, event.dest]:
                 if any(partition.has(vertex) for partition in self.partitions):
                     continue
@@ -249,37 +249,37 @@ class PartitionerProfile(TemporalGraphPartitioner):
         """
         This is decorator for partitioner that allows us to profile the partitioner by keeping track of the:
         - number of events processed
-        - number of batches processed
+        - number of buffers processed
         - number of unique vertices seen
         - time taken to process events
-        - partition sizes after processing every batch 
-        - edge cut after processing every batch
+        - partition sizes after processing every buffer 
+        - edge cut after processing every buffer
         """
         self.partitioner = partitioner
         self.num_events = 0
-        self.num_batches = 0
+        self.num_buffers = 0
         self.unique_vertices = set()
         self.partition_sizes = []
         self.edge_cuts = []
         self.edge_cuts_percentage = []
         self.total_time = 0
         self.original_graph = nx.Graph()
-        self.lost_edges_per_batch = []
-        self.lost_edges_per_batch_percentage = []
+        self.lost_edges_per_buffer = []
+        self.lost_edges_per_buffer_percentage = []
     
-    def push(self, batch: EventSequence):
+    def push(self, buffer: EventSequence):
         import time
-        self.num_batches += 1
+        self.num_buffers += 1
         # We need to do this to keep track of the original graph structure for calculating edge cuts, since the partitioner may not store all edges in the partitions
-        batch = list(batch)
-        self.original_graph.add_edges_from([(event.src, event.dest) for event in batch])
+        buffer = list(buffer)
+        self.original_graph.add_edges_from([(event.src, event.dest) for event in buffer])
         start_time = time.time()
-        self.partitioner.push(batch)
+        self.partitioner.push(buffer)
         self.total_time += time.time() - start_time
         partitions = self.partitioner.partitions if hasattr(self.partitioner, 'partitions') else set()
         if not partitions:
             raise ValueError("Partitioner must have a 'partitions' attribute to use PartitionerProfile")        
-        for event in batch:
+        for event in buffer:
             self.num_events += 1
             self.unique_vertices.add(event.src)
             self.unique_vertices.add(event.dest)
@@ -290,13 +290,13 @@ class PartitionerProfile(TemporalGraphPartitioner):
         self.edge_cuts_percentage.append(edge_cut / total_edges if total_edges > 0 else 0)
         
         _lost_edges = 0
-        for event in batch:
+        for event in buffer:
             src_partitions = {partition for partition in partitions if partition.has(event.src)}
             dest_partitions = {partition for partition in partitions if partition.has(event.dest)}
             if src_partitions.isdisjoint(dest_partitions):
                 _lost_edges += 1
-        self.lost_edges_per_batch.append(_lost_edges)
-        self.lost_edges_per_batch_percentage.append(_lost_edges / len(batch) if len(batch) > 0 else 0)
+        self.lost_edges_per_buffer.append(_lost_edges)
+        self.lost_edges_per_buffer_percentage.append(_lost_edges / len(buffer) if len(buffer) > 0 else 0)
     
     def calculate_edge_cut(self) -> int:
         edge_cut = 0
@@ -317,14 +317,14 @@ class PartitionerProfile(TemporalGraphPartitioner):
             logger.info(msg)
             print(msg)
         p(f"Number of events processed: {self.num_events}")
-        p(f"Number of batches processed: {self.num_batches}")
+        p(f"Number of buffers processed: {self.num_buffers}")
         p(f"Number of unique vertices seen: {len(self.unique_vertices)}")
         p(f"Total time taken to process events: {self.total_time:.2f} seconds")
-        p(f"Partition sizes after processing every batch: {self.partition_sizes}")
-        p(f"Edge cuts after processing every batch: {self.edge_cuts}")
-        p(f"Edge cuts percentage after processing every batch: {self.edge_cuts_percentage}")
-        p(f"Lost edges after processing every batch: {self.lost_edges_per_batch}")
-        p(f"Lost edges percentage after processing every batch: {self.lost_edges_per_batch_percentage}")
+        p(f"Partition sizes after processing every buffer: {self.partition_sizes}")
+        p(f"Edge cuts after processing every buffer: {self.edge_cuts}")
+        p(f"Edge cuts percentage after processing every buffer: {self.edge_cuts_percentage}")
+        p(f"Lost edges after processing every buffer: {self.lost_edges_per_buffer}")
+        p(f"Lost edges percentage after processing every buffer: {self.lost_edges_per_buffer_percentage}")
 
 class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     """
@@ -369,8 +369,8 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         if decay is not None:
             self.full_graph = nx.Graph()
             self.time = 0
-    def sample_events(self, batch: EventSequence) -> set[Event]:
-        events = list(batch)
+    def sample_events(self, buffer: EventSequence) -> set[Event]:
+        events = list(buffer)
         probabilities = [
             self.distribution(event.src, event) + 
             self.distribution(event.dest, event) 
@@ -382,12 +382,12 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
                 sampled_events.append(event)
         return set(sampled_events)
 
-    def score_partition(self, vertex, partition, batch):
+    def score_partition(self, vertex, partition, buffer):
         if self.decay is None:
-            neighbor_count = sum(1 for event in batch if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex))
+            neighbor_count = sum(1 for event in buffer if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex))
         else:
             neighbor_count = 0 
-            for event in batch:
+            for event in buffer:
                 self.full_graph.add_edge(event.src, event.dest, timestamp=self.time)
             for u, v in self.full_graph.edges():
                 if self.full_graph.has_edge(u, v):
@@ -403,17 +403,17 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         score = neighbor_count - capacity_penalty
         return score
 
-    def push(self, batch: EventSequence):
+    def push(self, buffer: EventSequence):
         """
-        Assign each vertex to the partition that contains the most neighbors of the vertex in the sampled events. Then connect the vertices in the same partition according to the events in the batch.
+        Assign each vertex to the partition that contains the most neighbors of the vertex in the sampled events. Then connect the vertices in the same partition according to the events in the buffer.
         """
-        batch = list(batch)
-        batch = self.sample_events(batch=batch)
-        for event in batch:
+        buffer = list(buffer)
+        buffer = self.sample_events(buffer=buffer)
+        for event in buffer:
             for vertex in [event.src, event.dest]:
-                best_partitions = sorted(self.partitions, key=lambda partition: self.score_partition(vertex, partition, batch), reverse=True)[:self.replication_factor]
+                best_partitions = sorted(self.partitions, key=lambda partition: self.score_partition(vertex, partition, buffer), reverse=True)[:self.replication_factor]
                 for partition in best_partitions:
-                    logger.debug(f"Assigning vertex {vertex} to partition {partition} based on score: {self.score_partition(vertex, partition, batch)}")
+                    logger.debug(f"Assigning vertex {vertex} to partition {partition} based on score: {self.score_partition(vertex, partition, buffer)}")
                     partition.add(vertex)
                 shuffled_partitions = self.partitions.copy()
                 shuffled_partitions = list(shuffled_partitions)
@@ -429,7 +429,7 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
                     if partition not in best_partitions and partition not in shuffled_partitions and partition.has(vertex):
                         logger.debug(f"Removing vertex {vertex} from partition {partition} due to repartitioning")
                         partition.remove(vertex)
-        for event in batch:
+        for event in buffer:
             for partition in self.partitions:
                 if partition.has(event.src) and partition.has(event.dest):
                     partition.connect(event.src, event.dest)
