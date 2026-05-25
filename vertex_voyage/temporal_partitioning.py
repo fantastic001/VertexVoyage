@@ -1,6 +1,5 @@
 
 from abc import ABC, abstractmethod
-from turtle import st
 from typing import Any, Callable, Iterable, Optional, Set
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random, choice, shuffle
