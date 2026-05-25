@@ -60,6 +60,10 @@ datasets = {
     "zachary": lambda: FileEventSequence("data/zachary.txt"),
     # "AstroPh": lambda: FileEventSequence("data/AstroPh.txt"),
     "AstroPh": NPZLoader("data/AstroPh.npz"),
+    "AS-Oregon": lambda: FileEventSequence("data/oregon2_as.txt"),
+    "DBLP": NPZLoader("data/dblp.npz"),
+    "Enron": lambda: FileEventSequence("data/enron.txt"),
+    "StackOverflow": lambda: FileEventSequence("data/stackoverflow.txt"),
 }
 
 
@@ -103,5 +107,25 @@ dataset_params = {
         p=2,
         q=.25,
         dim=100,
+    ),
+    "AS-Oregon": dict(
+        p=0.5,
+        q=2,
+        dim=128,
+    ),
+    "DBLP": dict(
+        p=0.5,
+        q=1,
+        dim=25,
+    ),
+    "Enron": dict(
+        p=.5,
+        q=1,
+        dim=128,
+    ),
+    "StackOverflow": dict(
+        p=1,
+        q=2,
+        dim=128,
     ),
 }
