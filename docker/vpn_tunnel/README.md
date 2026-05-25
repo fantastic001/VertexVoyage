@@ -17,6 +17,7 @@ Then run it
 
 and then connect to platform 
 
-    ./ssh.sh 
+    . config/config_ai.sh
+    sudo -E ./ssh.sh 
 
 Now you can use port `9292` on localhost to establish SSH connection 
