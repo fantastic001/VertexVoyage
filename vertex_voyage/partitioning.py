@@ -93,7 +93,7 @@ def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = Fa
     # partition the graph into a given number of partitions
     partitions = to_constant_bin_number(communities, partition_num, key=len)
     partitions = [list(sum(part, [])) for part in partitions]
-    return partitions
+    return {frozenset(p) for p in partitions}
 
 def calculate_partitioning_corruption(G: nx.Graph, partitions: list):
     """

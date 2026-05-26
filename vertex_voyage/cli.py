@@ -410,8 +410,10 @@ class Commands:
         ))
         dataset = run("graph", to_nx_graph, dataset)
         if not use_lpa:
+            log("Partitioning graph with LFM-based partitioner...")
             parts = run("partitions", partition_graph, dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
         else:
+            log("Partitioning graph with label propagation...")
             parts = run("partitions", label_propagation_partitioner, dataset, partitions)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Graph partitioned")
@@ -441,7 +443,9 @@ class Commands:
             if ("model_%s" % part_name) in run:
                 log("Loading model for partition...")
                 model = run["model_%s" % part_name]
+                log("Model parameters: p=%f, q=%f, dim=%d" % (model.p, model.q, model.dim))
                 log("Model loaded, embedding nodes...")
+                part = list(part)
                 emb = model.embed_nodes(part)
                 log("Nodes embedded")
                 f1 = get_f1_score(pg, reconstruct(pg.number_of_edges(), emb, part))
@@ -496,8 +500,9 @@ class Commands:
                         **P
                     )
                     model.fit(pg, dataset.nodes)
+                    part = list(part)
                     emb = model.embed_nodes(part)
-                    g = reconstruct(pg.number_of_edges(), emb, part)
+                    g = reconstruct(pg.number_of_edges(), emb, list(part))
                     PG = nx.Graph()
                     PG.add_edges_from(pg.edges)
                     f1 = get_f1_score(PG, g)
