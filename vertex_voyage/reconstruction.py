@@ -33,7 +33,7 @@ def get_f1_score(G, reconstructed_graph):
     recall = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(G.neighbors(n))) if len(list(G.neighbors(n))) > 0 else 0 for n in nodes]) / len(G.nodes())
     precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) if len(list(reconstructed_graph.neighbors(n))) > 0 else 0 for n in nodes]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
     if precision + recall == 0:
-        return 0
+        return 0, 0, 0
     f1 = 2 * (precision * recall) / (precision + recall)
     logger.info(f"Precision: {precision}, Recall: {recall}, F1 Score: {f1}")
-    return f1
+    return precision, recall, f1

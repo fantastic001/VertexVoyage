@@ -247,7 +247,7 @@ class Commands:
             assert all(isinstance(emb, np.ndarray) for emb in embeddings)
             assert all(isinstance(x, int) for x in dataset.nodes)
             reconstructed = reconstruct(dataset.number_of_edges(), embeddings)
-            f1_score = get_f1_score(dataset, reconstructed)
+            _, _, f1_score = get_f1_score(dataset, reconstructed)
             # calculate ARI 
             from sklearn.cluster import KMeans
             single_embeddings = gsp.load(
@@ -448,8 +448,8 @@ class Commands:
                 part = list(part)
                 emb = model.embed_nodes(part)
                 log("Nodes embedded")
-                f1 = get_f1_score(pg, reconstruct(pg.number_of_edges(), emb, part))
-                log("F1 score for partition: ", f1)
+                precision, recall, f1 = get_f1_score(pg, reconstruct(pg.number_of_edges(), emb, part))
+                log("Partition scores: Precision: %f, Recall: %f, F1 Score: %f" % (precision, recall, f1))
                 if f1 > best_f1:
                     best_f1 = f1
                     best = emb
@@ -505,12 +505,12 @@ class Commands:
                     g = reconstruct(pg.number_of_edges(), emb, list(part))
                     PG = nx.Graph()
                     PG.add_edges_from(pg.edges)
-                    f1 = get_f1_score(PG, g)
+                    precision, recall, f1 = get_f1_score(PG, g)
                     if f1 > best_f1:
                         best_f1 = f1
                         best = emb
                         best_model = model
-                        log("New best: ", p, q, best_f1)
+                        log("New best: p=%f, q=%f, dim=%d, precision=%f, recall=%f, f1=%f" % (p, q, dim, precision, recall, f1))
                     if break_early:
                         break
                 if break_early:
@@ -531,7 +531,8 @@ class Commands:
         g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
         G = nx.Graph()
         G.add_edges_from(dataset.edges)
-        log("Global F1 score: ", get_f1_score(G, g))
+        global_precision, global_recall, global_f1 = get_f1_score(G, g)
+        log("Global scores: Precision: %f, Recall: %f, F1 Score: %f" % (global_precision, global_recall, global_f1))
     
     def evaluate_partitioning(
             self, 
@@ -709,7 +710,7 @@ class Commands:
                     if u in nodes and v in nodes:
                         G.add_edge(u, v)
                 try:
-                    f1_score = get_f1_score(G, g)
+                    _, _, f1_score = get_f1_score(G, g)
                 except ZeroDivisionError:
                     f1_score = 0.0
                 log(f"Buffer: {bi+1}, F1 score: {f1_score}")
@@ -735,7 +736,7 @@ class Commands:
         # Compute F1 score for the full graph        full_emb =
         full_emb = node2vec.embed_nodes(original_graph.nodes)
         full_g = reconstruct(original_graph.number_of_edges(), full_emb, list(original_graph.nodes))
-        full_f1_score = get_f1_score(original_graph, full_g)
+        _, _, full_f1_score = get_f1_score(original_graph, full_g)
         log("F1 score for full graph using Node2Vec: ", full_f1_score)
         
 

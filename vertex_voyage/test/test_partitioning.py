@@ -14,6 +14,7 @@ class TestPartitioning(unittest.TestCase):
         zachary = nx.karate_club_graph()
         partition_num = 2
         communities = partition_graph(zachary, partition_num)
+        communities = list(communities)
         self.assertEqual(len(communities), partition_num)
         # approximately small differences between partitions )less than 10%_
         self.assertLessEqual(len(communities[0]), len(zachary.nodes) * 0.75)
@@ -26,6 +27,7 @@ class TestPartitioning(unittest.TestCase):
         G = nx.planted_partition_graph(2, n, p, q, seed=42)
         partition_num = 2
         communities = partition_graph(G, partition_num)
+        communities = list(communities)
         self.assertEqual(len(communities), partition_num)
         # approximately small differences between partitions )less than 10%_
         self.assertLessEqual(len(communities[0]), len(G.nodes) * 0.60)
@@ -72,6 +74,7 @@ class TestPartitioning(unittest.TestCase):
             n2v_partitioned[-1].fit(pg, nodes = zachary.nodes())
         
         embeddings = {}
+        communities = list(communities)
         for comm in communities:
             for node in comm:
                 myemb = n2v_partitioned[communities.index(comm)]
@@ -87,7 +90,7 @@ class TestPartitioning(unittest.TestCase):
             result.append(embeddings[node])
         reconstructed_graph = reconstruct(k, result, list(G.nodes()))
         nodes = G.nodes()
-        f1 = get_f1_score(G, reconstructed_graph)
+        _, _, f1 = get_f1_score(G, reconstructed_graph)
         self.assertGreaterEqual(f1, 0.40)
 
     def test_partitioning_corruption(self):

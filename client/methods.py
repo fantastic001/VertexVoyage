@@ -360,7 +360,8 @@ class Client:
                 original.add_edge(edge[0], edge[1])
             reconstructed = reconstruct(len(edges), emb, vertices)
             try:
-                y.append(get_f1_score(original, reconstructed))
+                _, _, f1 = get_f1_score(original, reconstructed)
+                y.append(f1)
             except ZeroDivisionError:
                 y.append(0)
         df = pd.DataFrame({
