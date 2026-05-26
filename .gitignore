@@ -338,3 +338,4 @@ doc/*/csv
 profile 
 profile.csv
 log
+runs/

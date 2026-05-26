@@ -35,7 +35,18 @@ import logging
 
 from vertex_voyage.temporal_partitioning import InMemoryPartition, MostCommonNeighborPartitioner, Partition, PartitionerProfile, RandomPartitioner 
 
+from vertex_voyage.persist import PersistedRun
+import hashlib
+
 logger = logging.getLogger("CLI")
+
+
+def hash_set_persistently(input_set):
+    sorted_elements = sorted(list(input_set))
+    string_representation = "|".join(str(x) for x in sorted_elements)
+    encoded_bytes = string_representation.encode('utf-8')
+    return hashlib.sha256(encoded_bytes).hexdigest()
+
 
 def setup_logging():
     logging.basicConfig(
@@ -362,7 +373,8 @@ class Commands:
              long_run : bool = False,
              use_dataset_params: bool = False,
              use_lpa: bool = False,
-             algorithm: str = "node2vec"
+             algorithm: str = "node2vec",
+             checkpoint: str = ""
     ):
         """
         Runs a test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
@@ -382,8 +394,9 @@ class Commands:
         - use_dataset_params: If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available.
         - use_lpa: If True, uses label propagation for partitioning instead of the default partitioning algorithm.
         - algorithm: The embedding algorithm to use (e.g., "node2vec", "distger", "dynnode2vec").
+        - checkpoint: The checkpoint directory to use for persisting the run.
         """
-
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa)
         import networkx as nx
         gsp = GridSearchPersistence(GS_LOCATION)
         log("Processing dataset ")
@@ -395,21 +408,23 @@ class Commands:
             type=x.type,
             attrs=x.attrs,
         ))
-        dataset = to_nx_graph(dataset)
+        dataset = run("graph", to_nx_graph, dataset)
         if not use_lpa:
-            parts = partition_graph(dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
+            parts = run("partitions", partition_graph, dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
         else:
-            parts = label_propagation_partitioner(dataset, partitions)
+            parts = run("partitions", label_propagation_partitioner, dataset, partitions)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Graph partitioned")
         embs = {}
         for part in parts:
+            part_name = hash_set_persistently(part)
             log("Partition size: %d" % len(part))
             if len(part) == 0:
                 print("Skipping empty partition")
                 continue
             best = None
             best_f1 = -1
+            best_model = None
             pg = dataset.subgraph(part)
             gg = nx.Graph()
             gg.add_edges_from(pg.edges)
@@ -423,6 +438,23 @@ class Commands:
             log("Partition number of edges: ", pg.number_of_edges())
             all_nodes = list(dataset.nodes)
             alg = ALGS[algorithm]
+            if ("model_%s" % part_name) in run:
+                log("Loading model for partition...")
+                model = run["model_%s" % part_name]
+                log("Model loaded, embedding nodes...")
+                emb = model.embed_nodes(part)
+                log("Nodes embedded")
+                f1 = get_f1_score(pg, reconstruct(pg.number_of_edges(), emb, part))
+                log("F1 score for partition: ", f1)
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best = emb
+                    best_model = model
+                for node, e in zip(part, emb):
+                    if node not in embs:
+                        embs[node] = []
+                    embs[node].append(e)
+                continue
             for p in [0.25, 0.5, 1, 2, 4]:
                 for q in [0.25, 0.5, 1, 2, 4]:
                     if ((default_p > 0 and default_q > 0) and 
@@ -472,12 +504,15 @@ class Commands:
                     if f1 > best_f1:
                         best_f1 = f1
                         best = emb
+                        best_model = model
                         log("New best: ", p, q, best_f1)
                     if break_early:
                         break
                 if break_early:
                     break
             log("Best achieved F1 score: ", best_f1)
+            if best_model is not None:
+                run[f"model_{part_name}"] = best_model
             for node, e in zip(part, best):
                 if node not in embs:
                     embs[node] = []
