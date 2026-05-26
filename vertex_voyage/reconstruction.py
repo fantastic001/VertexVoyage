@@ -3,6 +3,8 @@ import networkx as nx
 import numpy as np 
 from vertex_voyage_native import get_reconstructed_edges
 
+import logging
+logger = logging.getLogger(__name__)
 
 def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     """
@@ -33,4 +35,5 @@ def get_f1_score(G, reconstructed_graph):
     if precision + recall == 0:
         return 0
     f1 = 2 * (precision * recall) / (precision + recall)
+    logger.info(f"Precision: {precision}, Recall: {recall}, F1 Score: {f1}")
     return f1
