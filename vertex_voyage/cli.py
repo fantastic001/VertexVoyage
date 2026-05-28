@@ -38,6 +38,12 @@ from vertex_voyage.temporal_partitioning import InMemoryPartition, MostCommonNei
 from vertex_voyage.persist import PersistedRun
 import hashlib
 
+from vertex_voyage.tasks.link_prediction import (
+    train_on_static_graph,
+    ensemble_predict_links,
+    generate_embedding_dict
+)
+
 logger = logging.getLogger("CLI")
 
 
@@ -374,6 +380,7 @@ class Commands:
              use_dataset_params: bool = False,
              use_lpa: bool = False,
              algorithm: str = "node2vec",
+             link_prediction: bool = False,
              checkpoint: str = ""
     ):
         """
@@ -394,9 +401,10 @@ class Commands:
         - use_dataset_params: If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available.
         - use_lpa: If True, uses label propagation for partitioning instead of the default partitioning algorithm.
         - algorithm: The embedding algorithm to use (e.g., "node2vec", "distger", "dynnode2vec").
+        - link_prediction: If True, runs a link prediction task on the dataset using the generated embeddings.
         - checkpoint: The checkpoint directory to use for persisting the run.
         """
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction=link_prediction)
         import networkx as nx
         gsp = GridSearchPersistence(GS_LOCATION)
         log("Processing dataset ")
@@ -408,7 +416,51 @@ class Commands:
             type=x.type,
             attrs=x.attrs,
         ))
-        dataset = run("graph", to_nx_graph, dataset)
+        removed_edges = []
+        positive_edges = [] 
+        negative_edges = []
+        test_edges = []
+        if "graph" in run and not link_prediction:
+            dataset = run["graph"]
+            run["removed_edges"] = []
+            run["positive_edges"] = []
+            run["negative_edges"] = []
+        elif (
+            "graph" in run and 
+            "removed_edges" in run and 
+            "positive_edges" in run and
+            "negative_edges" in run
+        ):
+            dataset = run["graph"]
+            removed_edges = run["removed_edges"]
+            positive_edges = run["positive_edges"]
+            negative_edges = run["negative_edges"]
+            test_edges = positive_edges + negative_edges
+        else:
+            dataset = to_nx_graph(dataset)
+            if link_prediction:
+                nodes = list(dataset.nodes())
+                edges_to_remove = int(0.1 * dataset.number_of_edges())
+                # remove 10% of edges for link prediction testing
+                removed_edges = list(random.sample(list(dataset.edges()), edges_to_remove))
+                positive_edges = removed_edges
+                negative_edges = []
+                while len(negative_edges) < len(positive_edges):
+                    u = random.choice(nodes)
+                    v = random.choice(nodes)
+                    if not dataset.has_edge(u, v) and u != v:
+                        negative_edges.append((u, v))
+                test_edges = positive_edges + negative_edges
+                run["positive_edges"] = positive_edges
+                run["negative_edges"] = negative_edges
+                run["graph"] = dataset
+                run["removed_edges"] = removed_edges
+            else:
+                run["graph"] = dataset
+                run["removed_edges"] = []
+                run["positive_edges"] = []
+                run["negative_edges"] = []
+        log(f"Removed {len(removed_edges)} edges for testing link prediction.")
         if not use_lpa:
             log("Partitioning graph with LFM-based partitioner...")
             parts = run("partitions", partition_graph, dataset, partitions, alpha=alpha, threshold=threshold, use_modified_lfm=True)
@@ -418,6 +470,8 @@ class Commands:
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Graph partitioned")
         embs = {}
+        # Lets test the model on the removed edges and on some random non-edges.
+        lp_models = [] 
         for part in parts:
             part_name = hash_set_persistently(part)
             log("Partition size: %d" % len(part))
@@ -522,12 +576,38 @@ class Commands:
                 if node not in embs:
                     embs[node] = []
                 embs[node].append(e)
+            if link_prediction:
+                log("Training link prediction model on partition...")
+                lp_model, _, _ = run("lp_%s" % part_name, train_on_static_graph, pg, best_model)
         if skip_global:
             log("Skipping global F1 computation")
             return
         for n in dataset.nodes:
             embs[n] = np.mean(embs[n], axis=0)
         embs = [embs[n] for n in dataset.nodes]
+        embedding_dict = {n: embs[i] for i, n in enumerate(dataset.nodes)}
+        if link_prediction:
+            log("Running link prediction...")
+            lp_models = [run["lp_%s" % hash_set_persistently(part)][0] for part in parts]
+            predictions = ensemble_predict_links(test_edges, [embedding_dict], lp_models)
+            TP, FP, TN, FN = 0, 0, 0, 0
+            for (u, v), (is_edge, prob) in zip(test_edges, predictions):
+                if is_edge and (u, v) in positive_edges:
+                    TP += 1
+                elif is_edge and (u, v) in negative_edges:
+                    FP += 1
+                elif not is_edge and (u, v) in negative_edges:
+                    TN += 1
+                elif not is_edge and (u, v) in positive_edges:
+                    FN += 1
+            print(f"True Positives: {TP}")
+            print(f"False Positives: {FP}")
+            print(f"True Negatives: {TN}")
+            print(f"False Negatives: {FN}")
+            print(f"Precision: {TP / (TP + FP) if TP + FP > 0 else 0:.4f}")
+            print(f"Recall: {TP / (TP + FN) if TP + FN > 0 else 0:.4f}")
+            print(f"F1 Score: {2 * TP / (2 * TP + FP + FN) if 2 * TP + FP + FN > 0 else 0:.4f}")
+            print(f"Accuracy: {(TP + TN) / (TP + FP + TN + FN) if TP + FP + TN + FN > 0 else 0:.4f}")
         g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
         G = nx.Graph()
         G.add_edges_from(dataset.edges)

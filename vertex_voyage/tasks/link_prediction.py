@@ -18,7 +18,6 @@ class HadamardLogitsNet(nn.Module):
     criterion = nn.BCEWithLogitsLoss()
 
 def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10, batch_size=32, learning_rate=0.1):
-    print("Starting training...")
     val_losses = [] 
     train_losses = []
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
@@ -43,7 +42,6 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
                 total_loss += loss.item()
             avg_loss = total_loss / len(train_loader)
             train_losses.append(avg_loss)
-            print(f'Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}')
         # Validation
         with torch.no_grad():
             val_loss = 0
@@ -54,7 +52,6 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
                 val_loss += current_val_loss
             avg_val_loss = val_loss / len(val_loader)
             val_losses.append(avg_val_loss)
-            print(f'Validation Loss: {avg_val_loss:.4f}')
         # Update
         model.train()
         for u_batch, v_batch, y_batch in train_loader:
@@ -65,8 +62,6 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
             loss.backward()
             optimizer.step()
             total_loss += current_loss
-        print("-" * 30)
-    print("Training complete.")
     # Calculate one final validation loss after training
     model.eval()
     with torch.no_grad():
@@ -77,7 +72,6 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
             total_loss += loss.item()
         avg_loss = total_loss / len(train_loader)
         train_losses.append(avg_loss)
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}')
     # Validation
     with torch.no_grad():
         val_loss = 0
@@ -88,7 +82,6 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
             val_loss += current_val_loss
         avg_val_loss = val_loss / len(val_loader)
         val_losses.append(avg_val_loss)
-        print(f'Validation Loss: {avg_val_loss:.4f}')
     return model, train_losses, val_losses
 
 
