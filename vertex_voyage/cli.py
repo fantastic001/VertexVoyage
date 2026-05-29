@@ -586,6 +586,7 @@ class Commands:
             embs[n] = np.mean(embs[n], axis=0)
         embs = [embs[n] for n in dataset.nodes]
         embedding_dict = {n: embs[i] for i, n in enumerate(dataset.nodes)}
+        run["embedding_dict"] = embedding_dict
         if link_prediction:
             log("Running link prediction...")
             lp_models = [run["lp_%s" % hash_set_persistently(part)][0] for part in parts]
