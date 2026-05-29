@@ -41,7 +41,7 @@ import hashlib
 from vertex_voyage.tasks.link_prediction import (
     train_on_static_graph,
     ensemble_predict_links,
-    generate_embedding_dict
+    predict_links
 )
 
 logger = logging.getLogger("CLI")
@@ -608,6 +608,36 @@ class Commands:
             print(f"Recall: {TP / (TP + FN) if TP + FN > 0 else 0:.4f}")
             print(f"F1 Score: {2 * TP / (2 * TP + FP + FN) if 2 * TP + FP + FN > 0 else 0:.4f}")
             print(f"Accuracy: {(TP + TN) / (TP + FP + TN + FN) if TP + FP + TN + FN > 0 else 0:.4f}")
+            # lets train single model on the whole graph and see how it does on link prediction as well
+            log("Training link prediction model on full graph...")
+            class EM:
+                def __init__(self, embedding_dict):
+                    self.embedding_dict = embedding_dict
+                def embed_nodes(self, nodes):
+                    return [self.embed_node(n) for n in nodes]
+                def embed_node(self, node):
+                    return self.embedding_dict[node]
+            em = EM(embedding_dict)
+            full_model, _, _ = run("lp_full", train_on_static_graph, dataset, em)
+            full_predictions = predict_links(test_edges, em, full_model)
+            TP, FP, TN, FN = 0, 0, 0, 0
+            for (u, v), (is_edge, prob) in zip(test_edges, full_predictions):
+                if is_edge and (u, v) in positive_edges:
+                    TP += 1
+                elif is_edge and (u, v) in negative_edges:
+                    FP += 1
+                elif not is_edge and (u, v) in negative_edges:
+                    TN += 1
+                elif not is_edge and (u, v) in positive_edges:
+                    FN += 1
+            print(f"Full Model - True Positives: {TP}")
+            print(f"Full Model - False Positives: {FP}")
+            print(f"Full Model - True Negatives: {TN}")
+            print(f"Full Model - False Negatives: {FN}")
+            print(f"Full Model - Precision: {TP / (TP + FP) if TP   + FP > 0 else 0:.4f}")
+            print(f"Full Model - Recall: {TP / (TP + FN) if TP + FN > 0 else 0:.4f}")
+            print(f"Full Model - F1 Score: {2 * TP / (2 * TP + FP + FN) if 2 * TP + FP + FN > 0 else 0:.4f}")
+            print(f"Full Model - Accuracy: {(TP + TN) / (TP + FP + TN + FN) if TP + FP + TN + FN > 0 else 0:.4f}")  
         g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
         G = nx.Graph()
         G.add_edges_from(dataset.edges)
