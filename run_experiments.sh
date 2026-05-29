@@ -68,6 +68,7 @@ for parts in 1 2 4 8 16; do
             --long-run \
             --use-lpa \
             --epochs 10 \
+            --link-prediction \
             --checkpoint ${CP_DIR} \
             > ${CP_DIR}output.log 2>&1; echo >&3) &
         echo "----------------------------------------"
