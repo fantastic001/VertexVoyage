@@ -681,6 +681,7 @@ class Commands:
              iterations: int = 1,
              limit: int = -1,
              buffer_size: int = 100,
+             checkpoint: str = "",
 
              #  Parameters for partitioner (if needed
              replication_factor: int = 1,
@@ -707,9 +708,12 @@ class Commands:
         - iterations: The number of times to repeat the entire process for averaging results.
         - limit: If > 0, limits the number of events to process from the dataset for quicker testing.
         - buffer_size: The number of events to process in each buffer before updating the embeddings and evaluating the F1 score.
+        - checkpoint: The path to the checkpoint file for saving and loading intermediate results.
         """
         import networkx as nx
         scores = []
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay)
+        log(f"Processing dataset {name}")
         t = VertexEnumerator()
         dataset = Transform(datasets[name](), lambda x: Event(
             src=t(int(x.src)),
@@ -722,7 +726,8 @@ class Commands:
             og_events = list(dataset)[:limit]
         else:
             og_events = list(dataset)
-        original_graph = to_nx_graph(og_events)
+        original_graph = run("graph", to_nx_graph, og_events)
+
         logger.debug(f"Original graph has {original_graph.number_of_nodes()} nodes and {original_graph.number_of_edges()} edges")
         if use_dataset_params:
             params: dict = dataset_params.get(name, {})
@@ -731,120 +736,144 @@ class Commands:
             default_q = params.get('q', default_q)
         for it in range(iterations):
             log(f"Iteration {it+1} / {iterations}: Processing dataset {name}")
-            models = {InMemoryPartition.empty(id=p) : ALGS[algorithm](
-                dim=dim,
-                epochs=epochs,
-                p= default_p if default_p > 0 else 0.5,
-                q= default_q if default_q > 0 else 0.5,
+            if ("models_%d" % it in run and "partitioner_%d" % it in run
+                and "iteration_precisions_%d" % it in run
+                and "iteration_recalls_%d" % it in run
+                and "iteration_f1s_%d" % it in run):
+                log("Loading models and partitioner for iteration...")
+                models = run["models_%d" % it]
+                partitioner: PartitionerProfile = run["partitioner_%d" % it]
+                log("Models and partitioner loaded")
+                partitioner.print_profile()
+                scores.append(run["iteration_f1s_%d" % it][-1])
+            else:
+                models = {InMemoryPartition.empty(id=p) : ALGS[algorithm](
+                    dim=dim,
+                    epochs=epochs,
+                    p= default_p if default_p > 0 else 0.5,
+                    q= default_q if default_q > 0 else 0.5,
+                    n_walks=10 if long_run else 1,
+                    walk_size=80 if long_run else 10,
+                    window_size=10 if long_run else 3,
+                    retrain_threshold=int(0.1 * original_graph.number_of_nodes())
+                ) for p in range(partitions)}
+                parts: set[Partition] = set(models.keys())
+                partitioner = {
+                    "random": lambda **kw: RandomPartitioner.uniform(parts),
+                    "random.degree": lambda **kw: RandomPartitioner.degree_based(
+                        parts
+                    ),
+                    "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(
+                        parts, 
+                        replication_factor=kw["replication_factor"],
+                        mu=kw["mu"],
+                        epsilon=kw["epsilon"],
+                        alpha=kw["alpha"],
+                        decay=kw["decay"]
+                    ),
+                    "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(
+                        parts, 
+                        replication_factor=kw["replication_factor"],
+                        mu=kw["mu"],
+                        epsilon=kw["epsilon"],
+                        alpha=kw["alpha"],
+                        decay=kw["decay"]
+                    ),
+                }[partitioner_name](
+                    replication_factor=replication_factor,
+                    mu=mu,
+                    epsilon=epsilon,
+                    alpha=alpha,
+                    decay=decay if decay > 0 else None
+                )
+                partitioner = PartitionerProfile(partitioner)
+                events = og_events.copy()
+                if track_seen:
+                    random.shuffle(events)
+                nodes = set()
+                seen = set()
+                i = 0
+                old_f1_score = 0
+                sorted_events = []
+                while(len(events) > 0):
+                    seen_status = "maybe seen"
+                    if track_seen:
+                        # find event with smallest timestamp among events that are connected to seen nodes
+                        event = None
+                        for e in events:
+                            if e.src in seen or e.dest in seen:
+                                event = e
+                                seen_status = "seen"
+                                break
+                        if event is None:
+                            event = events[0]
+                            seen_status = "not seen"
+                        events.remove(event)
+                        seen.add(event.src)
+                        seen.add(event.dest)
+                    else:
+                        event = events.pop(0)
+                    # log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
+                    nodes.add(event.src)
+                    nodes.add(event.dest)
+                    sorted_events.append(event)
+                total_edges = 0
+                nodes = set()
+                iteration_precisions, iteration_recalls, iteration_f1s = [], [], []
+                for bi, buffer in enumerate(buffered(sorted_events, buffer_size)):
+                    for event in buffer:
+                        nodes.add(event.src)
+                        nodes.add(event.dest)
+                    partitioner.push(buffer)
+
+                    total_edges += len(buffer)
+                    for part, partition_buffer in partitioner.get_partition_buffers(buffer):
+                        models[part].update(partition_buffer)
+                    
+                    embeddings = partitioner.get_distributed_embedding(models, nodes)
+                    # reconstruct graph and compute F1 score
+                    g = reconstruct(total_edges, embeddings, list(nodes))
+                    G = nx.Graph()
+                    for u,v in original_graph.edges:
+                        if u in nodes and v in nodes:
+                            G.add_edge(u, v)
+                    try:
+                        precision, recall, f1_score = get_f1_score(G, g)
+                    except ZeroDivisionError:
+                        precision, recall, f1_score = 0.0, 0.0, 0.0
+                    log(f"Buffer: {bi+1}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
+                    if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
+                        logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
+                    old_f1_score = f1_score
+                    iteration_precisions.append(precision)
+                    iteration_recalls.append(recall)
+                    iteration_f1s.append(f1_score)
+                log("Event stream processing completed")
+                scores.append(old_f1_score)
+                run["models_%d" % it] = models
+                run["partitioner_%d" % it] = partitioner
+                run["iteration_precisions_%d" % it] = iteration_precisions
+                run["iteration_recalls_%d" % it] = iteration_recalls
+                run["iteration_f1s_%d" % it] = iteration_f1s
+                partitioner.print_profile()
+        log("Average F1 score: ", np.mean(scores))
+        log("Standard deviation of F1 score: ", np.std(scores))
+        if "full_model" in run:
+            node2vec = run["full_model"]
+        else:
+            node2vec = Node2Vec(
+                dim=dim, 
+                p=default_p if default_p > 0 else 0.5, 
+                q=default_q if default_q > 0 else 0.5,
                 n_walks=10 if long_run else 1,
                 walk_size=80 if long_run else 10,
                 window_size=10 if long_run else 3,
-                retrain_threshold=int(0.1 * original_graph.number_of_nodes())
-            ) for p in range(partitions)}
-            parts: set[Partition] = set(models.keys())
-            partitioner = {
-                "random": lambda **kw: RandomPartitioner.uniform(parts),
-                "random.degree": lambda **kw: RandomPartitioner.degree_based(
-                    parts
-                ),
-                "neighbors.all": lambda **kw: MostCommonNeighborPartitioner.all_neighbors(
-                    parts, 
-                    replication_factor=kw["replication_factor"],
-                    mu=kw["mu"],
-                    epsilon=kw["epsilon"],
-                    alpha=kw["alpha"],
-                    decay=kw["decay"]
-                ),
-                "neighbors.degree": lambda **kw: MostCommonNeighborPartitioner.degree_based(
-                    parts, 
-                    replication_factor=kw["replication_factor"],
-                    mu=kw["mu"],
-                    epsilon=kw["epsilon"],
-                    alpha=kw["alpha"],
-                    decay=kw["decay"]
-                ),
-            }[partitioner_name](
-                replication_factor=replication_factor,
-                mu=mu,
-                epsilon=epsilon,
-                alpha=alpha,
-                decay=decay if decay > 0 else None
+                epochs=epochs, 
             )
-            partitioner = PartitionerProfile(partitioner)
-            events = og_events.copy()
-            if track_seen:
-                random.shuffle(events)
-            nodes = set()
-            seen = set()
-            i = 0
-            old_f1_score = 0
-            sorted_events = []
-            while(len(events) > 0):
-                seen_status = "maybe seen"
-                if track_seen:
-                    # find event with smallest timestamp among events that are connected to seen nodes
-                    event = None
-                    for e in events:
-                        if e.src in seen or e.dest in seen:
-                            event = e
-                            seen_status = "seen"
-                            break
-                    if event is None:
-                        event = events[0]
-                        seen_status = "not seen"
-                    events.remove(event)
-                    seen.add(event.src)
-                    seen.add(event.dest)
-                else:
-                    event = events.pop(0)
-                # log(f"Processing {seen_status} event {i+1} / timestamp {event.timestamp}")
-                nodes.add(event.src)
-                nodes.add(event.dest)
-                sorted_events.append(event)
-            total_edges = 0
-            nodes = set()
-            for bi, buffer in enumerate(buffered(sorted_events, buffer_size)):
-                for event in buffer:
-                    nodes.add(event.src)
-                    nodes.add(event.dest)
-                partitioner.push(buffer)
-
-                total_edges += len(buffer)
-                for part, partition_buffer in partitioner.get_partition_buffers(buffer):
-                    models[part].update(partition_buffer)
-                
-                embeddings = partitioner.get_distributed_embedding(models, nodes)
-                # reconstruct graph and compute F1 score
-                g = reconstruct(total_edges, embeddings, list(nodes))
-                G = nx.Graph()
-                for u,v in original_graph.edges:
-                    if u in nodes and v in nodes:
-                        G.add_edge(u, v)
-                try:
-                    _, _, f1_score = get_f1_score(G, g)
-                except ZeroDivisionError:
-                    f1_score = 0.0
-                log(f"Buffer: {bi+1}, F1 score: {f1_score}")
-                if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
-                    logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
-                old_f1_score = f1_score
-            log("Event stream processing completed")
-            scores.append(old_f1_score)
-            partitioner.print_profile()
-        log("Average F1 score: ", np.mean(scores))
-        log("Standard deviation of F1 score: ", np.std(scores))
-        node2vec = Node2Vec(
-            dim=dim, 
-            p=default_p if default_p > 0 else 0.5, 
-            q=default_q if default_q > 0 else 0.5,
-            n_walks=10 if long_run else 1,
-            walk_size=80 if long_run else 10,
-            window_size=10 if long_run else 3,
-            epochs=epochs, 
-        )
-        # Fit on the full graph for an upper bound on performance
-        node2vec.fit(original_graph, original_graph.nodes)
-        # Compute F1 score for the full graph        full_emb =
+            # Fit on the full graph for an upper bound on performance
+            node2vec.fit(original_graph, original_graph.nodes)
+            # Compute F1 score for the full graph
+            run["full_model"] = node2vec
         full_emb = node2vec.embed_nodes(original_graph.nodes)
         full_g = reconstruct(original_graph.number_of_edges(), full_emb, list(original_graph.nodes))
         _, _, full_f1_score = get_f1_score(original_graph, full_g)

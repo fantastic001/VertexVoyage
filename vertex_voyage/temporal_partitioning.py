@@ -435,6 +435,9 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     def get(self, vertex) -> Set[Partition]:
         return {partition for partition in self.partitions if partition.has(vertex)}
     
+
+    def all_neighbors_distribution(vertex, event):
+        return 1.0
     @staticmethod
     def all_neighbors(
         partitions: Set[Partition], 
@@ -444,9 +447,7 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         alpha: float = 1.0,
         decay: Optional[float] = None
     ):
-        def all_neighbors_distribution(vertex, event):
-            return 1.0
-        return MostCommonNeighborPartitioner(partitions, all_neighbors_distribution, replication_factor, mu, epsilon, alpha, decay)
+        return MostCommonNeighborPartitioner(partitions, MostCommonNeighborPartitioner.all_neighbors_distribution, replication_factor, mu, epsilon, alpha, decay)
     
     @staticmethod
     def degree_based(
