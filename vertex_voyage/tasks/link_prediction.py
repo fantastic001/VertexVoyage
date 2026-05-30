@@ -17,6 +17,19 @@ class HadamardLogitsNet(nn.Module):
 
     criterion = nn.BCEWithLogitsLoss()
 
+class QuadraticLogitsNet(nn.Module):
+    def __init__(self, vector_dim, use_bias = True):
+        super(QuadraticLogitsNet, self).__init__()
+        self.fc = nn.Linear(vector_dim, vector_dim, bias=use_bias)
+        
+    def forward(self, u, v):
+        # x.T A y
+        u_transformed = self.fc(u)
+        logits = torch.sum(u_transformed * v, dim=1)
+        return logits
+
+    criterion = nn.BCEWithLogitsLoss()
+
 def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10, batch_size=32, learning_rate=0.1):
     val_losses = [] 
     train_losses = []
@@ -85,7 +98,7 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
     return model, train_losses, val_losses
 
 
-def train_on_static_graph(graph, embedding_model, val_ratio=0.2, epochs=60, batch_size=32, learning_rate=0.1, use_bias=False, cv_k=10):
+def train_on_static_graph(graph, embedding_model, val_ratio=0.2, epochs=60, batch_size=32, learning_rate=0.1, use_bias=False, cv_k=10, model_class = QuadraticLogitsNet):
     nodes = list(graph.nodes())
     embeddings = embedding_model.embed_nodes(nodes)
     embeddings = np.array(embeddings)
@@ -123,7 +136,7 @@ def train_on_static_graph(graph, embedding_model, val_ratio=0.2, epochs=60, batc
             u_val.append(embeddings[node_to_idx[u_neg]])
             v_val.append(embeddings[node_to_idx[v_neg]])
             y_val.append(0)  # Negative edge
-        model, train_losses, val_losses = train_model(HadamardLogitsNet(
+        model, train_losses, val_losses = train_model(model_class(
                 vector_dim=embeddings.shape[1],
                 use_bias=use_bias
             ), 
