@@ -471,7 +471,7 @@ class Commands:
         log("Graph partitioned")
         embs = {}
         # Lets test the model on the removed edges and on some random non-edges.
-        lp_models = [] 
+        lp_models = []
         for part in parts:
             part_name = hash_set_persistently(part)
             log("Partition size: %d" % len(part))
@@ -619,7 +619,8 @@ class Commands:
                 def embed_node(self, node):
                     return self.embedding_dict[node]
             em = EM(embedding_dict)
-            full_model, _, _ = run("lp_full", train_on_static_graph, dataset, em)
+            full_model, train_losses, val_losses = run("lp_full", train_on_static_graph, dataset, em)
+            log("Full model trained (Train loss: %f, Val loss: %f)" % (train_losses[-1], val_losses[-1]))
             full_predictions = predict_links(test_edges, em, full_model)
             TP, FP, TN, FN = 0, 0, 0, 0
             for (u, v), (is_edge, prob) in zip(test_edges, full_predictions):
