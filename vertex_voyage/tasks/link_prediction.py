@@ -226,3 +226,73 @@ def ensemble_predict_links(node_pairs, embedding_dicts, link_prediction_models):
         is_edge = avg_prob > 0.5
         predictions.append((is_edge, avg_prob))
     return predictions
+
+
+def evaluate_predictions(embedding_model, model, positive_edges, negative_edges):
+    """
+    Evaluates the performance of link prediction by calculating precision, recall, F1 score, and accuracy.
+    Args:
+        model: The link prediction model to be evaluated.
+        positive_edges (set): Set of true positive edges in the graph for comparison.
+        negative_edges (set): Set of true negative edges in the graph for comparison.
+    Returns:
+        tuple: precision, recall, F1 score, and accuracy of the predictions.
+    """
+    TP = FP = TN = FN = 0
+    test_edges = list(positive_edges) + list(negative_edges)
+    predictions = predict_links(test_edges, embedding_model, model)
+    for (u, v), (is_edge, prob) in zip(test_edges, predictions):
+        if is_edge and (u, v) in positive_edges:
+            TP += 1
+        elif is_edge and (u, v) in negative_edges:
+            FP += 1
+        elif not is_edge and (u, v) in negative_edges:
+            TN += 1
+        elif not is_edge and (u, v) in positive_edges:
+            FN += 1
+    precision = TP / (TP + FP) if TP + FP > 0 else 0.0
+    recall = TP / (TP + FN) if TP + FN > 0 else 0.0
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+    accuracy = (TP + TN) / (TP + FP + TN + FN) if TP + FP + TN + FN > 0 else 0.0
+    return precision, recall, f1_score, accuracy
+
+def hits_k_score(embedding_model, model, g, positive_edges, k=3, ns=500):
+    """
+    Evaluates link prediction performance using the Hits@K metric, which measures the proportion of true positive edges that are ranked in the top K predictions among a set of negative samples.
+
+    Args:
+        embedding_model: The model used to generate node embeddings.
+        model: The link prediction model to be evaluated.
+        g: The graph containing the nodes and edges.
+        positive_edges (set): Set of true positive edges for testing.
+        k (int): The number of top predictions to consider for Hits@K.
+        ns (int): The number of negative samples to generate for each positive edge.
+
+    Returns:
+        float: The Hits@K score, representing the proportion of true positive edges that are ranked in the top K predictions.
+    
+    Note:
+        g should not contain the positive edges being evaluated, as they are used for testing. The function generates negative samples by randomly pairing nodes that do not have an edge in the graph, and then ranks the true positive edge among these negative samples based on the predicted probabilities from the link prediction model.
+    """
+    hits = 0
+    for x,y in positive_edges:
+        # Lets save g.has_edge method in order to avoid Python attribute lookup
+        has_edge = g.has_edge
+        # Generate negative samples
+        negative_samples = []
+        while len(negative_samples) < ns:
+            u = random.choice(list(g.nodes()))
+            # We do not check inside positive edges for performance reasons, 
+            # but we check against the graph's edges to ensure we are 
+            # generating true negative samples.
+            # Probability that it is inside positive edges is low, and even if 
+            # it is, it will just make the evaluation slightly more difficult, 
+            # which is acceptable for this metric.
+            if not has_edge(x, u):
+                negative_samples.append((x, u))
+        scores = predict_links([(x, y)] + negative_samples, embedding_model, model)
+        scores = [prob for _, prob in scores]  # Extract probabilities
+        topk = np.argpartition(scores, -k)[-k:]  # Get indices of top K scores
+        if 0 in topk:  # Check if the true positive edge (index 0) is in the top K predictions
+            hits += 1
+    return hits / len(positive_edges) if positive_edges else 0.0
