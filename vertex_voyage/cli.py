@@ -607,8 +607,12 @@ class Commands:
             
             hits3 = run("lp_hits3", hits_k_score, em, full_model, dataset, positive_edges, k=3)
             hits1 = run("lp_hits1", hits_k_score, em, full_model, dataset, positive_edges, k=1)
+            hits5 = run("lp_hits5", hits_k_score, em, full_model, dataset, positive_edges, k=5)
+            hits10 = run("lp_hits10", hits_k_score, em, full_model, dataset, positive_edges, k=10)
             log(f"Full Model - Hits@3: {hits3:.4f}")
             log(f"Full Model - Hits@1: {hits1:.4f}")
+            log(f"Full Model - Hits@5: {hits5:.4f}")
+            log(f"Full Model - Hits@10: {hits10:.4f}")
 
         g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
         G = nx.Graph()
