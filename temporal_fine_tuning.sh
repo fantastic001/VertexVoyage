@@ -64,7 +64,7 @@ for RF in 1 3; do
         mkdir -p $CP_DIR
         export VERTEX_VOYAGE_LOG_FILE="${CP_DIR}vv.log"
         (python -m vertex_voyage  temporal_test \
-            --name zachary \
+            --name $dataset \
             --long-run \
             --track-seen \
             --iterations 2 \
