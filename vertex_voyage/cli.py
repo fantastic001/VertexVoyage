@@ -453,6 +453,7 @@ class Commands:
                     if not dataset.has_edge(u, v) and u != v:
                         negative_edges.append((u, v))
                 test_edges = positive_edges + negative_edges
+                dataset.remove_edges_from(removed_edges)
                 run["positive_edges"] = positive_edges
                 run["negative_edges"] = negative_edges
                 run["graph"] = dataset
