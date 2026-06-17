@@ -97,47 +97,58 @@ def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10
         val_losses.append(avg_val_loss)
     return model, train_losses, val_losses
 
+class DatasetGenerator:
+    def __init__(self, graph, embedding_model):
+        self.nodes = list(graph.nodes())
+        self.embeddings = embedding_model.embed_nodes(self.nodes)
+        self.embeddings = np.array(self.embeddings)
+        self.node_to_idx = {node: idx for idx, node in enumerate(self.nodes)}
+        self.edges = list(graph.edges())
+        self.graph = graph
+
+    def generate_data(self, positive_edges, negative_edges):
+        u_data, v_data, y_data = [], [], []
+        for u, v in positive_edges:
+            u_data.append(self.embeddings[self.node_to_idx[u]])
+            v_data.append(self.embeddings[self.node_to_idx[v]])
+            y_data.append(1)  # Positive edge
+        for u, v in negative_edges:
+            u_data.append(self.embeddings[self.node_to_idx[u]])
+            v_data.append(self.embeddings[self.node_to_idx[v]])
+            y_data.append(0)  # Negative edge
+        return np.array(u_data), np.array(v_data), np.array(y_data)
+    def generate_train_val_data(self, val_ratio=0.2):
+        random.shuffle(self.edges)
+        split_idx = int(len(self.edges) * (1 - val_ratio))
+        train_edges = self.edges[:split_idx]
+        val_edges = self.edges[split_idx:]
+        u_train, v_train, y_train = [], [], []
+        negative_edges = []
+        for _ in range(len(train_edges)):
+            u_neg, v_neg = random.sample(self.nodes, 2)
+            while self.graph.has_edge(u_neg, v_neg):
+                u_neg, v_neg = random.sample(self.nodes, 2)
+            negative_edges.append((u_neg, v_neg))
+        u_train, v_train, y_train = self.generate_data(train_edges, negative_edges)
+        u_val, v_val, y_val = [], [], []
+        negative_val_edges = []
+        for _ in range(len(val_edges)):
+            u_neg, v_neg = random.sample(self.nodes, 2)
+            while self.graph.has_edge(u_neg, v_neg):
+                u_neg, v_neg = random.sample(self.nodes, 2)
+            negative_val_edges.append((u_neg, v_neg))
+        u_val, v_val, y_val = self.generate_data(val_edges, negative_val_edges)
+        return np.array(u_train), np.array(v_train), np.array(y_train), np.array(u_val), np.array(v_val), np.array(y_val)
 
 def train_on_static_graph(graph, embedding_model, val_ratio=0.2, epochs=60, batch_size=32, learning_rate=0.1, use_bias=False, cv_k=10, model_class = QuadraticLogitsNet):
-    nodes = list(graph.nodes())
-    embeddings = embedding_model.embed_nodes(nodes)
-    embeddings = np.array(embeddings)
-    node_to_idx = {node: idx for idx, node in enumerate(nodes)}
-    edges = list(graph.edges())
     best_model = None
     best_train_losses = []
     best_val_losses = []
+    dataset_generator = DatasetGenerator(graph, embedding_model)
     for _ in range(cv_k):
-        random.shuffle(edges)
-        split_idx = int(len(edges) * (1 - val_ratio))
-        train_edges = edges[:split_idx]
-        val_edges = edges[split_idx:]
-        u_train, v_train, y_train = [], [], []
-        for u, v in train_edges:
-            u_train.append(embeddings[node_to_idx[u]])
-            v_train.append(embeddings[node_to_idx[v]])
-            y_train.append(1)  # Positive edge
-        for _ in range(len(train_edges)):
-            u_neg, v_neg = random.sample(nodes, 2)
-            while graph.has_edge(u_neg, v_neg):
-                u_neg, v_neg = random.sample(nodes, 2)
-            u_train.append(embeddings[node_to_idx[u_neg]])
-            v_train.append(embeddings[node_to_idx[v_neg]])
-            y_train.append(0)  # Negative edge
-        u_val, v_val, y_val = [], [], []
-        for u, v in val_edges:
-            u_val.append(embeddings[node_to_idx[u]])
-            v_val.append(embeddings[node_to_idx[v]])
-            y_val.append(1)  # Positive edge
-        for _ in range(len(val_edges)):
-            u_neg, v_neg = random.sample(nodes, 2)
-            while graph.has_edge(u_neg, v_neg):
-                u_neg, v_neg = random.sample(nodes, 2)
-            u_val.append(embeddings[node_to_idx[u_neg]])
-            v_val.append(embeddings[node_to_idx[v_neg]])
-            y_val.append(0)  # Negative edge
+        u_train, v_train, y_train, u_val, v_val, y_val = dataset_generator.generate_train_val_data(val_ratio=val_ratio)
         model, train_losses, val_losses = train_model(model_class(
-                vector_dim=embeddings.shape[1],
+                vector_dim=u_train.shape[1],
                 use_bias=use_bias
             ), 
             np.array(u_train), np.array(v_train), np.array(y_train), 
@@ -256,7 +267,7 @@ def evaluate_predictions(embedding_model, model, positive_edges, negative_edges)
     accuracy = (TP + TN) / (TP + FP + TN + FN) if TP + FP + TN + FN > 0 else 0.0
     return precision, recall, f1_score, accuracy
 
-def hits_k_score(embedding_model, model, g, positive_edges, k=3, ns=500):
+def hits_k_score(embedding_model, model, g, positive_edges, max_k=10, ns=500, ps=1000):
     """
     Evaluates link prediction performance using the Hits@K metric, which measures the proportion of true positive edges that are ranked in the top K predictions among a set of negative samples.
 
@@ -265,17 +276,21 @@ def hits_k_score(embedding_model, model, g, positive_edges, k=3, ns=500):
         model: The link prediction model to be evaluated.
         g: The graph containing the nodes and edges.
         positive_edges (set): Set of true positive edges for testing.
-        k (int): The number of top predictions to consider for Hits@K.
+        max_k (int): The number of top predictions to consider for Hits@K. This function will compute Hits@K for K=1 to max_k.
         ns (int): The number of negative samples to generate for each positive edge.
-
+        ps (int): The number of positive samples to use for evaluation.
     Returns:
-        float: The Hits@K score, representing the proportion of true positive edges that are ranked in the top K predictions.
+        list of floats: A list containing the Hits@K scores for K=1 to max_k.
     
     Note:
         g should not contain the positive edges being evaluated, as they are used for testing. The function generates negative samples by randomly pairing nodes that do not have an edge in the graph, and then ranks the true positive edge among these negative samples based on the predicted probabilities from the link prediction model.
     """
-    hits = 0
-    for x,y in positive_edges:
+    hits_at_k = []
+    for k in range(max_k):
+        hits_at_k.append(0)
+    # Limit to ps positive edges for evaluation
+    sample = random.sample(positive_edges, min(len(positive_edges), ps))
+    for x,y in sample:
         # Lets save g.has_edge method in order to avoid Python attribute lookup
         has_edge = g.has_edge
         # Generate negative samples
@@ -292,7 +307,10 @@ def hits_k_score(embedding_model, model, g, positive_edges, k=3, ns=500):
                 negative_samples.append((x, u))
         scores = predict_links([(x, y)] + negative_samples, embedding_model, model)
         scores = [prob for _, prob in scores]  # Extract probabilities
-        topk = np.argpartition(scores, -k)[-k:]  # Get indices of top K scores
-        if 0 in topk:  # Check if the true positive edge (index 0) is in the top K predictions
-            hits += 1
-    return hits / len(positive_edges) if positive_edges else 0.0
+        for k in range(1, max_k + 1):
+            # Get indices of top K scores
+            topk = np.argpartition(scores, -k)[-k:]
+            # Check if the true positive edge (x, y) is among the top k
+            if 0 in topk: 
+                hits_at_k[k - 1] += 1
+    return [hits / len(sample) if sample else 0.0 for hits in hits_at_k]
