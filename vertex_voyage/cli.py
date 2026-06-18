@@ -795,6 +795,7 @@ class Commands:
                 total_edges = 0
                 nodes = set()
                 iteration_precisions, iteration_recalls, iteration_f1s = [], [], []
+                total_buffers = (len(sorted_events) + buffer_size - 1) // buffer_size
                 for bi, buffer in enumerate(buffered(sorted_events, buffer_size)):
                     for event in buffer:
                         nodes.add(event.src)
@@ -806,23 +807,27 @@ class Commands:
                         models[part].update(partition_buffer)
                     
                     embeddings = partitioner.get_distributed_embedding(models, nodes)
-                    # reconstruct graph and compute F1 score
-                    g = reconstruct(total_edges, embeddings, list(nodes))
-                    G = nx.Graph()
-                    for u,v in original_graph.edges:
-                        if u in nodes and v in nodes:
-                            G.add_edge(u, v)
-                    try:
-                        precision, recall, f1_score = get_f1_score(G, g)
-                    except ZeroDivisionError:
-                        precision, recall, f1_score = 0.0, 0.0, 0.0
-                    log(f"Buffer: {bi+1}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
-                    if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
-                        logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
-                    old_f1_score = f1_score
-                    iteration_precisions.append(precision)
-                    iteration_recalls.append(recall)
-                    iteration_f1s.append(f1_score)
+                    # Compute F1 on every total_buffers // 100 buffers, or at least once per iteration
+                    if (bi + 1) % (total_buffers // 100) == 0 or (bi + 1) == total_buffers:
+                        # reconstruct graph and compute F1 score
+                        g = reconstruct(total_edges, embeddings, list(nodes))
+                        G = nx.Graph()
+                        for u,v in original_graph.edges:
+                            if u in nodes and v in nodes:
+                                G.add_edge(u, v)
+                        try:
+                            precision, recall, f1_score = get_f1_score(G, g)
+                        except ZeroDivisionError:
+                            precision, recall, f1_score = 0.0, 0.0, 0.0
+                        log(f"Buffer: {bi+1}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
+                        if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
+                            logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
+                        old_f1_score = f1_score
+                        iteration_precisions.append(precision)
+                        iteration_recalls.append(recall)
+                        iteration_f1s.append(f1_score)
+                    else:
+                        log(f"Buffer: {bi+1}, F1 score not computed this buffer")
                 log("Event stream processing completed")
                 scores.append(old_f1_score)
                 run["models_%d" % it] = models
