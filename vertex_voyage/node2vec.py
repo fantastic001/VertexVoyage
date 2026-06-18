@@ -13,6 +13,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+PARALLELIZATION_THRESHOLD = 1000
+
 class Node2Vec:
 
     def __init__(self, 
@@ -92,8 +94,9 @@ class Node2Vec:
         if nodes is None:
             nodes = list(G.nodes)
         self.g_nodes = list(G.nodes)
+        self.node_to_idx = {node: idx for idx, node in enumerate(self.g_nodes)}
         if not isinstance(self.G, VVGraph):
-            self.nodes = {node: self._encode(node) for node in nodes}
+            self.nodes = {node: self.node_to_idx.get(node) for node in nodes}
         else:
             self.nodes = self.g_nodes
         self.walks = self._random_walks()
@@ -105,14 +108,8 @@ class Node2Vec:
         self.W = W
         return self.W
 
-    def _encode(self, node):
-        try:
-            return self.g_nodes.index(node)
-        except ValueError:
-            return None 
-
     def embed_node(self, node):
-        node_idx = self._encode(node)
+        node_idx = self.node_to_idx.get(node)
         if node_idx is None:
             return np.zeros(self.dim)
         return self.W[node_idx]
@@ -120,18 +117,20 @@ class Node2Vec:
     def embed_nodes(self, nodes):
         return [self.embed_node(node) for node in nodes]
 
-    def _random_walks(self):
+    def _random_walks(self, affected_nodes=None):
         walks = []
         self.G: nx.Graph
+        if affected_nodes is None:
+            affected_nodes = self.g_nodes
         if self.G.number_of_nodes() == 0:
             return [] 
-        if self.use_threads:
-            starts = [n for _ in range(self.n_walks) for n in self.g_nodes]
+        if self.use_threads and len(affected_nodes) > PARALLELIZATION_THRESHOLD:
+            starts = [n for _ in range(self.n_walks) for n in affected_nodes]
             with mpp.Pool() as pool:
                 walks = pool.map(self._random_walk, starts)
         else:
             for _ in range(self.n_walks):
-                for n in self.g_nodes:
+                for n in affected_nodes:
                     start = n
                     walks.append(self._random_walk(start))
         return walks
@@ -146,7 +145,7 @@ class Node2Vec:
             walk.append(next_node)
             prev = current
             current = next_node
-        result = [self._encode(n) for n in walk]
+        result = [self.node_to_idx.get(n, None) for n in walk]
         logger.debug(f"Completed random walk: {result}")
         return result
 

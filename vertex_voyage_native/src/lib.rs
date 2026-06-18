@@ -42,11 +42,9 @@ fn get_reconstructed_edges(
     let dim = embeddings.shape()[1];
     let mut neighbors: Vec<(usize, usize)> = Vec::new();
 
-    println!("Acquiring");
     let emb = embeddings.as_array();
     py.allow_threads(|| {
         let cpu_num = num_cpus::get();
-        println!("Using {} threads", cpu_num);
         
         // parallel computing 
         // each thread processes a chunk of nodes

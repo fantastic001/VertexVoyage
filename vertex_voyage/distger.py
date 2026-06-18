@@ -160,6 +160,6 @@ class DistGER(Node2Vec):
                 (n, len(set(self.G.neighbors(v)) & set(self.G.neighbors(n)))) 
                 for n in self.G.neighbors(v)] for v in self.G.nodes}
         graph = native.Graph(self.adjacency)
-        walk_ = list(self._encode(n) for n in native.walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
+        walk_ = list(self.node_to_idx.get(n, None) for n in native.walk(graph, walker, threshold=self.threshold, min_length=self.min_walk_size, max_length=self.walk_size))
         return walk_
         

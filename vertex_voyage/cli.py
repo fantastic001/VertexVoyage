@@ -807,8 +807,8 @@ class Commands:
                         models[part].update(partition_buffer)
                     
                     embeddings = partitioner.get_distributed_embedding(models, nodes)
-                    # Compute F1 on every total_buffers // 100 buffers, or at least once per iteration
-                    if bi == 0 or total_buffers  < 100 or (bi + 1) % (total_buffers // 100) == 0 or (bi + 1) == total_buffers:
+                    # Compute F1 on the reconstructed graph every 100 buffers or on the last buffer
+                    if bi % 100 == 0 or bi == total_buffers - 1:
                         # reconstruct graph and compute F1 score
                         g = reconstruct(total_edges, embeddings, list(nodes))
                         G = nx.Graph()
