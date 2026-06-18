@@ -37,6 +37,27 @@ class PersistedRun:
         n2v.train()
     ```
     """
+    def load(directory: str) -> "PersistedRun":
+        """
+        Loads a persisted run from the given directory. It checks if the directory exists and if there is a file named 'metadata.json'. If the directory does not exist or if there is no 'metadata.json' file, it raises an error.
+
+        In case of success, it returns a PersistedRun object where parameters are loaded from the 'metadata.json' file and data is loaded from the files in the directory.
+
+        Args:
+            directory (str): The path to the directory where the persisted run is stored.
+        """
+        if not os.path.exists(directory):
+            logger.error(f"Directory {directory} does not exist.")
+            raise ValueError(f"Directory {directory} does not exist.")
+        metadata_path = os.path.join(directory, "metadata.json")
+        if not os.path.exists(metadata_path):
+            logger.error(f"No metadata.json file found in directory {directory}.")
+            raise ValueError(f"No metadata.json file found in directory {directory}.")
+        with open(metadata_path, "r") as f:
+            params = json.load(f)
+            logger.info(f"Loaded metadata from {metadata_path}: {params}")
+        return PersistedRun(directory, **params)
+
     def __init__(self, directory, **params):
         logger.info(f"Initializing PersistedRun with directory: {directory} and params: {params}")
         self.directory = directory
