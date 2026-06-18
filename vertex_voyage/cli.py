@@ -40,7 +40,7 @@ import hashlib
 
 from vertex_voyage.tasks.link_prediction import (
     evaluate_predictions,
-    hits_k_score,
+    heart_benchmark,
     train_on_static_graph,
     ensemble_predict_links,
     predict_links
@@ -606,11 +606,13 @@ class Commands:
             log(f"Full Model - F1 Score: {lp_f1:.4f}")
             log(f"Full Model - Accuracy: {lp_accuracy:.4f}")
             
-            hitsAtk = run("lp_hits@k", hits_k_score, em, full_model, dataset, positive_edges, max_k=10)
-            log(f"Full Model - Hits@1: {hitsAtk[0]:.4f}")
-            log(f"Full Model - Hits@3: {hitsAtk[2]:.4f}")
-            log(f"Full Model - Hits@5: {hitsAtk[4]:.4f}")
-            log(f"Full Model - Hits@10: {hitsAtk[9]:.4f}")
+            ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=1000)
+            log(f"Full Model - Mean Rank: {ranks.mean_rank():.4f}")
+            log(f"Full Model - MRR: {ranks.mrr():.4f}")
+            log(f"Full Model - Hits@1: {ranks.hits_at_k(1):.4f}")
+            log(f"Full Model - Hits@3: {ranks.hits_at_k(3):.4f}")
+            log(f"Full Model - Hits@5: {ranks.hits_at_k(5):.4f}")
+            log(f"Full Model - Hits@10: {ranks.hits_at_k(10):.4f}")
 
         g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
         G = nx.Graph()
