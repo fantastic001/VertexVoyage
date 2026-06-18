@@ -1,7 +1,5 @@
 
 import networkx as nx  
-import cdlib.algorithms
-import cdlib.utils
 import numpy as np
 import vertex_voyage.node2vec as nv 
 from vertex_voyage.cluster import *

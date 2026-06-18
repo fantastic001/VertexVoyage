@@ -1,8 +1,7 @@
 
 
 import networkx as nx 
-from cdlib.algorithms import lfm
-from cdlib.algorithms.internal.lfm import Community
+
 from binpacking import to_constant_bin_number
 import random 
 import vertex_voyage.config as cfg 
@@ -22,10 +21,11 @@ class __NativeGraph:
         return list(self.G.nodes())
     
 
-def remove_vertex_from_community(c: Community, v):
+def remove_vertex_from_community(c, v):
     return c.remove_vertex(v)
 
 def modified__lfm(G: nx.Graph, partition_count, alpha: float = 1,threshold: float = 0.5, seed: int = None, pm_k: int  = None) -> list:
+    from cdlib.algorithms.internal.lfm import Community
     logger.info(f"Running modified LFM with alpha={alpha}, threshold={threshold}, seed={seed}, pm_k={pm_k}")
     if seed is not None:
         random.seed(seed)
@@ -83,6 +83,7 @@ def partition_graph(G: nx.Graph, partition_num: int, use_modified_lfm: bool = Fa
     """
     Partition the graph into a given number of partitions using LFM algorithm.
     """
+    from cdlib.algorithms import lfm
     logger.info(f"Partitioning graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges into {partition_num} partitions using {'modified LFM' if use_modified_lfm else 'LFM'} with alpha={alpha}, threshold={threshold}, seed={seed}")
     # create a LFM object
     communities = None 
