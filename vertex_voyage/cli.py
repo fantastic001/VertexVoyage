@@ -48,6 +48,7 @@ from vertex_voyage.tasks.link_prediction import (
 
 logger = logging.getLogger("CLI")
 
+F1_COMPU_THRESHOLD = 1000
 
 def hash_set_persistently(input_set):
     sorted_elements = sorted(list(input_set))
@@ -796,7 +797,10 @@ class Commands:
                 nodes = set()
                 iteration_precisions, iteration_recalls, iteration_f1s = [], [], []
                 total_buffers = (len(sorted_events) + buffer_size - 1) // buffer_size
+
+                processed_after_last_f1 = 0
                 for bi, buffer in enumerate(buffered(sorted_events, buffer_size)):
+                    processed_after_last_f1 += len(buffer)
                     for event in buffer:
                         nodes.add(event.src)
                         nodes.add(event.dest)
@@ -807,8 +811,8 @@ class Commands:
                         models[part].update(partition_buffer)
                     
                     embeddings = partitioner.get_distributed_embedding(models, nodes)
-                    # Compute F1 on the reconstructed graph every 100 buffers or on the last buffer
-                    if bi % 100 == 0 or bi == total_buffers - 1:
+                    if processed_after_last_f1 >= F1_COMPU_THRESHOLD or bi == total_buffers - 1 or bi == 0:
+                        processed_after_last_f1 = 0
                         # reconstruct graph and compute F1 score
                         g = reconstruct(total_edges, embeddings, list(nodes))
                         G = nx.Graph()
@@ -819,7 +823,7 @@ class Commands:
                             precision, recall, f1_score = get_f1_score(G, g)
                         except ZeroDivisionError:
                             precision, recall, f1_score = 0.0, 0.0, 0.0
-                        log(f"Buffer: {bi+1}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
+                        log(f"Buffer: {bi+1}/{total_buffers}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
                         if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
                             logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
                         old_f1_score = f1_score
@@ -827,7 +831,7 @@ class Commands:
                         iteration_recalls.append(recall)
                         iteration_f1s.append(f1_score)
                     else:
-                        log(f"Buffer: {bi+1}, F1 score not computed this buffer")
+                        log(f"Buffer: {bi+1}/{total_buffers}, F1 score not computed this buffer")
                 log("Event stream processing completed")
                 scores.append(old_f1_score)
                 run["models_%d" % it] = models
