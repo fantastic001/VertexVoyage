@@ -22,7 +22,8 @@ class TestDistGER(unittest.TestCase):
     def test_random_walks(self):
         self.node2vec.G = self.G
         self.node2vec.g_nodes = list(self.G.nodes())
-        self.node2vec.nodes = {node: self.node2vec._encode(node) for node in self.G.nodes()}
+        self.node2vec.node_to_idx = {node: idx for idx, node in enumerate(self.node2vec.g_nodes)}
+        self.node2vec.nodes = {node: self.node2vec.node_to_idx[node] for node in self.G.nodes()}
         self.node2vec.node_to_neightbours_map = {node: list(self.G.neighbors(node)) for node in self.G.nodes()}
         walks = self.node2vec._random_walks()
         self.assertEqual(len(walks), self.node2vec.n_walks * len(self.G.nodes()))
@@ -44,7 +45,8 @@ class TestDistGER(unittest.TestCase):
         node2vec.G = G
         node2vec.node_to_neightbours_map = {node: list(G.neighbors(node)) for node in G.nodes()}
         node2vec.g_nodes = list(G.nodes())
-        node2vec.nodes = {node: node2vec._encode(node) for node in G.nodes()}
+        node2vec.node_to_idx = {node: idx for idx, node in enumerate(node2vec.g_nodes)}
+        node2vec.nodes = {node: node2vec.node_to_idx[node] for node in G.nodes()}
         walks = node2vec._random_walks()
         self.assertEqual(len(walks), node2vec.n_walks * len(G.nodes()))
         for walk in walks:
