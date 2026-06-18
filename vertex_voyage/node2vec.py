@@ -13,7 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-PARALLELIZATION_THRESHOLD = 1000
+PARALLELIZATION_THRESHOLD = cfg.get_config_int("parallelization_threshold", 10000, "Threshold for parallelization")
 
 class Node2Vec:
 

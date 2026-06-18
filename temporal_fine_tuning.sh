@@ -42,13 +42,17 @@ if [ "$DEBUG" = "1" ]; then
     echo "Running in DEBUG mode"
     set -x
 fi
-MAX_JOBS=4
+MAX_JOBS=${MAX_JOBS:-4}
 # We assume no spaces in dataset names, and that the dataset names are unique enough to be used as directory names for checkpoints and logs.
 for mu in 0 0.5 1 2; do 
 for alpha in 0.5 1 2; do
-for parts in 4 8 16; do 
+if [ $mu -eq 0 ] && [ $alpha -gt 0 ]; then
+    echo "Skipping mu=0 and alpha>0 as it is not a valid configuration"
+    continue
+fi
+for parts in 4 8; do 
 for RF in 1 3; do
-    for dataset in CITESEER Cit-HepPh; do 
+    for dataset in CITESEER AstroPh; do 
         if [ $(jobs -rp | wc -l) -ge $MAX_JOBS ]; then
             echo "Maximum number of concurrent jobs ($MAX_JOBS) reached. Waiting for a job to finish..."
             read <&3 # Wait for a job to signal completion
@@ -63,6 +67,7 @@ for RF in 1 3; do
         CP_DIR="temporal_runs/$dataset-${parts}_${RF}-${mu}-${alpha}/"
         mkdir -p $CP_DIR
         export VERTEX_VOYAGE_LOG_FILE="${CP_DIR}vv.log"
+        export VERTEX_VOYAGE_F1_COMPUTATION_THRESHOLD=10000
         (python -m vertex_voyage  temporal_test \
             --name $dataset \
             --long-run \
@@ -70,7 +75,7 @@ for RF in 1 3; do
             --iterations 2 \
             --epochs 5 \
             --use-dataset-params \
-            --buffer-size 50 \
+            --buffer-size 1000 \
             --replication-factor $RF \
             --partitioner neighbors.all \
             --mu $mu --alpha $alpha --partitions $parts \

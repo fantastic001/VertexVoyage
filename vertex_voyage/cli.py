@@ -27,7 +27,7 @@ from vertex_voyage.partitioning import (
     label_propagation_partitioner
 )
 from datetime import datetime
-from vertex_voyage.config import get_config_str
+from vertex_voyage.config import get_config_int, get_config_str
 
 from vertex_voyage.dynnode2vec import DynNode2Vec
 
@@ -48,7 +48,7 @@ from vertex_voyage.tasks.link_prediction import (
 
 logger = logging.getLogger("CLI")
 
-F1_COMPU_THRESHOLD = 1000
+F1_COMPU_THRESHOLD = get_config_int("f1_computation_threshold", 1000, "Threshold for computing F1 score")
 
 def hash_set_persistently(input_set):
     sorted_elements = sorted(list(input_set))
