@@ -38,7 +38,7 @@ class TestDynNode2Vec(unittest.TestCase):
         self.assertEqual(len(embeddings), len(nodes))
 
     def test_update_method_calls_random_walks(self):
-        model = DynNode2Vec()
+        model = DynNode2Vec(use_threads=False)
         model._random_walk = MagicMock(side_effect=model._random_walk)
         events = [
             Event(src=1, dest=2, timestamp=0),
@@ -55,7 +55,7 @@ class TestDynNode2Vec(unittest.TestCase):
     @mock.patch('vertex_voyage.word2vec.word2vec')
     @mock.patch('gensim.models.Word2Vec')
     def test_if_word2vec_called_on_previous_models(self, mock_gensim_word2vec, mock_word2vec):
-        model = DynNode2Vec()
+        model = DynNode2Vec(use_threads=False)
         mock_word2vec.side_effect = word2vec
         M = gensim.models.Word2Vec(vector_size=model.dim, min_count=1)
         M.build_vocab([[0, 1, 2], [1, 2, 3]])

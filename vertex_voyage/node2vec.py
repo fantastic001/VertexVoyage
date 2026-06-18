@@ -127,7 +127,7 @@ class Node2Vec:
             return [] 
         if self.use_threads:
             starts = [n for _ in range(self.n_walks) for n in self.g_nodes]
-            with mpp.ThreadPool() as pool:
+            with mpp.Pool() as pool:
                 walks = pool.map(self._random_walk, starts)
         else:
             for _ in range(self.n_walks):
