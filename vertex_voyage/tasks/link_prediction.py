@@ -303,6 +303,12 @@ def heart_benchmark(embedding_model, model, g, positive_edges, ns=500, ps=1000):
     Note:
         g should not contain the positive edges being evaluated, as they are used for testing. The function generates negative samples by randomly pairing nodes that do not have an edge in the graph, and then ranks the true positive edge among these negative samples based on the predicted probabilities from the link prediction model.
     """
+    assert ns > 0, "Number of negative samples (ns) must be greater than 0."
+    assert ps > 0, "Number of positive samples (ps) must be greater than 0."
+    assert len(positive_edges) > 0, "There must be at least one positive edge for evaluation."
+    assert len(g.nodes()) > 0, "Graph must contain nodes for evaluation."
+    assert len(g.edges()) > 0, "Graph must contain edges for evaluation."
+    assert not any(g.has_edge(x, y) for x, y in positive_edges), "Graph should not contain the positive edges being evaluated."
     ranks = Ranks()
     # Limit to ps positive edges for evaluation
     sample = random.sample(positive_edges, min(len(positive_edges), ps))
