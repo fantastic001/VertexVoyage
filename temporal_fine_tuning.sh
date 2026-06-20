@@ -44,12 +44,14 @@ if [ "$DEBUG" = "1" ]; then
 fi
 MAX_JOBS=${MAX_JOBS:-4}
 # We assume no spaces in dataset names, and that the dataset names are unique enough to be used as directory names for checkpoints and logs.
-for mu in 0 0.5 1 2; do 
-for alpha in 0.5 1 2; do
-if [ $mu -eq 0 ] && [ $alpha -gt 0 ]; then
-    echo "Skipping mu=0 and alpha>0 as it is not a valid configuration"
-    continue
+for mu in 0 1; do 
+if [ "$mu" = "0" ]; then
+    alpha_values="0"
+else
+    alpha_values="1"
 fi
+for alpha in $alpha_values; do
+
 for parts in 4 8; do 
 for RF in 1 3; do
     for dataset in CITESEER AstroPh; do 
@@ -63,7 +65,7 @@ for RF in 1 3; do
             exit 1
         fi
         echo "----------------------------------------"
-        echo "Running experiment on dataset $dataset with $parts partitions"
+        echo "Running experiment on dataset $dataset with P=$parts and RF=$RF, mu=$mu, alpha=$alpha"
         CP_DIR="temporal_runs/$dataset-${parts}_${RF}-${mu}-${alpha}/"
         mkdir -p $CP_DIR
         export VERTEX_VOYAGE_LOG_FILE="${CP_DIR}vv.log"
