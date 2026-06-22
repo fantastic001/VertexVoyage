@@ -42,6 +42,9 @@ class Partition:
     
     def __sub__(self, other):
         return DiffPartition(self, other)
+    
+    def __contains__(self, node):
+        return self.has(node)
 
 class SumPartition(Partition):
     def __init__(self, *partitions):
@@ -265,6 +268,8 @@ class PartitionerProfile(TemporalGraphPartitioner):
         self.original_graph = nx.Graph()
         self.lost_edges_per_buffer = []
         self.lost_edges_per_buffer_percentage = []
+        self.prev_partitions = None
+        self.repartitionings = []
     
     def push(self, buffer: EventSequence):
         import time
@@ -273,12 +278,19 @@ class PartitionerProfile(TemporalGraphPartitioner):
         buffer = list(buffer)
         self.original_graph.add_edges_from([(event.src, event.dest) for event in buffer])
         start_time = time.time()
-        self.partitioner.push(buffer)
-        self.total_time += time.time() - start_time
-        partitions = self.partitioner.partitions if hasattr(self.partitioner, 'partitions') else set()
+        partitions = self.partitioner.partitions if hasattr(self.partitioner, 'partitions') else None
         if not partitions:
             raise ValueError("Partitioner must have a 'partitions' attribute to use PartitionerProfile")        
+        prev_partitions = {partition: set(partition.graph().nodes()) for partition in partitions}
+        self.partitioner.push(buffer)
+        partitions = self.partitioner.partitions if hasattr(self.partitioner, 'partitions') else set()
+        self.total_time += time.time() - start_time
+        new_vertices = set()
         for event in buffer:
+            if event.src not in self.unique_vertices:
+                new_vertices.add(event.src)
+            if event.dest not in self.unique_vertices:
+                new_vertices.add(event.dest)
             self.num_events += 1
             self.unique_vertices.add(event.src)
             self.unique_vertices.add(event.dest)
@@ -296,7 +308,21 @@ class PartitionerProfile(TemporalGraphPartitioner):
                 _lost_edges += 1
         self.lost_edges_per_buffer.append(_lost_edges)
         self.lost_edges_per_buffer_percentage.append(_lost_edges / len(buffer) if len(buffer) > 0 else 0)
+        self.calculate_repartitionings(new_vertices, prev_partitions, partitions)
     
+    def calculate_repartitionings(self, new_vertices, prev_partitions, partitions):
+        # Calculate the number of vertices that have been repartitioned since the last buffer
+        # repartitioning = ((old_partition[p] ^ new_partition[p]) for all p in partitions - new_vertices) / 2
+        repartitioning = 0
+        for partition in partitions:
+            old_partition = prev_partitions.get(partition, set())
+            new_partition = set(partition.graph().nodes())
+            old_partition = set(old_partition.graph().nodes()) if isinstance(old_partition, Partition) else old_partition
+            new_partition = set(new_partition.graph().nodes()) if isinstance(new_partition, Partition) else new_partition
+            repartitioning += len((old_partition ^ new_partition) - new_vertices)
+        self.repartitionings.append(repartitioning // 2) # each vertex is counted twice
+
+
     def calculate_edge_cut(self) -> int:
         edge_cut = 0
         partitions = self.partitioner.partitions if hasattr(self.partitioner, 'partitions') else set()
@@ -324,6 +350,7 @@ class PartitionerProfile(TemporalGraphPartitioner):
         p(f"Edge cuts percentage after processing every buffer: {self.edge_cuts_percentage}")
         p(f"Lost edges after processing every buffer: {self.lost_edges_per_buffer}")
         p(f"Lost edges percentage after processing every buffer: {self.lost_edges_per_buffer_percentage}")
+        p(f"Repartitionings after processing every buffer: {self.repartitionings}")
 
 class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     """
