@@ -48,6 +48,23 @@ from vertex_voyage.tasks.link_prediction import (
 
 logger = logging.getLogger("CLI")
 
+class DummyTemporalEmbedding(DynNode2Vec):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        log("Using DummyTemporalEmbedding, which does not compute embeddings.")
+        self.embeddings = {}
+    
+    
+    def update(self, events):
+        for event in events:
+            self.embeddings[event.src] = np.zeros(self.dim)
+            self.embeddings[event.dest] = np.zeros(self.dim)
+    def embed_nodes(self, nodes):
+        return [self.embeddings.get(node, np.zeros(self.dim)) for node in nodes]
+    def embed_node(self, node):
+        return self.embeddings.get(node, np.zeros(self.dim))
+    
+
 F1_COMPU_THRESHOLD = get_config_int("f1_computation_threshold", 1000, "Threshold for computing F1 score")
 
 def hash_set_persistently(input_set):
@@ -82,6 +99,7 @@ ALGS = {
     "node2vec": Node2Vec,
     "distger": DistGER,
     "dynnode2vec": DynNode2Vec,
+    "dummy": DummyTemporalEmbedding
 }
 
 def perform_embedding(cls, alg: str, p: float, q: float, dim: int, dataset_name: str, part_num: int):
@@ -688,6 +706,7 @@ class Commands:
         """
         import networkx as nx
         scores = []
+        log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
         run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay)
         log(f"Processing dataset {name}")
         t = VertexEnumerator()
