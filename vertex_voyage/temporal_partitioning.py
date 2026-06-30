@@ -351,6 +351,19 @@ class PartitionerProfile(TemporalGraphPartitioner):
         p(f"Lost edges after processing every buffer: {self.lost_edges_per_buffer}")
         p(f"Lost edges percentage after processing every buffer: {self.lost_edges_per_buffer_percentage}")
         p(f"Repartitionings after processing every buffer: {self.repartitionings}")
+    def dump_profile(self):
+        return {
+            "num_events": self.num_events,
+            "num_buffers": self.num_buffers,
+            "num_unique_vertices": len(self.unique_vertices),
+            "total_time": self.total_time,
+            "partition_sizes": self.partition_sizes,
+            "edge_cuts": self.edge_cuts,
+            "edge_cuts_percentage": self.edge_cuts_percentage,
+            "lost_edges_per_buffer": self.lost_edges_per_buffer,
+            "lost_edges_per_buffer_percentage": self.lost_edges_per_buffer_percentage,
+            "repartitionings": self.repartitionings
+        }
 
 class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
     """

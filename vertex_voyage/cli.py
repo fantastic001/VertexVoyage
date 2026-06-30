@@ -45,6 +45,7 @@ from vertex_voyage.tasks.link_prediction import (
     ensemble_predict_links,
     predict_links
 )
+from vertex_voyage.vv_graph import VVGraph
 
 logger = logging.getLogger("CLI")
 
@@ -859,6 +860,7 @@ class Commands:
                 run["iteration_recalls_%d" % it] = iteration_recalls
                 run["iteration_f1s_%d" % it] = iteration_f1s
                 partitioner.print_profile()
+                run["profile_%d" % it] = partitioner.dump_profile()
         log("Average F1 score: ", np.mean(scores))
         log("Standard deviation of F1 score: ", np.std(scores))
         if "full_model" in run:
@@ -881,7 +883,19 @@ class Commands:
         full_g = reconstruct(original_graph.number_of_edges(), full_emb, list(original_graph.nodes))
         _, _, full_f1_score = get_f1_score(original_graph, full_g)
         log("F1 score for full graph using Node2Vec: ", full_f1_score)
-        
+    
+    def dataset(self, name: str):
+        d = datasets.get(name)
+        if d is None:
+            raise ValueError(f"Dataset {name} not found")
+        g = to_nx_graph(d())
+        return {
+            
+            "name": name,
+            "num_nodes": g.number_of_nodes(),
+            "num_edges": g.number_of_edges(),
+            "avg_degree": sum(dict(g.degree()).values()) / g.number_of_nodes(),
+        }
 
 if __name__ == "__main__":
     command_executor_main(Commands)
