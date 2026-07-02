@@ -3,6 +3,7 @@ import json
 import importlib 
 import inspect
 import sys 
+import logging
 
 class ConfigurationError(Exception):
     pass
@@ -14,13 +15,11 @@ PROJECT_NAME = "vertex_voyage"
 PROJECT_VERSION = "0.1.0"
 PROJECT_ENVVAR_PREFIX = "VERTEX_VOYAGE"
 DEFAULT_PLUGINS = [
-    "vertex_voyage.plugins.greeting",
-    "vertex_voyage.plugins.config_commands",
-    "vertex_voyage.plugins.plugin_manager",
+    "vertex_voyage.plugins.*",
     "experiments.*",
 ]
 CONFIG_FILE_NAME = PROJECT_NAME + ".json"
-
+logger = logging.getLogger(__name__)
 def get_config_location():
     return os.environ.get(PROJECT_ENVVAR_PREFIX + "_CONFIG", os.path.join(os.path.expanduser("~"), ".config", CONFIG_FILE_NAME))
 
@@ -128,9 +127,10 @@ def load_plugins():
     result = []
     for plugin in plugins:
         try:
+            logger.info(f"Loading plugin {plugin}")
             result.append((plugin, importlib.import_module(plugin)))
         except ImportError as e:
-            print(f"Error loading plugin {plugin}: {e}")
+            logger.error(f"Error loading plugin {plugin}: {e}")
     sys.path = oldpath
     return result
 
@@ -159,10 +159,12 @@ def get_symbols_satisfying(predicate):
     visited = set()
     for name, plugin in plugins:
         for symbol in dir(plugin):
+            logger.info(f"Checking symbol {symbol} in plugin {name}")
             if (name, symbol) in visited:
                 continue
             visited.add((name, symbol))
             if predicate(getattr(plugin, symbol)):
+                logger.info(f"Symbol {symbol} in plugin {name} satisfies predicate")
                 result.append(getattr(plugin, symbol))
     return result
 
