@@ -4,6 +4,9 @@ export VERTEX_VOYAGE_PLUGINS="experiments.*"
 # Enable job control
 set -m
 
+DATASETS="${1:-CITESEER AstroPh DBLP AS-Oregon Enron}"
+PARTITIONS="${2:-1 2 4 8}"
+
 CANCELLED=0
 OSTYPE=$(uname)
 kill_all_jobs() {
@@ -44,12 +47,12 @@ if [ "$DEBUG" = "1" ]; then
 fi
 MAX_JOBS=${MAX_JOBS:-1}
 
-for parts in 1 2 4 8; do 
+for parts in $PARTITIONS; do
 for RF in 1 3; do
-    if [ $RF -lt $parts ]; then
+    if [ $RF -gt $parts ]; then
         continue
     fi
-    for dataset in CITESEER AstroPh DBLP AS-Oregon Enron; do 
+    for dataset in $DATASETS; do
         if [ $(jobs -rp | wc -l) -ge $MAX_JOBS ]; then
             echo "Maximum number of concurrent jobs ($MAX_JOBS) reached. Waiting for a job to finish..."
             read <&3 # Wait for a job to signal completion
