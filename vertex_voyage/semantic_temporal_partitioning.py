@@ -139,8 +139,16 @@ class PartitionAssignment(ABC):
 
 
 class KNearestNeighborsAssignment(PartitionAssignment):
-    def __init__(self, k: int = 1):
+    def __init__(self, k: int = 1, mu: float = 0.0):
         self.k = max(1, k)
+        self.mu = max(0.0, mu)
+
+    @staticmethod
+    def _partition_order_key(partition: Partition) -> tuple[int, int]:
+        pid = getattr(partition, "id", None)
+        if isinstance(pid, int):
+            return (0, pid)
+        return (1, hash(partition))
 
     def assign(
         self,
@@ -152,7 +160,28 @@ class KNearestNeighborsAssignment(PartitionAssignment):
         if not partitions:
             return {node: set() for node in node_embeddings}
 
-        ordered_partitions = sorted(partitions, key=lambda partition: partition.size())
+        ordered_partitions = sorted(
+            partitions,
+            key=lambda partition: (partition.size(), self._partition_order_key(partition)),
+        )
+        virtual_sizes = {partition: partition.size() for partition in ordered_partitions}
+        average_size = (
+            float(np.mean([virtual_sizes[partition] for partition in ordered_partitions]))
+            if ordered_partitions
+            else 0.0
+        )
+
+        def imbalance(partition: Partition) -> float:
+            return max(0.0, float(virtual_sizes[partition]) - average_size)
+
+        def effective_score(raw_score: float, partition: Partition) -> float:
+            # Unified utility: maximize similarity and minimize distance.
+            partition_score = raw_score if metric.is_similarity else -raw_score
+            return partition_score - self.mu * imbalance(partition)
+
+        def unscored_utility(partition: Partition) -> float:
+            return -self.mu * imbalance(partition)
+
         result: dict[Any, set[Partition]] = {}
         for node, node_embedding in node_embeddings.items():
             scored: list[tuple[float, Partition]] = []
@@ -162,15 +191,22 @@ class KNearestNeighborsAssignment(PartitionAssignment):
                 if partition_embedding is None:
                     unscored.append(partition)
                     continue
-                scored.append((metric.score(node_embedding, partition_embedding), partition))
+                score = metric.score(node_embedding, partition_embedding)
+                scored.append((effective_score(score, partition), partition))
 
             if scored:
-                scored.sort(key=lambda entry: entry[0], reverse=metric.is_similarity)
+                scored.sort(
+                    key=lambda entry: (-entry[0], self._partition_order_key(entry[1]))
+                )
                 assigned = [partition for _, partition in scored[: self.k]]
             else:
                 assigned = []
 
             if len(assigned) < self.k:
+                unscored = sorted(
+                    unscored,
+                    key=lambda partition: (-unscored_utility(partition), self._partition_order_key(partition)),
+                )
                 for partition in unscored:
                     if partition not in assigned:
                         assigned.append(partition)
@@ -178,17 +214,25 @@ class KNearestNeighborsAssignment(PartitionAssignment):
                         break
 
             if not assigned:
-                assigned = [ordered_partitions[0]]
+                assigned = sorted(
+                    ordered_partitions,
+                    key=lambda partition: (-unscored_utility(partition), self._partition_order_key(partition)),
+                )[:1]
+
+            for partition in assigned[: self.k]:
+                virtual_sizes[partition] += 1
 
             result[node] = set(assigned[: self.k])
         return result
 
 
 class DBSCANAssignment(PartitionAssignment):
-    def __init__(self, eps: float = 0.5, min_samples: int = 2, reassign_noise: bool = True):
+    def __init__(self, eps: float = 0.5, min_samples: int = 2, reassign_noise: bool = True, mu: float = 0.0):
         self.eps = eps
         self.min_samples = min_samples
         self.reassign_noise = reassign_noise
+        self._knn_default = KNearestNeighborsAssignment(k=1, mu=mu)
+        self.mu = max(0.0, mu)
 
     def _to_distance(self, metric: Metric, left: np.ndarray, right: np.ndarray) -> float:
         value = metric.score(left, right)
@@ -209,9 +253,16 @@ class DBSCANAssignment(PartitionAssignment):
         if not partitions:
             return {node: set() for node in nodes}
 
+        replication_factor = self._knn_default.k
+
         if len(nodes) == 1:
-            fallback = min(partitions, key=lambda partition: partition.size())
-            return {nodes[0]: {fallback}}
+            fallback = self._knn_default.assign(
+                node_embeddings={nodes[0]: node_embeddings[nodes[0]]},
+                partitions=partitions,
+                metric=metric,
+                partition_embedding_fn=partition_embedding_fn,
+            )
+            return fallback
 
         distances = np.zeros((len(nodes), len(nodes)), dtype=np.float64)
         for i in range(len(nodes)):
@@ -242,7 +293,7 @@ class DBSCANAssignment(PartitionAssignment):
                     assignments[node] = set()
             return assignments
 
-        knn_fallback = KNearestNeighborsAssignment(k=1)
+        knn_fallback = KNearestNeighborsAssignment(k=replication_factor, mu=self.mu)
         noise_nodes = [node for idx, node in enumerate(nodes) if int(labels[idx]) == -1]
         if noise_nodes:
             noise_embeddings = {node: node_embeddings[node] for node in noise_nodes}
@@ -253,7 +304,46 @@ class DBSCANAssignment(PartitionAssignment):
                 partition_embedding_fn=partition_embedding_fn,
             )
             assignments.update(fallback_assignments)
+
+        if replication_factor > 1:
+            missing_nodes = [node for node in nodes if len(assignments.get(node, set())) < replication_factor]
+            if missing_nodes:
+                fill_assignments = KNearestNeighborsAssignment(k=replication_factor, mu=self.mu).assign(
+                    node_embeddings={node: node_embeddings[node] for node in missing_nodes},
+                    partitions=partitions,
+                    metric=metric,
+                    partition_embedding_fn=partition_embedding_fn,
+                )
+                for node in missing_nodes:
+                    assignments.setdefault(node, set()).update(fill_assignments.get(node, set()))
+                    if len(assignments[node]) > replication_factor:
+                        scored = []
+                        for partition in assignments[node]:
+                            partition_embedding = partition_embedding_fn(partition)
+                            if partition_embedding is None:
+                                score = float("-inf") if metric.is_similarity else float("inf")
+                            else:
+                                score = metric.score(node_embeddings[node], partition_embedding)
+                            scored.append((score, partition))
+                        scored.sort(key=lambda entry: entry[0], reverse=metric.is_similarity)
+                        assignments[node] = {partition for _, partition in scored[:replication_factor]}
         return assignments
+
+    @property
+    def k(self) -> int:
+        return self._knn_default.k
+
+    @k.setter
+    def k(self, value: int) -> None:
+        self._knn_default.k = max(1, value)
+
+    @property
+    def mu(self) -> float:
+        return self._knn_default.mu
+
+    @mu.setter
+    def mu(self, value: float) -> None:
+        self._knn_default.mu = max(0.0, value)
 
 
 class SemanticTemporalGraphPartitioner(TemporalGraphPartitioner):
@@ -286,12 +376,15 @@ class SemanticTemporalGraphPartitioner(TemporalGraphPartitioner):
         eps: float,
         min_samples: int,
         reassign_noise: bool,
+        mu: float,
     ) -> PartitionAssignment:
         normalized = assignment.lower().strip()
         if normalized in {"knn", "k_nearest_neighbors", "k-nearest-neighbors"}:
-            return KNearestNeighborsAssignment(k=k)
+            return KNearestNeighborsAssignment(k=k, mu=mu)
         if normalized in {"dbscan"}:
-            return DBSCANAssignment(eps=eps, min_samples=min_samples, reassign_noise=reassign_noise)
+            assignment_impl = DBSCANAssignment(eps=eps, min_samples=min_samples, reassign_noise=reassign_noise, mu=mu)
+            assignment_impl.k = k
+            return assignment_impl
         raise ValueError(f"Unsupported assignment '{assignment}'. Use 'knn' or 'dbscan'.")
 
     @classmethod
@@ -305,6 +398,7 @@ class SemanticTemporalGraphPartitioner(TemporalGraphPartitioner):
         eps: float = 0.5,
         min_samples: int = 2,
         reassign_noise: bool = True,
+        mu: float = 0.0,
         model: Optional[Node2Vec] = None,
         **node2vec_kwargs,
     ) -> "SemanticTemporalGraphPartitioner":
@@ -316,6 +410,7 @@ class SemanticTemporalGraphPartitioner(TemporalGraphPartitioner):
             eps=eps,
             min_samples=min_samples,
             reassign_noise=reassign_noise,
+            mu=mu,
         )
         return cls(partitions, embedding_model, metric_impl, assignment_impl)
 
@@ -330,6 +425,7 @@ class SemanticTemporalGraphPartitioner(TemporalGraphPartitioner):
         eps: float = 0.5,
         min_samples: int = 2,
         reassign_noise: bool = True,
+        mu: float = 0.0,
         model: Optional[DynNode2Vec] = None,
         **dynnode2vec_kwargs,
     ) -> "SemanticTemporalGraphPartitioner":
@@ -341,6 +437,7 @@ class SemanticTemporalGraphPartitioner(TemporalGraphPartitioner):
             eps=eps,
             min_samples=min_samples,
             reassign_noise=reassign_noise,
+            mu=mu,
         )
         return cls(partitions, embedding_model, metric_impl, assignment_impl)
 

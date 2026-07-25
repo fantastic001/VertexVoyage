@@ -397,6 +397,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 parts,
                 metric=kw["semantic_metric"],
                 assignment=kw["semantic_assignment"],
+                mu=kw["mu"],
                 k=kw["semantic_k"],
                 eps=kw["semantic_eps"],
                 min_samples=kw["semantic_min_samples"],
@@ -413,6 +414,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 parts,
                 metric=kw["semantic_metric"],
                 assignment=kw["semantic_assignment"],
+                mu=kw["mu"],
                 k=kw["semantic_k"],
                 eps=kw["semantic_eps"],
                 min_samples=kw["semantic_min_samples"],
@@ -682,7 +684,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                decay: float = 0,
                semantic_metric: str = "cosine",
                semantic_assignment: str = "knn",
-               semantic_k: int = 1,
+             semantic_k: int = -1,
                semantic_eps: float = 0.5,
                semantic_min_samples: int = 2,
                semantic_reassign_noise: bool = True,
@@ -712,6 +714,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         semantic_n_walks, semantic_walk_size, semantic_window_size = self._walk_params(long_run)
         semantic_resolved_p, semantic_resolved_q = self._resolved_default_pq(default_p, default_q)
         semantic_retrain_threshold = int(0.1 * original_graph.number_of_nodes())
+        effective_semantic_k = replication_factor if semantic_k <= 0 else semantic_k
         if semantic_embedding == "auto":
             if partitioner_name == "semantic.node2vec":
                 resolved_partitioner_name = "semantic.node2vec"
@@ -760,7 +763,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     decay=decay,
                     semantic_metric=semantic_metric,
                     semantic_assignment=semantic_assignment,
-                    semantic_k=semantic_k,
+                    semantic_k=effective_semantic_k,
                     semantic_eps=semantic_eps,
                     semantic_min_samples=semantic_min_samples,
                     semantic_reassign_noise=semantic_reassign_noise,

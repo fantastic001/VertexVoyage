@@ -74,6 +74,35 @@ class TestSemanticFactories(unittest.TestCase):
 
 
 class TestSemanticAssignments(unittest.TestCase):
+    def test_knn_balances_when_partitions_have_no_centroids_and_mu_positive(self):
+        p0 = InMemoryPartition.empty(0)
+        p1 = InMemoryPartition.empty(1)
+        p2 = InMemoryPartition.empty(2)
+        p3 = InMemoryPartition.empty(3)
+
+        vectors = {
+            "a": np.array([1.0, 0.0]),
+            "b": np.array([0.8, 0.2]),
+            "c": np.array([0.2, 0.8]),
+            "d": np.array([0.0, 1.0]),
+        }
+        embedding_model = FakeEmbeddingModel(vectors)
+        partitioner = SemanticTemporalGraphPartitioner(
+            partitions={p0, p1, p2, p3},
+            embedding_model=embedding_model,
+            metric=CosineSimilarityMetric(),
+            assignment=KNearestNeighborsAssignment(k=1, mu=1.0),
+        )
+
+        events = [
+            Event(src="a", dest="b", timestamp=0),
+            Event(src="c", dest="d", timestamp=1),
+        ]
+        partitioner.push(events)
+
+        sizes = sorted([p.size() for p in [p0, p1, p2, p3]])
+        self.assertEqual(sizes, [1, 1, 1, 1])
+
     def test_knn_respects_similarity_metric_direction(self):
         p_left = InMemoryPartition.empty(1)
         p_right = InMemoryPartition.empty(2)
@@ -136,6 +165,33 @@ class TestSemanticAssignments(unittest.TestCase):
 
         for node in ["n1", "n2", "n3", "n4"]:
             self.assertTrue(partitioner.get(node))
+
+    def test_dbscan_respects_replication_factor_via_k(self):
+        p0 = InMemoryPartition.empty(0)
+        p1 = InMemoryPartition.empty(1)
+        p2 = InMemoryPartition.empty(2)
+        p3 = InMemoryPartition.empty(3)
+
+        vectors = {
+            "u": np.array([1.0, 0.0]),
+            "v": np.array([1.0, 0.0]),
+            "w": np.array([1.0, 0.0]),
+        }
+        embedding_model = FakeEmbeddingModel(vectors)
+        assignment = DBSCANAssignment(eps=0.2, min_samples=2, reassign_noise=True)
+        assignment.k = 3
+        partitioner = SemanticTemporalGraphPartitioner(
+            partitions={p0, p1, p2, p3},
+            embedding_model=embedding_model,
+            metric=CosineSimilarityMetric(),
+            assignment=assignment,
+        )
+
+        partitioner.push([Event(src="u", dest="v", timestamp=0), Event(src="v", dest="w", timestamp=1)])
+
+        self.assertEqual(len(partitioner.get("u")), 3)
+        self.assertEqual(len(partitioner.get("v")), 3)
+        self.assertEqual(len(partitioner.get("w")), 3)
 
 
 class TestSemanticPushGet(unittest.TestCase):
