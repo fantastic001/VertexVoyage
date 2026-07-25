@@ -33,6 +33,9 @@ from vertex_voyage.temporal_partitioning import (
     PartitionerProfile,
     RandomPartitioner,
 )
+from vertex_voyage.semantic_temporal_partitioning import (
+    SemanticTemporalGraphPartitioner,
+)
 
 logger = logging.getLogger("CLI")
 
@@ -356,6 +359,20 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         epsilon: float,
         alpha: float,
         decay: float,
+        semantic_metric: str,
+        semantic_assignment: str,
+        semantic_k: int,
+        semantic_eps: float,
+        semantic_min_samples: int,
+        semantic_reassign_noise: bool,
+        semantic_dim: int,
+        semantic_epochs: int,
+        semantic_p: float,
+        semantic_q: float,
+        semantic_n_walks: int,
+        semantic_walk_size: int,
+        semantic_window_size: int,
+        semantic_retrain_threshold: int,
     ):
         partitioner = {
             "random": lambda **kw: RandomPartitioner.uniform(parts),
@@ -376,12 +393,59 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 alpha=kw["alpha"],
                 decay=kw["decay"]
             ),
+            "semantic.node2vec": lambda **kw: SemanticTemporalGraphPartitioner.node2vec(
+                parts,
+                metric=kw["semantic_metric"],
+                assignment=kw["semantic_assignment"],
+                k=kw["semantic_k"],
+                eps=kw["semantic_eps"],
+                min_samples=kw["semantic_min_samples"],
+                reassign_noise=kw["semantic_reassign_noise"],
+                dim=kw["semantic_dim"],
+                epochs=kw["semantic_epochs"],
+                p=kw["semantic_p"],
+                q=kw["semantic_q"],
+                n_walks=kw["semantic_n_walks"],
+                walk_size=kw["semantic_walk_size"],
+                window_size=kw["semantic_window_size"],
+            ),
+            "semantic.dynnode2vec": lambda **kw: SemanticTemporalGraphPartitioner.dynnode2vec(
+                parts,
+                metric=kw["semantic_metric"],
+                assignment=kw["semantic_assignment"],
+                k=kw["semantic_k"],
+                eps=kw["semantic_eps"],
+                min_samples=kw["semantic_min_samples"],
+                reassign_noise=kw["semantic_reassign_noise"],
+                dim=kw["semantic_dim"],
+                epochs=kw["semantic_epochs"],
+                p=kw["semantic_p"],
+                q=kw["semantic_q"],
+                n_walks=kw["semantic_n_walks"],
+                walk_size=kw["semantic_walk_size"],
+                window_size=kw["semantic_window_size"],
+                retrain_threshold=kw["semantic_retrain_threshold"],
+            ),
         }[partitioner_name](
             replication_factor=replication_factor,
             mu=mu,
             epsilon=epsilon,
             alpha=alpha,
-            decay=decay if decay > 0 else None
+            decay=decay if decay > 0 else None,
+            semantic_metric=semantic_metric,
+            semantic_assignment=semantic_assignment,
+            semantic_k=semantic_k,
+            semantic_eps=semantic_eps,
+            semantic_min_samples=semantic_min_samples,
+            semantic_reassign_noise=semantic_reassign_noise,
+            semantic_dim=semantic_dim,
+            semantic_epochs=semantic_epochs,
+            semantic_p=semantic_p,
+            semantic_q=semantic_q,
+            semantic_n_walks=semantic_n_walks,
+            semantic_walk_size=semantic_walk_size,
+            semantic_window_size=semantic_window_size,
+            semantic_retrain_threshold=semantic_retrain_threshold,
         )
         return PartitionerProfile(partitioner)
 
@@ -615,12 +679,19 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              mu: float = 0,
              epsilon: float = 0.1,
              alpha: float = 1.0,
-             decay: float = 0):
+               decay: float = 0,
+               semantic_metric: str = "cosine",
+               semantic_assignment: str = "knn",
+               semantic_k: int = 1,
+               semantic_eps: float = 0.5,
+               semantic_min_samples: int = 2,
+               semantic_reassign_noise: bool = True,
+               semantic_embedding: str = "auto"):
         import networkx as nx
 
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding)
         log(f"Processing dataset {name}")
         t = VertexEnumerator()
         dataset = _enumerated_event_stream(name, t)
@@ -637,6 +708,24 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             dim = params.get('dim', dim)
             default_p = params.get('p', default_p)
             default_q = params.get('q', default_q)
+
+        semantic_n_walks, semantic_walk_size, semantic_window_size = self._walk_params(long_run)
+        semantic_resolved_p, semantic_resolved_q = self._resolved_default_pq(default_p, default_q)
+        semantic_retrain_threshold = int(0.1 * original_graph.number_of_nodes())
+        if semantic_embedding == "auto":
+            if partitioner_name == "semantic.node2vec":
+                resolved_partitioner_name = "semantic.node2vec"
+            elif partitioner_name == "semantic.dynnode2vec":
+                resolved_partitioner_name = "semantic.dynnode2vec"
+            else:
+                resolved_partitioner_name = partitioner_name
+        elif semantic_embedding in {"node2vec", "dynnode2vec"}:
+            if partitioner_name in {"semantic", "semantic.node2vec", "semantic.dynnode2vec"}:
+                resolved_partitioner_name = f"semantic.{semantic_embedding}"
+            else:
+                resolved_partitioner_name = partitioner_name
+        else:
+            raise ValueError("semantic_embedding must be one of: auto, node2vec, dynnode2vec")
         for it in range(iterations):
             log(f"Iteration {it+1} / {iterations}: Processing dataset {name}")
             if ("models_%d" % it in run and "partitioner_%d" % it in run
@@ -662,13 +751,27 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 )
                 parts: set[Partition] = set(models.keys())
                 partitioner = self._create_temporal_partitioner(
-                    partitioner_name=partitioner_name,
+                    partitioner_name=resolved_partitioner_name,
                     parts=parts,
                     replication_factor=replication_factor,
                     mu=mu,
                     epsilon=epsilon,
                     alpha=alpha,
                     decay=decay,
+                    semantic_metric=semantic_metric,
+                    semantic_assignment=semantic_assignment,
+                    semantic_k=semantic_k,
+                    semantic_eps=semantic_eps,
+                    semantic_min_samples=semantic_min_samples,
+                    semantic_reassign_noise=semantic_reassign_noise,
+                    semantic_dim=dim,
+                    semantic_epochs=epochs,
+                    semantic_p=semantic_resolved_p,
+                    semantic_q=semantic_resolved_q,
+                    semantic_n_walks=semantic_n_walks,
+                    semantic_walk_size=semantic_walk_size,
+                    semantic_window_size=semantic_window_size,
+                    semantic_retrain_threshold=semantic_retrain_threshold,
                 )
                 sorted_events = self._sort_temporal_events(og_events, track_seen)
                 old_f1_score, iteration_precisions, iteration_recalls, iteration_f1s = self._process_temporal_buffers(
