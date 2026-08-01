@@ -71,7 +71,6 @@ for RF in 1 3; do
         (python -m vertex_voyage  temporal_test \
             --name $dataset \
             --long-run \
-            --track-seen \
             --iterations 2 \
             --use-dataset-params \
             --buffer-size 1000 \
