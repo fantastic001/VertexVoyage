@@ -329,15 +329,58 @@ maturin develop
 
 # Experimental results
 
+## Node2Vec baseline 
+
+| Dataset  | Average F1 score |
+|----------|------------------|
+| CITESEER | 34.82%           |
+| DBLP     | 60.3%            |
+| AstroPh  | 70.41%           |
+| AS-Oregon|                  |
+
 ## Dynnode2vec with buffered event processing 
 
 Example of run:
 
 ```sh
-vv temporal_test --name CITESEER  --long-run --track-seen --iterations 10  --use-dataset-params  --buffer-size 100
+vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-params  --buffer-size 1000 --partitions 5 --replication-factor 1 
 ```
 
-| Dataset | Buffer size | # of parts | RF | Average F1 score | Baseline |
-|---------|-------------|------------|----|------------------|----------|
-| CITESEER | 50 | 5 | 2 | 55.57% | 34.82% | 
-| CITESEER | 50 | 5 | 1 | 56% | 34.82% |
+CITESEER:
+
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|-------------------------|----------|----------|
+| 1               | 47%    | 0%    | 1 | 
+| 2               | 45.45% | 23%   | 1.31 |
+| 4               | 47.48% | 39%   | 1.63 |
+| 8               | 49.86% | 48%   | 1.75 |
+
+DBLP: 
+
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|-------------------------|----------|----------|
+| 1               | 50.44% | 0%     | 1 | 
+| 2               | 54.35% | 23%    | 1.10 |
+| 4               | 54.30% | 50%    | 1.21 |
+| 8               | 50.07% |.59%    | 1.35 |
+
+AstroPh:
+
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|-------------------------|----------|----------|
+| 1               | 57.59% | 0%     | 1 |
+| 2               | 55.28% | 33%    | 1.10 |
+| 4               | 50.2%. | 55%    | 1.10 |
+| 8               | 46.82% | 65%    | 1.25 |
+
+AS-Oregon:
+
+| # of partitions | F1 Reconstruction score | Edge cut |
+|-----------------|-------------------------|----------|
+| 1               | | 0%   |
+| 2               | |      |
+| 4               | |      |
+| 8               | |      |
+
+Partitioning time is negligible compared to embedding time. By partitioning the graph into multiple partitions, we can reduce the embedding time significantly, where the slowest partition is the biggest bottleneck. 
+
