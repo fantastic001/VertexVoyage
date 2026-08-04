@@ -477,7 +477,17 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             sorted_events.append(event)
         return sorted_events
 
-    def _process_temporal_buffers(self, *, nx, sorted_events, buffer_size: int, partitioner, models, original_graph):
+    def _process_temporal_buffers(
+            self, *, 
+            nx, 
+            sorted_events, 
+            buffer_size: int, 
+            partitioner, 
+            models, 
+            original_graph,
+            iteration: int,
+            run = None,
+        ):
         total_edges = 0
         nodes = set()
         iteration_precisions, iteration_recalls, iteration_f1s = [], [], []
@@ -496,7 +506,11 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             for part, partition_buffer in partitioner.get_partition_buffers(buffer):
                 models[part].update(partition_buffer)
 
-            embeddings = partitioner.get_distributed_embedding(models, nodes)
+            if run is not None:
+                embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes)
+            else:
+                embeddings = partitioner.get_distributed_embedding(models, nodes)
+            
             if processed_after_last_f1 >= F1_COMPU_THRESHOLD or bi == total_buffers - 1 or bi == 0:
                 processed_after_last_f1 = 0
                 g = reconstruct(total_edges, embeddings, list(nodes))
@@ -678,6 +692,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              buffer_size: int = 100,
              checkpoint: str = "",
              replication_factor: int = 1,
+             checkpoint_iterations: bool = False,
              mu: float = 0,
              epsilon: float = 0.1,
              alpha: float = 1.0,
@@ -784,6 +799,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     partitioner=partitioner,
                     models=models,
                     original_graph=original_graph,
+                    iteration=it,
+                    run = run if checkpoint_iterations else None
                 )
                 log("Event stream processing completed")
                 scores.append(old_f1_score)
