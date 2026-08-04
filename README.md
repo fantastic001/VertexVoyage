@@ -336,7 +336,7 @@ maturin develop
 | CITESEER | 34.82%           |
 | DBLP     | 60.3%            |
 | AstroPh  | 70.41%           |
-| AS-Oregon|                  |
+| AS-Oregon| 35.85%           |
 
 ## Dynnode2vec with buffered event processing 
 
