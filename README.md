@@ -336,7 +336,7 @@ maturin develop
 | CITESEER | 34.82%           |
 | DBLP     | 60.3%            |
 | AstroPh  | 70.41%           |
-| AS-Oregon| 35.85%           |
+| AS-Oregon| 31.26%           |
 
 ## Dynnode2vec with buffered event processing 
 
@@ -375,9 +375,9 @@ AstroPh:
 
 AS-Oregon:
 
-| # of partitions | F1 Reconstruction score | Edge cut |
-|-----------------|-------------------------|----------|
-| 1               | | 0%   |
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|-------------------------|----------|----------|
+| 1               | 26.58% | 0%   | 1 |
 | 2               | |      |
 | 4               | |      |
 | 8               | |      |
