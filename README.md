@@ -378,9 +378,9 @@ AS-Oregon:
 | # of partitions | F1 Reconstruction score | Edge cut | Balance |
 |-----------------|-------------------------|----------|----------|
 | 1               | 26.58% | 0%   | 1 |
-| 2               | 28.72% | 30.44%     | 1.21|
-| 4               | |      |
-| 8               | |      |
+| 2               | 28.72% | 30.44%   | 1.21|
+| 4               | 25.67% | 53.79%  | 1.26 |
+| 8               | 23.13% | 71.56%  | 1.27 |
 
 Partitioning time is negligible compared to embedding time. By partitioning the graph into multiple partitions, we can reduce the embedding time significantly, where the slowest partition is the biggest bottleneck. 
 
