@@ -329,6 +329,27 @@ maturin develop
 
 # Experimental results
 
+## Datasets 
+
+
+## Datasets
+
+| Dataset | Nodes | Edges | Citation |
+| --- | --- | --- | --- |
+| CITESEER | 3327 | 9104 | Z. Yang, W. W. Cohen, and R. Salakhutdinov. Revisiting Semi-Supervised Learning with Graph Embeddings. ICML 2016. Dataset statistics from the PyTorch Geometric Planetoid documentation. |
+|DBLP | 17716| 52867| J. Leskovec, A. Krevl, SNAP Datasets: Stanford large network dataset collection, http://snap.stanford.edu/data (Jun. 2014).|
+| AstroPh | 18772 | 198110 | J. Leskovec, J. Kleinberg, and C. Faloutsos. Graph Evolution: Densification and Shrinking Diameters. ACM Transactions on Knowledge Discovery from Data 1(1), 2007. |
+| AS - Oregon 2 | 11461 | 32730 | J. Leskovec, J. Kleinberg and C. Faloutsos. Graphs over Time: Densification Laws, Shrinking Diameters and Possible Explanations. ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD), 2005. |
+| Enron | 36692 | 183831 | B. Klimmt, Y. Yang. Introducing the Enron corpus. CEAS conference, 2004.|
+
+
+- CITESEER: A dataset of scientific publications and their citations, which can be represented as a graph where nodes are papers and edges are citations.
+- AS - Oregon: A dataset of autonomous systems (AS) and their connections, which can be represented as a graph where nodes are AS and edges are connections between them.
+- AstroPh: A dataset of scientific publications in the field of astrophysics, which can be represented as a graph where nodes are papers and edges are citations.
+- Enron: A dataset of email communications within the Enron corporation, which can be represented as a graph where nodes are email addresses and edges are email communications between them.
+- DBLP: A dataset of scientific publications in computer science, which can be represented as a graph where nodes are papers and edges are citations.
+
+
 ## Node2Vec baseline 
 
 | Dataset  | Average F1 score |
