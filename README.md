@@ -337,6 +337,7 @@ maturin develop
 | DBLP     | 60.3%            |
 | AstroPh  | 70.41%           |
 | AS-Oregon| 31.26%           |
+| Enron | 20.42%           |
 
 ## Dynnode2vec with buffered event processing 
 
@@ -382,5 +383,37 @@ AS-Oregon:
 | 4               | 25.67% | 53.79%  | 1.26 |
 | 8               | 23.13% | 71.56%  | 1.27 |
 
-Partitioning time is negligible compared to embedding time. By partitioning the graph into multiple partitions, we can reduce the embedding time significantly, where the slowest partition is the biggest bottleneck. 
+
+Enron:
+
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|-------------------------|----------|----------|
+| 1               | 17.63% | 0%    | 1    |
+| 2               | 24.35% | 33.07% | 1.09 |
+| 4               | 31.44% | 49.18% | 1.08 |
+| 8               | 30.68% | 61.99% | 1.25 |
+
+
+
+Partitioning time is negligible compared to embedding time. By partitioning the graph into multiple partitions, we can reduce the embedding time significantly, where the slowest partition is the biggest bottleneck.
+
+## Dataset parameters
+
+The following embedding hyperparameters were used for each dataset (via `--use-dataset-params`):
+
+| Dataset   | p    | q    | dim |
+|-----------|------|------|-----|
+| CITESEER  | 0.5  | 0.25 | 50  |
+| DBLP      | 0.5  | 1    | 25  |
+| AstroPh   | 2    | 0.25 | 50  |
+| AS-Oregon | 0.5  | 2    | 128 |
+| Enron     | 0.5  | 1    | 128 |
+
+## Balance metric
+
+The **balance** column measures how evenly vertices are distributed across partitions. It is computed as:
+
+$$B = 1 + \frac{1}{K} \sum_{i=1}^{K} \frac{|s_i - \bar{s}|}{\bar{s}}$$
+
+where $K$ is the number of partitions, $s_i$ is the number of vertices assigned to partition $i$, and $\bar{s} = \frac{1}{K} \sum_{i=1}^{K} s_i$ is the average partition size. A perfectly balanced partitioning yields $B = 1$; higher values indicate greater imbalance.
 
