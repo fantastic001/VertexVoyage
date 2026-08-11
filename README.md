@@ -438,3 +438,71 @@ $$B = 1 + \frac{1}{K} \sum_{i=1}^{K} \frac{|s_i - \bar{s}|}{\bar{s}}$$
 
 where $K$ is the number of partitions, $s_i$ is the number of vertices assigned to partition $i$, and $\bar{s} = \frac{1}{K} \sum_{i=1}^{K} s_i$ is the average partition size. A perfectly balanced partitioning yields $B = 1$; higher values indicate greater imbalance.
 
+## Temporal evolution plots
+
+The following plots show how F1 score, balance, edge cuts, and repartitioning rate evolve over iterations (buffer steps) for each dataset, broken down by number of partitions.
+
+### F1 Score over iterations
+
+| CITESEER | DBLP |
+|----------|------|
+| ![CITESEER F1](plots/citeseer-f1.png) | ![DBLP F1](plots/dblp-f1.png) |
+
+| AstroPh | AS-Oregon |
+|---------|-----------|
+| ![AstroPh F1](plots/astroph-f1.png) | ![AS-Oregon F1](plots/as-oregon-f1.png) |
+
+| Enron |
+|-------|
+| ![Enron F1](plots/enron-f1.png) |
+
+F1 reconstruction score generally improves as more events are ingested. Using more partitions tends to maintain competitive or improved F1 in datasets with clear community structure (CITESEER, DBLP, Enron), while high-density datasets (AstroPh) see a modest drop at higher partition counts due to increased edge cut.
+
+### Balance over iterations
+
+| CITESEER | DBLP |
+|----------|------|
+| ![CITESEER Balance](plots/citeseer-balance.png) | ![DBLP Balance](plots/dblp-balance.png) |
+
+| AstroPh | AS-Oregon |
+|---------|-----------|
+| ![AstroPh Balance](plots/astroph-balance.png) | ![AS-Oregon Balance](plots/as-oregon-balance.png) |
+
+| Enron |
+|-------|
+| ![Enron Balance](plots/enron-balance.png) |
+
+Balance remains close to 1 across all datasets and partition counts, indicating that the neighbor-based partitioner distributes vertices nearly evenly without requiring explicit load-balancing. The imbalance stays within a small constant factor of the ideal even as the graph evolves over time.
+
+### Edge cuts over iterations
+
+| CITESEER | DBLP |
+|----------|------|
+| ![CITESEER Edge Cuts](plots/citeseer-edge-cuts.png) | ![DBLP Edge Cuts](plots/dblp-edge-cuts.png) |
+
+| AstroPh | AS-Oregon |
+|---------|-----------|
+| ![AstroPh Edge Cuts](plots/astroph-edge-cuts.png) | ![AS-Oregon Edge Cuts](plots/as-oregon-edge-cuts.png) |
+
+| Enron |
+|-------|
+| ![Enron Edge Cuts](plots/enron-edge-cuts.png) |
+
+Edge cut ratio rises quickly in the first few iterations as new vertices are assigned, then stabilizes at a bounded plateau. This plateau is determined primarily by the number of partitions and the graph's community structure, confirming that the partitioner keeps edge cuts at predictable and manageable levels throughout the stream.
+
+### Repartitioning rate over iterations
+
+| CITESEER | DBLP |
+|----------|------|
+| ![CITESEER Repartitions](plots/citeseer-repartitions.png) | ![DBLP Repartitions](plots/dblp-repartitions.png) |
+
+| AstroPh | AS-Oregon |
+|---------|-----------|
+| ![AstroPh Repartitions](plots/astroph-repartitions.png) | ![AS-Oregon Repartitions](plots/as-oregon-repartitions.png) |
+
+| Enron |
+|-------|
+| ![Enron Repartitions](plots/enron-repartitions.png) |
+
+The fraction of vertices repartitioned per iteration decays rapidly and stays below 20% across all datasets and partition configurations. After the initial warm-up phase, the partitioner stabilises and only reassigns vertices whose neighbourhood has shifted significantly, keeping the overhead of maintaining partition assignments low throughout the stream.
+
