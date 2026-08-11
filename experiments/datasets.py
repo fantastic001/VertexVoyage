@@ -64,6 +64,7 @@ datasets = {
     "DBLP": NPZLoader("data/dblp.npz"),
     "Enron": lambda: FileEventSequence("data/enron.txt"),
     "StackOverflow": lambda: FileEventSequence("data/stackoverflow.txt"),
+    "DGraph-Fin": lambda: FileEventSequence("data/dgraph-fin-small.txt"),
 }
 
 
@@ -126,6 +127,11 @@ dataset_params = {
     "StackOverflow": dict(
         p=1,
         q=2,
+        dim=128,
+    ),
+    "DGraph-Fin": dict(
+        p=1,
+        q=8,
         dim=128,
     ),
 }
