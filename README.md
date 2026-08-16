@@ -371,11 +371,13 @@ vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-para
 CITESEER:
 
 | # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|-------------------------|----------|----------|
-| 1               | 47%    | 0%    | 1 | 
-| 2               | 45.45% | 23%   | 1.31 |
-| 4               | 47.48% | 39%   | 1.63 |
-| 8               | 49.86% | 48%   | 1.75 |
+|-----------------|--------------------------|----------|----------|
+| 1               | 47.57% ± 1.56%           | 0%       | 1 | 
+| 2               | 45.81% ± 0.59%           | 23%      | 1.31 |
+| 4               | 48.06% ± 0.53%           | 39%      | 1.63 |
+| 8               | 54.81% ± 1.66%           | 48%      | 1.75 |
+
+F1 Reconstruction score is reported as mean ± standard deviation over 11 runs.
 
 DBLP: 
 
