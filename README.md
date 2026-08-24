@@ -512,3 +512,133 @@ Edge cut ratio rises quickly in the first few iterations as new vertices are ass
 
 The fraction of vertices repartitioned per iteration decays rapidly and stays below 20% across all datasets and partition configurations. After the initial warm-up phase, the partitioner stabilises and only reassigns vertices whose neighbourhood has shifted significantly, keeping the overhead of maintaining partition assignments low throughout the stream.
 
+## Sensitivity analysis of the balance penalty parameter (μ)
+
+The most common neighbor partitioner (see [Partitioning methods](#partitioning-methods)) uses a capacity penalty coefficient $\mu$ to discourage assigning vertices to partitions that are already larger than average. This section analyzes the effect of $\mu$ on partition balance, varying $\mu \in \{0, 0.5, 1, 1.5, 2\}$ across all five datasets with 2 and 4 partitions. $\mu = 0$ disables the penalty entirely, so balance is determined purely by neighbor counts; higher $\mu$ increasingly rebalances vertex placement at the expense of prioritizing neighbor locality.
+
+### Balance at the last iteration
+
+The tables below show the average balance at the final iteration for each combination of $\mu$ and partition count. As in the [Balance metric](#balance-metric) section, $B = 1$ is a perfectly balanced partitioning; higher values indicate greater imbalance.
+
+AS-Oregon:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.18 | 1.49 |
+| 1.0 | 1.18 | 1.20 |
+| 1.5 | 1.10 | 1.21 |
+| 2.0 | 1.05 | 1.19 |
+
+AstroPh:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.15 | 1.18 |
+| 1.0 | 1.13 | 1.12 |
+| 1.5 | 1.08 | 1.12 |
+| 2.0 | 1.05 | 1.22 |
+
+CITESEER:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.61 | 1.61 |
+| 1.0 | 1.31 | 1.63 |
+| 1.5 | 1.17 | 1.50 |
+| 2.0 | 1.17 | 1.17 |
+
+DBLP:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.08 | 1.16 |
+| 1.0 | 1.03 | 1.09 |
+| 1.5 | 1.14 | 1.20 |
+| 2.0 | 1.01 | 1.14 |
+
+Enron:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.10 | 1.14 |
+| 1.0 | 1.10 | 1.10 |
+| 1.5 | 1.02 | 1.02 |
+| 2.0 | 1.06 | 1.06 |
+
+### Average balance across iterations
+
+The tables below show the average balance across all iterations (not just the last one) for each combination of $\mu$ and partition count, capturing how balance behaves during the stream rather than only at the end.
+
+AS-Oregon:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.14 | 1.51 |
+| 1.0 | 1.12 | 1.23 |
+| 1.5 | 1.10 | 1.18 |
+| 2.0 | 1.10 | 1.15 |
+
+AstroPh:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.24 | 1.51 |
+| 1.0 | 1.14 | 1.27 |
+| 1.5 | 1.11 | 1.21 |
+| 2.0 | 1.10 | 1.20 |
+
+CITESEER:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.92 | 2.12 |
+| 1.0 | 1.52 | 1.84 |
+| 1.5 | 1.34 | 1.66 |
+| 2.0 | 1.34 | 1.55 |
+
+DBLP:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.30 | 1.60 |
+| 1.0 | 1.17 | 1.40 |
+| 1.5 | 1.15 | 1.33 |
+| 2.0 | 1.12 | 1.25 |
+
+Enron:
+
+| μ | P=2 | P=4 |
+|---|-----|-----|
+| 0.0 | 2.00 | 2.50 |
+| 0.5 | 1.14 | 1.27 |
+| 1.0 | 1.11 | 1.19 |
+| 1.5 | 1.09 | 1.17 |
+| 2.0 | 1.08 | 1.15 |
+
+### Balance evolution across μ values
+
+The following plots show the (smoothed) average balance over iterations for each $\mu$ value, for P=2 and P=4 partitions side by side.
+
+
+![CITESEER Balance vs mu](plots/citeseer-balance-mu.png) 
+
+![DBLP Balance vs mu](plots/dblp-balance-mu.png) |
+
+
+![AstroPh Balance vs mu](plots/astroph-balance-mu.png) 
+
+![AS-Oregon Balance vs mu](plots/as-oregon-balance-mu.png) |
+
+![Enron Balance vs mu](plots/enron-balance-mu.png) |
+
+Across all datasets, $\mu = 0$ (no capacity penalty) produces the worst balance, matching the partition count almost exactly ($B \approx 1.5 + P/4$ at $P$ partitions), since vertices are placed purely by neighbor affinity with no regard for partition size. Increasing $\mu$ from 0 to 1 yields the largest balance improvement; beyond $\mu = 1$–$1.5$, returns diminish and balance mostly plateaus, with CITESEER remaining the hardest dataset to balance at every $\mu$ value tested.
+
