@@ -696,6 +696,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              mu: float = 0,
              epsilon: float = 0.1,
              alpha: float = 1.0,
+             skip_full_graph_baseline: bool = False,
                decay: float = 0,
                semantic_metric: str = "cosine",
                semantic_assignment: str = "knn",
@@ -813,13 +814,15 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 run["profile_%d" % it] = partitioner.dump_profile()
         log("Average F1 score: ", np.mean(scores))
         log("Standard deviation of F1 score: ", np.std(scores))
-        self._evaluate_temporal_full_graph_baseline(
-            run,
-            original_graph,
-            dim=dim,
-            default_p=default_p,
-            default_q=default_q,
-            long_run=long_run,
-            epochs=epochs,
-        )
+        if not skip_full_graph_baseline:
+            log("Evaluating full graph baseline...")
+            self._evaluate_temporal_full_graph_baseline(
+                run,
+                original_graph,
+                dim=dim,
+                default_p=default_p,
+                default_q=default_q,
+                long_run=long_run,
+                epochs=epochs,
+            )
         notify_plugins("temporal_test_completed", run)
