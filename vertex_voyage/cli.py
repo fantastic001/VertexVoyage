@@ -1,6 +1,7 @@
 
 import sys
 import numpy as np
+import networkx as nx
 from vertex_voyage.grid_search import (
     GridSearchPersistence, 
     grid_search, 
@@ -384,7 +385,18 @@ class Commands:
             "num_nodes": g.number_of_nodes(),
             "num_edges": g.number_of_edges(),
             "avg_degree": sum(dict(g.degree()).values()) / g.number_of_nodes(),
+            "clustering_coefficient": nx.average_clustering(g),
+            "density": nx.density(g),
+            "modularity": nx.algorithms.community.quality.modularity(g, [list(c) for c in nx.algorithms.community.label_propagation_communities(g)]),
+            "assortativity": nx.degree_assortativity_coefficient(g),
         }
+
+    def datasets(self, *, sort_by: str = "name", names: str = ""):
+        d = []
+        name_list = names.split() if names else datasets.keys()
+        for name in name_list:
+            d.append(self.dataset(name))
+        return sorted(d, key=lambda x: x[sort_by])
 
 if __name__ == "__main__":
     command_executor_main(Commands)
