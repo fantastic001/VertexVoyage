@@ -329,9 +329,6 @@ maturin develop
 
 # Experimental results
 
-## Datasets 
-
-
 ## Datasets
 
 | Dataset | Nodes | Edges | Citation |
