@@ -26,6 +26,7 @@ from vertex_voyage.tasks.link_prediction import (
     train_on_static_graph,
 )
 from vertex_voyage.temporal import buffered, to_nx_graph
+from vertex_voyage.timing import TimeMetric
 from vertex_voyage.temporal_partitioning import (
     InMemoryPartition,
     MostCommonNeighborPartitioner,
@@ -55,6 +56,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
     def testtest(self):
         return "testtest"
+
+    def _report_timing(self, run):
+        """Persist collected TimeMetric aggregates onto the run and log the report."""
+        try:
+            run["timing"] = TimeMetric.dump()
+        except Exception:
+            logger.warning("Could not persist timing metrics to run", exc_info=True)
+        TimeMetric.print_report()
 
     def _resolved_default_pq(self, default_p: float, default_q: float):
         return (
@@ -284,6 +293,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         return best, best_f1, best_model
 
+    @TimeMetric("link_prediction")
     def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges):
         log("Training link prediction model on full graph...")
 
@@ -322,6 +332,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Full Model - Hits@5: {ranks.hits_at_k(5):.4f}")
         log(f"Full Model - Hits@10: {ranks.hits_at_k(10):.4f}")
 
+    @TimeMetric("create_models")
     def _create_temporal_models(
         self,
         *,
@@ -349,6 +360,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             ) for p in range(partitions)
         }
 
+    @TimeMetric("create_partitioner")
     def _create_temporal_partitioner(
         self,
         *,
@@ -451,6 +463,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         )
         return PartitionerProfile(partitioner)
 
+    @TimeMetric("sort_events")
     def _sort_temporal_events(self, og_events, track_seen: bool):
         events = og_events.copy()
         if track_seen:
@@ -477,9 +490,10 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             sorted_events.append(event)
         return sorted_events
 
+    @TimeMetric("process_buffers")
     def _process_temporal_buffers(
-            self, *, 
-            nx, 
+            self, *,
+            nx,
             sorted_events, 
             buffer_size: int, 
             partitioner, 
@@ -500,28 +514,32 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             for event in buffer:
                 nodes.add(event.src)
                 nodes.add(event.dest)
-            partitioner.push(buffer)
+            with TimeMetric("partitioner_push"):
+                partitioner.push(buffer)
 
             total_edges += len(buffer)
-            for part, partition_buffer in partitioner.get_partition_buffers(buffer):
-                models[part].update(partition_buffer)
+            with TimeMetric("model_update"):
+                for part, partition_buffer in partitioner.get_partition_buffers(buffer):
+                    models[part].update(partition_buffer)
 
-            if run is not None:
-                embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes)
-            else:
-                embeddings = partitioner.get_distributed_embedding(models, nodes)
-            
+            with TimeMetric("embedding"):
+                if run is not None:
+                    embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes)
+                else:
+                    embeddings = partitioner.get_distributed_embedding(models, nodes)
+
             if processed_after_last_f1 >= F1_COMPU_THRESHOLD or bi == total_buffers - 1 or bi == 0:
                 processed_after_last_f1 = 0
-                g = reconstruct(total_edges, embeddings, list(nodes))
-                G = nx.Graph()
-                for u, v in original_graph.edges:
-                    if u in nodes and v in nodes:
-                        G.add_edge(u, v)
-                try:
-                    precision, recall, f1_score = get_f1_score(G, g)
-                except ZeroDivisionError:
-                    precision, recall, f1_score = 0.0, 0.0, 0.0
+                with TimeMetric("reconstruct_and_f1"):
+                    g = reconstruct(total_edges, embeddings, list(nodes))
+                    G = nx.Graph()
+                    for u, v in original_graph.edges:
+                        if u in nodes and v in nodes:
+                            G.add_edge(u, v)
+                    try:
+                        precision, recall, f1_score = get_f1_score(G, g)
+                    except ZeroDivisionError:
+                        precision, recall, f1_score = 0.0, 0.0, 0.0
                 log(f"Buffer: {bi+1}/{total_buffers}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
                 if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
                     logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
@@ -534,6 +552,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         return old_f1_score, iteration_precisions, iteration_recalls, iteration_f1s
 
+    @TimeMetric("full_graph_baseline")
     def _evaluate_temporal_full_graph_baseline(
         self,
         run,
@@ -585,18 +604,23 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              checkpoint: str = ""):
         import networkx as nx
 
+        TimeMetric.reset()
+        _overall = TimeMetric("test").start()
+
         run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction=link_prediction)
         log("Processing dataset ")
         t = VertexEnumerator()
-        dataset, removed_edges, positive_edges, negative_edges, test_edges = self._initialize_test_dataset(
-            run,
-            name,
-            link_prediction,
-            t,
-        )
+        with TimeMetric("init_dataset"):
+            dataset, removed_edges, positive_edges, negative_edges, test_edges = self._initialize_test_dataset(
+                run,
+                name,
+                link_prediction,
+                t,
+            )
         log(f"Removed {len(removed_edges)} edges for testing link prediction.")
         notify_plugins("test_started", run)
-        parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa)
+        with TimeMetric("partition"):
+            parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa)
         notify_plugins("test_partitioned", run)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Graph partitioned")
@@ -626,7 +650,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     self._append_embedding(embs, node, e)
                 continue
 
-            best, best_f1, best_model = self._train_best_partition_model(
+            with TimeMetric("train_partition"):
+              best, best_f1, best_model = self._train_best_partition_model(
                 nx=nx,
                 alg=alg,
                 name=name,
@@ -653,6 +678,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         if skip_global:
             log("Skipping global F1 computation")
+            _overall.stop()
+            self._report_timing(run)
             return
         for n in dataset.nodes:
             embs[n] = np.mean(embs[n], axis=0)
@@ -668,12 +695,15 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 negative_edges,
             )
 
-        g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
-        G = nx.Graph()
-        G.add_edges_from(dataset.edges)
-        global_precision, global_recall, global_f1 = get_f1_score(G, g)
+        with TimeMetric("global_f1"):
+            g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
+            G = nx.Graph()
+            G.add_edges_from(dataset.edges)
+            global_precision, global_recall, global_f1 = get_f1_score(G, g)
         log("Global scores: Precision: %f, Recall: %f, F1 Score: %f" % (global_precision, global_recall, global_f1))
         notify_plugins("test_completed", run)
+        _overall.stop()
+        self._report_timing(run)
 
     def temporal_test(self, *,
              name: str = "CITESEER",
@@ -707,17 +737,21 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                semantic_embedding: str = "auto"):
         import networkx as nx
 
+        TimeMetric.reset()
+        _overall = TimeMetric("temporal_test").start()
+
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
         run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding)
         log(f"Processing dataset {name}")
-        t = VertexEnumerator()
-        dataset = _enumerated_event_stream(name, t)
-        if limit > 0:
-            og_events = list(dataset)[:limit]
-        else:
-            og_events = list(dataset)
-        original_graph = run("graph", to_nx_graph, og_events)
+        with TimeMetric("load_dataset"):
+            t = VertexEnumerator()
+            dataset = _enumerated_event_stream(name, t)
+            if limit > 0:
+                og_events = list(dataset)[:limit]
+            else:
+                og_events = list(dataset)
+            original_graph = run("graph", to_nx_graph, og_events)
         notify_plugins("temporal_test_started", run)
 
         logger.debug(f"Original graph has {original_graph.number_of_nodes()} nodes and {original_graph.number_of_edges()} edges")
@@ -826,3 +860,5 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 epochs=epochs,
             )
         notify_plugins("temporal_test_completed", run)
+        _overall.stop()
+        self._report_timing(run)
