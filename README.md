@@ -641,3 +641,9 @@ The following plots show the (smoothed) average balance over iterations for each
 
 Across all datasets, $\mu = 0$ (no capacity penalty) produces the worst balance, matching the partition count almost exactly ($B \approx 1.5 + P/4$ at $P$ partitions), since vertices are placed purely by neighbor affinity with no regard for partition size. Increasing $\mu$ from 0 to 1 yields the largest balance improvement; beyond $\mu = 1$–$1.5$, returns diminish and balance mostly plateaus, with CITESEER remaining the hardest dataset to balance at every $\mu$ value tested.
 
+
+## Buffer size impact on F1 score and timing 
+
+![CITESEER Buffer size vs F1](plots/citeseer-buffer-timing.png)
+
+![AstroPh Buffer size vs F1](plots/astroph-buffer-timing.png)
