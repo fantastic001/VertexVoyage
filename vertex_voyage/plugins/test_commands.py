@@ -520,8 +520,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             total_edges += len(buffer)
             with TimeMetric("model_update"):
                 for part, partition_buffer in partitioner.get_partition_buffers(buffer):
-                    models[part].update(partition_buffer)
-
+                        with TimeMetric("model_update_part"):
+                            models[part].update(partition_buffer)
             with TimeMetric("embedding"):
                 if run is not None:
                     embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes)
