@@ -187,6 +187,40 @@ class CatchAllPartitioner(TemporalGraphPartitioner):
     def get(self, vertex) -> Set[Partition]:
         return self.partitions
 
+class UniformDistribution:
+    """Picklable callable implementing a uniform P(partition | vertex)."""
+    def __init__(self, partitions: Set[Partition]):
+        self.partitions = partitions
+
+    def __call__(self, vertex, partition):
+        return 1 / len(self.partitions)
+
+
+class DegreeBasedDistribution:
+    """Picklable callable weighting partitions by the vertex's degree inside them."""
+    def __init__(self, partitions: Set[Partition]):
+        self.partitions = partitions
+
+    def __call__(self, vertex, partition):
+        degree = sum(partition.has(neighbor) for neighbor in partition.graph().neighbors(vertex))
+        total_degree = sum(
+            sum(p.has(neighbor) for neighbor in p.graph().neighbors(vertex))
+            for p in self.partitions
+        )
+        return degree / total_degree if total_degree > 0 else 1 / len(self.partitions)
+
+
+class SizeBasedDistribution:
+    """Picklable callable weighting partitions by their current size."""
+    def __init__(self, partitions: Set[Partition]):
+        self.partitions = partitions
+
+    def __call__(self, vertex, partition):
+        size = partition.size()
+        total_size = sum(p.size() for p in self.partitions)
+        return size / total_size if total_size > 0 else 1 / len(self.partitions)
+
+
 class RandomPartitioner(TemporalGraphPartitioner):
     """
     Partition of vertex is a random partition.
@@ -196,28 +230,18 @@ class RandomPartitioner(TemporalGraphPartitioner):
     def __init__(self, partitions: Set[Partition], distribution: Callable[[Any, Partition], float]):
         self.partitions = partitions
         self.distribution = distribution
-    
+
     @staticmethod
     def uniform(partitions: set[Partition]):
-        def uniform_distribution(vertex, partition):
-            return 1 / len(partitions)
-        return RandomPartitioner(partitions, uniform_distribution)
-    
+        return RandomPartitioner(partitions, UniformDistribution(partitions))
+
     @staticmethod
     def degree_based(partitions: Set[Partition]):
-        def degree_based_distribution(vertex, partition):
-            degree = sum(partition.has(neighbor) for neighbor in partition.graph().neighbors(vertex))
-            total_degree = sum(sum(partition.has(neighbor) for neighbor in partition.graph().neighbors(vertex)) for partition in partitions)
-            return degree / total_degree if total_degree > 0 else 1 / len(partitions)
-        return RandomPartitioner(partitions, degree_based_distribution)
-    
+        return RandomPartitioner(partitions, DegreeBasedDistribution(partitions))
+
     @staticmethod
     def size_based(partitions: Set[Partition]):
-        def size_based_distribution(vertex, partition):
-            size = partition.size()
-            total_size = sum(partition.size() for partition in partitions)
-            return size / total_size if total_size > 0 else 1 / len(partitions)
-        return RandomPartitioner(partitions, size_based_distribution)
+        return RandomPartitioner(partitions, SizeBasedDistribution(partitions))
     def push(self, buffer: EventSequence):
         for event in buffer:
             for vertex in [event.src, event.dest]:
