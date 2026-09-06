@@ -423,6 +423,38 @@ Enron:
 
 Partitioning time is negligible compared to embedding time. By partitioning the graph into multiple partitions, we can reduce the embedding time significantly, where the slowest partition is the biggest bottleneck.
 
+## Random partitioner baseline
+
+To measure how much of the neighbor-based partitioner's (see [Partitioning methods](#partitioning-methods)) embedding quality comes from preserving neighborhood locality, we ran the same buffered dynnode2vec pipeline using a **random partitioner**, which assigns each vertex to a partition uniformly at random, ignoring its neighbors entirely.
+
+Example of run:
+
+```sh
+vv temporal_test --name CITESEER  --long-run --iterations 3  --use-dataset-params  --buffer-size 1000 --partitions 4 --replication-factor 1 --partitioner random
+```
+
+CITESEER:
+
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|--------------------------|----------|----------|
+| 2               | 0.03% ± 0.02%            | 50.01%   | 1.02 |
+| 4               | 0.03% ± 0.03%            | 70.89%   | 1.32 |
+| 8               | 0.04% ± 0.03%            | 81.58%   | 1.61 |
+
+F1 Reconstruction score is reported as mean ± standard deviation over 3 runs.
+
+AstroPh:
+
+| # of partitions | F1 Reconstruction score | Edge cut | Balance |
+|-----------------|--------------------------|----------|----------|
+| 2               | 0.04% ± 0.02%            | 49.98%   | 1.00 |
+| 4               | 0.03% ± 0.02%            | 70.86%   | 1.31 |
+| 8               | 0.02% ± 0.01%            | 81.43%   | 1.60 |
+
+F1 Reconstruction score is reported as mean ± standard deviation over 3 runs.
+
+Compared to the neighbor-based partitioner, which reaches F1 scores of 45–55% on CITESEER and 46–55% on AstroPh at the same partition counts, random partitioning collapses reconstruction quality to essentially zero. This confirms that the neighbor partitioner's F1 scores are driven by preserving neighborhood locality across partitions rather than by the embedding algorithm alone: once locality is destroyed, per-partition embeddings become mutually incompatible and the reconstructed graph is no better than chance. Edge cut is also far higher under random partitioning (50–82%) than under the neighbor partitioner (23–65%), closely tracking the theoretical upper bound of $(P-1)/P$ for uniform random assignment.
+
 ## Dataset parameters
 
 The following embedding hyperparameters were used for each dataset (via `--use-dataset-params`):
