@@ -25,7 +25,8 @@ from vertex_voyage.tasks.link_prediction import (
     heart_benchmark,
     train_on_static_graph,
 )
-from vertex_voyage.temporal import buffered, to_nx_graph
+from vertex_voyage.temporal import FromIterable, buffered, to_nx_graph
+from vertex_voyage.temporal_ordering import BFSOrdering, DFSOrdering, RandomOrdering
 from vertex_voyage.timing import TimeMetric
 from vertex_voyage.temporal_partitioning import (
     InMemoryPartition,
@@ -42,6 +43,11 @@ logger = logging.getLogger("CLI")
 
 class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
     P_Q_GRID = [0.25, 0.5, 1, 2, 4]
+    EDGE_ORDERINGS = {
+        "bfs": BFSOrdering,
+        "dfs": DFSOrdering,
+        "random": RandomOrdering,
+    }
     LONG_RUN_WALK_PARAMS = {
         "n_walks": 10,
         "walk_size": 80,
@@ -463,6 +469,13 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         )
         return PartitionerProfile(partitioner)
 
+    @TimeMetric("order_events")
+    def _order_temporal_events(self, og_events, track_seen: bool, ordering: str):
+        if ordering:
+            ordering_cls = self.EDGE_ORDERINGS[ordering]
+            return list(ordering_cls(FromIterable(iter(og_events))))
+        return self._sort_temporal_events(og_events, track_seen)
+
     @TimeMetric("sort_events")
     def _sort_temporal_events(self, og_events, track_seen: bool):
         events = og_events.copy()
@@ -717,6 +730,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              use_dataset_params: bool = False,
              algorithm: str = "dynnode2vec",
              track_seen: bool = False,
+             ordering: str = "",
              iterations: int = 1,
              limit: int = -1,
              buffer_size: int = 100,
@@ -737,12 +751,15 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                semantic_embedding: str = "auto"):
         import networkx as nx
 
+        if ordering and ordering not in self.EDGE_ORDERINGS:
+            raise ValueError(f"ordering must be one of: '', {', '.join(self.EDGE_ORDERINGS)}")
+
         TimeMetric.reset()
         _overall = TimeMetric("temporal_test").start()
 
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding)
         log(f"Processing dataset {name}")
         with TimeMetric("load_dataset"):
             t = VertexEnumerator()
@@ -826,7 +843,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     semantic_window_size=semantic_window_size,
                     semantic_retrain_threshold=semantic_retrain_threshold,
                 )
-                sorted_events = self._sort_temporal_events(og_events, track_seen)
+                sorted_events = self._order_temporal_events(og_events, track_seen, ordering)
                 old_f1_score, iteration_precisions, iteration_recalls, iteration_f1s = self._process_temporal_buffers(
                     nx=nx,
                     sorted_events=sorted_events,
