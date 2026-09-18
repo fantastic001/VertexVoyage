@@ -1,14 +1,25 @@
+import logging
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-import random 
+import random
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Callable, Type
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import log_loss
+
+logger = logging.getLogger(__name__)
 
 # Model without explicit Sigmoid
 class HadamardLogitsNet(nn.Module):
     def __init__(self, vector_dim, use_bias = True):
         super(HadamardLogitsNet, self).__init__()
+        logger.info(f"Initializing HadamardLogitsNet with vector_dim={vector_dim}, use_bias={use_bias}")
         self.fc = nn.Linear(vector_dim, 1, bias=use_bias)
         
     def forward(self, u, v):
@@ -20,6 +31,7 @@ class HadamardLogitsNet(nn.Module):
 class QuadraticLogitsNet(nn.Module):
     def __init__(self, vector_dim, use_bias = True):
         super(QuadraticLogitsNet, self).__init__()
+        logger.info(f"Initializing QuadraticLogitsNet with vector_dim={vector_dim}, use_bias={use_bias}")
         self.fc = nn.Linear(vector_dim, vector_dim, bias=use_bias)
         
     def forward(self, u, v):
@@ -29,6 +41,103 @@ class QuadraticLogitsNet(nn.Module):
         return logits
 
     criterion = nn.BCEWithLogitsLoss()
+
+
+class LinkPredictionModel(ABC):
+    @abstractmethod
+    def predict_proba(self, u_embedding, v_embedding) -> float:
+        ...
+
+
+class TorchLogitsLinkPredictionModel(LinkPredictionModel):
+    def __init__(self, net: nn.Module):
+        self.net = net
+
+    def predict_proba(self, u_embedding, v_embedding) -> float:
+        with torch.no_grad():
+            logit = self.net(
+                torch.tensor(u_embedding, dtype=torch.float32).unsqueeze(0),
+                torch.tensor(v_embedding, dtype=torch.float32).unsqueeze(0),
+            ).item()
+        return 1 / (1 + np.exp(-logit))
+
+
+def concatenate_embeddings(u_embeddings, v_embeddings):
+    return np.concatenate((np.atleast_2d(u_embeddings), np.atleast_2d(v_embeddings)), axis=1)
+
+
+class RandomForestLinkPredictionModel(LinkPredictionModel):
+    def __init__(self, classifier: RandomForestClassifier):
+        logger.info(f"Initializing RandomForestLinkPredictionModel with classifier: {classifier}")
+        self.classifier = classifier
+
+    def predict_proba(self, u_embedding, v_embedding) -> float:
+        features = concatenate_embeddings(u_embedding, v_embedding)
+        return self.classifier.predict_proba(features)[0][1]
+
+
+@dataclass
+class LinkPredictionSplit:
+    u: np.ndarray
+    v: np.ndarray
+    y: np.ndarray
+
+
+@dataclass
+class LinkPredictionDataset:
+    train: LinkPredictionSplit
+    val: LinkPredictionSplit
+
+
+class LinkPredictionModelTrainer(ABC):
+    @abstractmethod
+    def train(self, dataset: LinkPredictionDataset) -> "tuple[LinkPredictionModel, list, list]":
+        ...
+
+
+class TorchLogitsLinkPredictionModelTrainer(LinkPredictionModelTrainer):
+    def __init__(self, net_class: Type[nn.Module], epochs=60, batch_size=32, learning_rate=0.1, use_bias=False):
+        self.net_class = net_class
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.use_bias = use_bias
+
+    def train(self, dataset: LinkPredictionDataset):
+        net = self.net_class(vector_dim=dataset.train.u.shape[1], use_bias=self.use_bias)
+        net, train_losses, val_losses = train_model(
+            net,
+            dataset.train.u, dataset.train.v, dataset.train.y,
+            dataset.val.u, dataset.val.v, dataset.val.y,
+            epochs=self.epochs, batch_size=self.batch_size, learning_rate=self.learning_rate,
+        )
+        return TorchLogitsLinkPredictionModel(net), train_losses, val_losses
+
+
+class RandomForestLinkPredictionModelTrainer(LinkPredictionModelTrainer):
+    def __init__(self, n_estimators=100, random_state=42):
+        self.n_estimators = n_estimators
+        self.random_state = random_state
+
+    def train(self, dataset: LinkPredictionDataset):
+        classifier = RandomForestClassifier(n_estimators=self.n_estimators, random_state=self.random_state)
+        classifier.fit(concatenate_embeddings(dataset.train.u, dataset.train.v), dataset.train.y)
+        model = RandomForestLinkPredictionModel(classifier)
+        train_losses = [self._compute_log_loss(model, dataset.train)]
+        val_losses = [self._compute_log_loss(model, dataset.val)] if len(dataset.val.y) > 0 else list(train_losses)
+        return model, train_losses, val_losses
+
+    def _compute_log_loss(self, model: RandomForestLinkPredictionModel, split: LinkPredictionSplit) -> float:
+        probabilities = [model.predict_proba(u, v) for u, v in zip(split.u, split.v)]
+        return log_loss(split.y, probabilities, labels=[0, 1])
+
+
+LINK_PREDICTION_MODEL_TRAINERS: "dict[str, Callable[[], LinkPredictionModelTrainer]]" = {
+    "bilinear": lambda: TorchLogitsLinkPredictionModelTrainer(QuadraticLogitsNet),
+    "hadamard": lambda: TorchLogitsLinkPredictionModelTrainer(HadamardLogitsNet),
+    "random_forest": lambda: RandomForestLinkPredictionModelTrainer(),
+}
+
 
 def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10, batch_size=32, learning_rate=0.1):
     val_losses = [] 
@@ -140,34 +249,32 @@ class DatasetGenerator:
         u_val, v_val, y_val = self.generate_data(val_edges, negative_val_edges)
         return np.array(u_train), np.array(v_train), np.array(y_train), np.array(u_val), np.array(v_val), np.array(y_val)
 
-def train_on_static_graph(graph, embedding_model, val_ratio=0.2, epochs=60, batch_size=32, learning_rate=0.1, use_bias=False, cv_k=10, model_class = QuadraticLogitsNet):
+def train_on_static_graph(graph, embedding_model, val_ratio=0.2, cv_k=10, model_trainer: LinkPredictionModelTrainer = None):
+    model_trainer = model_trainer or LINK_PREDICTION_MODEL_TRAINERS["bilinear"]()
     best_model = None
     best_train_losses = []
     best_val_losses = []
     dataset_generator = DatasetGenerator(graph, embedding_model)
     for _ in range(cv_k):
         u_train, v_train, y_train, u_val, v_val, y_val = dataset_generator.generate_train_val_data(val_ratio=val_ratio)
-        model, train_losses, val_losses = train_model(model_class(
-                vector_dim=u_train.shape[1],
-                use_bias=use_bias
-            ), 
-            np.array(u_train), np.array(v_train), np.array(y_train), 
-            np.array(u_val), np.array(v_val), np.array(y_val), 
-            epochs=epochs, batch_size=batch_size, learning_rate=learning_rate
+        dataset = LinkPredictionDataset(
+            train=LinkPredictionSplit(np.array(u_train), np.array(v_train), np.array(y_train)),
+            val=LinkPredictionSplit(np.array(u_val), np.array(v_val), np.array(y_val)),
         )
+        model, train_losses, val_losses = model_trainer.train(dataset)
         if len(best_val_losses) == 0 or val_losses[-1] < best_val_losses[-1]:
             best_model = model
             best_train_losses = train_losses
             best_val_losses = val_losses
     return best_model, best_train_losses, best_val_losses
 
-def predict_links(node_pairs, embedding_model, link_prediction_model):
+def predict_links(node_pairs, embedding_model, link_prediction_model: LinkPredictionModel):
     """
     Predicts the existence of edges for given node pairs using the trained link prediction model and node embeddings.
     Args:
         node_pairs (list of tuples): List of node pairs (u, v) for which to predict edge existence.
         embedding_model: The model used to generate node embeddings.
-        link_prediction_model: The trained link prediction model that takes node embeddings as input and outputs logits.
+        link_prediction_model: The trained LinkPredictionModel that takes node embeddings as input and outputs a probability.
     Returns:
         List of tuples: Each tuple contains (is_edge, probability) where is_edge is a boolean indicating predicted edge existence and probability is the confidence score for that prediction.
     """
@@ -175,14 +282,9 @@ def predict_links(node_pairs, embedding_model, link_prediction_model):
     for u, v in node_pairs:
         u_emb = embedding_model.embed_node(u)
         v_emb = embedding_model.embed_node(v)
-        with torch.no_grad():
-            logit = link_prediction_model(
-                torch.tensor(u_emb, dtype=torch.float32).unsqueeze(0), 
-                torch.tensor(v_emb, dtype=torch.float32).unsqueeze(0)
-            ).item()
-            prob = 1 / (1 + np.exp(-logit))  # Sigmoid
-            is_edge = prob > 0.5
-            predictions.append((is_edge, prob))
+        prob = link_prediction_model.predict_proba(u_emb, v_emb)
+        is_edge = prob > 0.5
+        predictions.append((is_edge, prob))
     return predictions
 
 def generate_embedding_dict(graph, embedding_model):
@@ -225,14 +327,8 @@ def ensemble_predict_links(node_pairs, embedding_dicts, link_prediction_models):
             continue
         u_emb = np.mean(u_emb, axis=0)  # Average embeddings if multiple models provide them
         v_emb = np.mean(v_emb, axis=0)
-        for i in range(len(link_prediction_models)):
-            with torch.no_grad():
-                logit = link_prediction_models[i](
-                    torch.tensor(u_emb, dtype=torch.float32).unsqueeze(0), 
-                    torch.tensor(v_emb, dtype=torch.float32).unsqueeze(0)
-                ).item()
-                prob = 1 / (1 + np.exp(-logit))  # Sigmoid
-                probs.append(prob)
+        for link_prediction_model in link_prediction_models:
+            probs.append(link_prediction_model.predict_proba(u_emb, v_emb))
         avg_prob = np.mean(probs)
         is_edge = avg_prob > 0.5
         predictions.append((is_edge, avg_prob))

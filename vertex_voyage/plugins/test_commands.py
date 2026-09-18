@@ -21,6 +21,11 @@ from vertex_voyage.partitioning import label_propagation_partitioner, partition_
 from vertex_voyage.persist import PersistedRun
 from vertex_voyage.reconstruction import get_f1_score, reconstruct
 from vertex_voyage.tasks.link_prediction import (
+    HadamardLogitsNet,
+    LinkPredictionModelTrainer,
+    QuadraticLogitsNet,
+    RandomForestLinkPredictionModelTrainer,
+    TorchLogitsLinkPredictionModelTrainer,
     evaluate_predictions,
     heart_benchmark,
     train_on_static_graph,
@@ -59,6 +64,16 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         "window_size": 3,
     }
     LINK_PREDICTION_TEST_FRACTION = 0.1
+    LINK_PREDICTION_TEST_EPOCHS = 10
+    LINK_PREDICTION_MODEL_TRAINERS = {
+        "bilinear": lambda epochs=LINK_PREDICTION_TEST_EPOCHS: TorchLogitsLinkPredictionModelTrainer(
+            QuadraticLogitsNet, epochs=epochs
+        ),
+        "hadamard": lambda epochs=LINK_PREDICTION_TEST_EPOCHS: TorchLogitsLinkPredictionModelTrainer(
+            HadamardLogitsNet, epochs=epochs
+        ),
+        "random_forest": lambda: RandomForestLinkPredictionModelTrainer(),
+    }
 
     def testtest(self):
         return "testtest"
@@ -300,7 +315,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         return best, best_f1, best_model
 
     @TimeMetric("link_prediction")
-    def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges):
+    def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges, model_trainer: LinkPredictionModelTrainer):
         log("Training link prediction model on full graph...")
 
         class EM:
@@ -314,7 +329,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 return self.embedding_dict[node]
 
         em = EM(embedding_dict)
-        full_model, train_losses, val_losses = run("lp_full", train_on_static_graph, dataset, em, epochs=10)
+        full_model, train_losses, val_losses = run("lp_full", train_on_static_graph, dataset, em, model_trainer=model_trainer)
         log("Full model trained (Train loss: %f, Val loss: %f)" % (train_losses[-1], val_losses[-1]))
 
         lp_precision, lp_recall, lp_f1, lp_accuracy = run(
@@ -613,21 +628,25 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              use_dataset_params: bool = False,
              use_lpa: bool = False,
              algorithm: str = "node2vec",
-             link_prediction: bool = False,
+             link_prediction_model: str = "",
              checkpoint: str = ""):
         import networkx as nx
+
+        if link_prediction_model and link_prediction_model not in self.LINK_PREDICTION_MODEL_TRAINERS:
+            raise ValueError(f"link_prediction_model must be one of: '', {', '.join(self.LINK_PREDICTION_MODEL_TRAINERS)}")
+        is_link_prediction_enabled = bool(link_prediction_model)
 
         TimeMetric.reset()
         _overall = TimeMetric("test").start()
 
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction=link_prediction)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model)
         log("Processing dataset ")
         t = VertexEnumerator()
         with TimeMetric("init_dataset"):
             dataset, removed_edges, positive_edges, negative_edges, test_edges = self._initialize_test_dataset(
                 run,
                 name,
-                link_prediction,
+                is_link_prediction_enabled,
                 t,
             )
         log(f"Removed {len(removed_edges)} edges for testing link prediction.")
@@ -699,13 +718,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         embs = [embs[n] for n in dataset.nodes]
         embedding_dict = {n: embs[i] for i, n in enumerate(dataset.nodes)}
         run["embedding_dict"] = embedding_dict
-        if link_prediction:
+        if is_link_prediction_enabled:
             self._run_link_prediction_with_embedding(
                 run,
                 dataset,
                 embedding_dict,
                 positive_edges,
                 negative_edges,
+                self.LINK_PREDICTION_MODEL_TRAINERS[link_prediction_model](),
             )
 
         with TimeMetric("global_f1"):

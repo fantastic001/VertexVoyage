@@ -1,8 +1,7 @@
-import unittest 
+import unittest
 
-from vertex_voyage.tasks.link_prediction import Ranks, heart_benchmark
+from vertex_voyage.tasks.link_prediction import LinkPredictionModel, Ranks, heart_benchmark
 import networkx as nx
-from torch import tensor
 
 class DummyEmbeddingModel:
     def embed_nodes(self, nodes):
@@ -12,13 +11,10 @@ class DummyEmbeddingModel:
         # Return a fixed embedding for testing
         return [0.1, 0.2, 0.3]
 
-class DummyModel:
-    def predict(self, X, Y):
+class DummyModel(LinkPredictionModel):
+    def predict_proba(self, u_embedding, v_embedding) -> float:
         # Return a fixed probability for testing
-        return tensor([0.9 for _ in range(len(X))])
-    
-    def __call__(self, X, Y):
-        return self.predict(X, Y)
+        return 0.9
 
 class TestLinkPredictionBenchmark(unittest.TestCase):
     def setUp(self):
