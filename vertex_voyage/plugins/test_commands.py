@@ -345,13 +345,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Full Model - F1 Score: {lp_f1:.4f}")
         log(f"Full Model - Accuracy: {lp_accuracy:.4f}")
 
-        ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=1000)
-        log(f"Full Model - Mean Rank: {ranks.mean_rank():.4f}")
-        log(f"Full Model - MRR: {ranks.mrr():.4f}")
-        log(f"Full Model - Hits@1: {ranks.hits_at_k(1):.4f}")
-        log(f"Full Model - Hits@3: {ranks.hits_at_k(3):.4f}")
-        log(f"Full Model - Hits@5: {ranks.hits_at_k(5):.4f}")
-        log(f"Full Model - Hits@10: {ranks.hits_at_k(10):.4f}")
+        with TimeMetric("link_prediction_evaluation"):
+            ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=100)
+            log(f"Full Model - Mean Rank: {ranks.mean_rank():.4f}")
+            log(f"Full Model - MRR: {ranks.mrr():.4f}")
+            log(f"Full Model - Hits@1: {ranks.hits_at_k(1):.4f}")
+            log(f"Full Model - Hits@3: {ranks.hits_at_k(3):.4f}")
+            log(f"Full Model - Hits@5: {ranks.hits_at_k(5):.4f}")
+            log(f"Full Model - Hits@10: {ranks.hits_at_k(10):.4f}")
 
     @TimeMetric("create_models")
     def _create_temporal_models(
