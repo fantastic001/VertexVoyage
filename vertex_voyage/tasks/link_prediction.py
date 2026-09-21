@@ -9,6 +9,7 @@ import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Type
+import vertex_voyage.config as cfg 
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import log_loss
@@ -128,8 +129,16 @@ class RandomForestLinkPredictionModelTrainer(LinkPredictionModelTrainer):
         return model, train_losses, val_losses
 
     def _compute_log_loss(self, model: RandomForestLinkPredictionModel, split: LinkPredictionSplit) -> float:
-        probabilities = [model.predict_proba(u, v) for u, v in zip(split.u, split.v)]
-        return log_loss(split.y, probabilities, labels=[0, 1])
+        if cfg.get_config_bool(
+            "lp_rdf_compute_log_loss", 
+            False, 
+            "Wether to compute log loss when using RDF."
+            " It is a slow operation."
+        ):
+            probabilities = [model.predict_proba(u, v) for u, v in zip(split.u, split.v)]
+            return log_loss(split.y, probabilities, labels=[0, 1])
+        else:
+            return 0
 
 
 LINK_PREDICTION_MODEL_TRAINERS: "dict[str, Callable[[], LinkPredictionModelTrainer]]" = {
