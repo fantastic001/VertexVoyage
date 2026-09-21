@@ -115,7 +115,7 @@ class TorchLogitsLinkPredictionModelTrainer(LinkPredictionModelTrainer):
 
 
 class RandomForestLinkPredictionModelTrainer(LinkPredictionModelTrainer):
-    def __init__(self, n_estimators=100, random_state=42):
+    def __init__(self, n_estimators=20, random_state=42):
         self.n_estimators = n_estimators
         self.random_state = random_state
 
