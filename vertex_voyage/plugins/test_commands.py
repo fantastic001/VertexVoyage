@@ -346,7 +346,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Full Model - Accuracy: {lp_accuracy:.4f}")
 
         with TimeMetric("link_prediction_evaluation"):
-            ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=100)
+            ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=1000)
             log(f"Full Model - Mean Rank: {ranks.mean_rank():.4f}")
             log(f"Full Model - MRR: {ranks.mrr():.4f}")
             log(f"Full Model - Hits@1: {ranks.hits_at_k(1):.4f}")
