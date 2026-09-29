@@ -11,4 +11,5 @@ patterns:
     names:
       - S
       - cross_S
+      - alpha
       - delta
