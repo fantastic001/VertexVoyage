@@ -18,6 +18,7 @@ predefined_pattern = {
 parser = argparse.ArgumentParser(description="Analyze outputs from different iterations")
 parser.add_argument("spec_file", help="Specification file for the analysis")
 parser.add_argument("input_dir", help="Directory containing the output files to analyze")
+parser.add_argument("--verbose", action="store_true", help="Enable verbose output", default=False)
 args = parser.parse_args()
 
 spec = yaml.safe_load(open(args.spec_file))
@@ -58,7 +59,8 @@ for i in inputs:
             "iteration": iteration,
             "results": iteration_results
         })
-        print(f"Group: {input_group_name_mapping}, Iteration: {iteration}, Results: {iteration_results}")
+        if args.verbose:
+            print(f"Group: {input_group_name_mapping}, Iteration: {iteration}, Results: {iteration_results}")
 
 # Now, calculate summary statistics for each group and pattern
 summary = {}
