@@ -1,0 +1,14 @@
+groups:
+  - dataset
+  - partitions
+patterns:
+  - regex: "Global scores \\(macro-averaged over nodes\\): Precision: (\\f), Recall: (\\f), F1 Score: (\\f)"
+    names:
+      - precision
+      - recall
+      - f1
+  - regex: "Node-level F1 \\(micro-averaged over pairs, not comparable to the macro-averaged Global scores above\\): S \\(within-partition F1\\): (\\f), cross-partition F1: (\\f), alpha: (\\f), delta: (\\f)"
+    names:
+      - S
+      - cross_S
+      - delta
