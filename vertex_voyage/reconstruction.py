@@ -35,13 +35,28 @@ def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     reconstructed_graph.add_edges_from(reconstructed_edges)
     return reconstructed_graph
 
-def get_f1_score(G, reconstructed_graph):
+def get_f1_score(G, reconstructed_graph, weighted: bool = False):
+    def _weight(n):
+        return len(list(G.neighbors(n))) if weighted else 1
     nodes = G.nodes()
-    recall = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(G.neighbors(n))) if len(list(G.neighbors(n))) > 0 else 0 for n in nodes]) / len(G.nodes())
+    weights = {n: _weight(n) for n in nodes}
+    N = lambda n: set(G.neighbors(n))
+    RN = lambda n: set(reconstructed_graph.neighbors(n))
+    recall = sum(
+        [
+            w*len(N(n).intersection(RN(n))) / len(N(n)) if len(N(n)) > 0 else 0 
+            for n, w in weights.items()
+        ]
+    ) / sum(weights.values())
     nodes_with_reconstructed_neighbors = [n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0]
     if len(nodes_with_reconstructed_neighbors) == 0:
         return 0, 0, 0
-    precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes_with_reconstructed_neighbors]) / len(nodes_with_reconstructed_neighbors)
+    precision = sum(
+        [
+            w * len(N(n).intersection(RN(n))) / len(RN(n)) if len(RN(n)) > 0 else 0
+            for n, w in weights.items() 
+        ]
+    ) / sum(weights.values())
     if precision + recall == 0:
         return 0, 0, 0
     f1 = 2 * (precision * recall) / (precision + recall)
@@ -335,6 +350,8 @@ class MacroF1Report:
     reconstructed_edge_partition_share: MacroScopedRate
     vertices_with_true_neighbors: int
     vertices_with_reconstructed_neighbors: int
+    # F1 score weighted by vertex degree
+    weighted_f1: MacroF1Score
 
 
 def get_macro_f1_report(
@@ -353,6 +370,8 @@ def get_macro_f1_report(
     reconstructed_edge_within_share: list[tuple[int, int]] = []
     vertices_with_true_neighbors = 0
     vertices_with_reconstructed_neighbors = 0
+
+    weighted_f1s = []
 
     for node in G.nodes():
         true_within, true_cross = _split_neighbors_by_scope(G, node, node_partition_ids)
@@ -384,7 +403,15 @@ def get_macro_f1_report(
 
     if global_f1 is None:
         global_f1 = get_f1_score(G, reconstructed_graph)
+    weighted_f1 = get_f1_score(G, reconstructed_graph, weighted=True)
     global_precision, global_recall, global_f1_score = global_f1
+    weighted_precision, weighted_recall, weighted_f1_score = weighted_f1
+
+    weighted_f1_score_obj = MacroF1Score(
+        precision=weighted_precision,
+        recall=weighted_recall,
+        f1=weighted_f1_score,
+    )
 
     report = MacroF1Report(
         global_f1=MacroF1Score(
@@ -392,6 +419,7 @@ def get_macro_f1_report(
             recall=global_recall,
             f1=global_f1_score,
         ),
+        weighted_f1=weighted_f1_score_obj,
         recall_by_scope=MacroScopedRate(
             within=_macro_mean_with_default(recall_within),
             cross=_macro_mean_with_default(recall_cross),

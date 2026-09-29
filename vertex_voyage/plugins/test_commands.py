@@ -371,6 +371,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             "Vertices with true neighbors: %d, vertices with reconstructed neighbors: %d"
             % (report.vertices_with_true_neighbors, report.vertices_with_reconstructed_neighbors)
         )
+        log("Weighted F1: precision=%f, recall=%f, f1=%f" % (report.weighted_f1.precision, report.weighted_f1.recall, report.weighted_f1.f1))
         return report
 
     @TimeMetric("link_prediction")

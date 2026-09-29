@@ -25,3 +25,8 @@ patterns:
       - cross_S
       - alpha
       - delta
+  - regex: "Weighted F1: precision=(\\f), recall=(\\f), f1=(\\f)"
+    names:
+      - weighted_f1_precision
+      - weighted_f1_recall
+      - weighted_f1_f1
