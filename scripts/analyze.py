@@ -91,8 +91,11 @@ else:
         for g, value in group:
             data[g] = value
         for name, stats in patterns.items():
-            data[name] = "%f +- %f" % (stats["mean"], stats["std"])
+            n = len(values) if (values := stats["values"]) is not None else 0
+            data[name] = "%f +- %f (N=%d)" % (stats["mean"], stats["std"], n)
         data_list.append(data)
+    # sort data list by group columns
+    data_list.sort(key=lambda x: tuple(x[g] for g in groups))
     df = pd.DataFrame(data_list)
     print(df.to_markdown())
 
@@ -110,13 +113,14 @@ for pattern_name in list(next(iter(summary.values())).keys()):
                 values1 = patterns1[pattern_name]["values"]
                 values2 = patterns2[pattern_name]["values"]
                 if len(values1) > 1 and len(values2) > 1:
-                    stat, p = S.mannwhitneyu(values1, values2)
+                    stat, p = S.mannwhitneyu(values1, values2, alternative='two-sided')
                     cohen_d = (np.mean(values1) - np.mean(values2)) / np.sqrt((np.std(values1) ** 2 + np.std(values2) ** 2) / 2)
                     
                     data.append({
                         "groups": entry_name,
                         "mannwhitneyu_stat": stat,
                         "mannwhitneyu_p": p,
+                        "Same distribution": p > 0.05,
                         "cohen_d": cohen_d
                     })
                 else:
