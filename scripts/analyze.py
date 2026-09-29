@@ -67,6 +67,7 @@ for entry in results:
 # Convert lists to summary statistics (mean, std)
 for group, patterns in summary.items():
     for name, values in patterns.items():
+        values = [x for x in values if not np.isnan(x)]
         summary[group][name] = {
             "mean": np.mean(values),
             "std": np.std(values),
@@ -80,7 +81,7 @@ elif len(groups) == 1:
         data = {}
         data[groups[0]] = group
         for name, stats in patterns.items():
-            data[name] = "%f +- %f" % (stats["mean"], stats["std"])
+            data[name] = "%f +- %f (N=%d)" % (stats["mean"], stats["std"], len(stats["values"]))
         df = pd.DataFrame([data])
         print(df.to_markdown())
 else:
@@ -112,9 +113,6 @@ for pattern_name in list(next(iter(summary.values())).keys()):
             if pattern_name in patterns1 and pattern_name in patterns2:
                 values1 = patterns1[pattern_name]["values"]
                 values2 = patterns2[pattern_name]["values"]
-                # drop nan values 
-                values1 = [v for v in values1 if not np.isnan(v)]
-                values2 = [v for v in values2 if not np.isnan(v)]
                 if len(values1) > 1 and len(values2) > 1:
                     stat, p = S.mannwhitneyu(values1, values2, alternative='two-sided')
                     cohen_d = (np.mean(values1) - np.mean(values2)) / np.sqrt((np.std(values1) ** 2 + np.std(values2) ** 2) / 2)
