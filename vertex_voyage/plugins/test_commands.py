@@ -11,6 +11,7 @@ from vertex_voyage.cli import (
 import vertex_voyage.cli
 import random
 import logging
+from dataclasses import asdict
 import numpy as np
 
 from experiments.datasets import dataset_params
@@ -19,7 +20,13 @@ from vertex_voyage.distger import DistGER
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.partitioning import label_propagation_partitioner, partition_graph
 from vertex_voyage.persist import PersistedRun
-from vertex_voyage.reconstruction import get_f1_score, reconstruct
+from vertex_voyage.reconstruction import (
+    f1_from_pair_probability_terms,
+    get_f1_score,
+    get_macro_f1_report,
+    get_pair_probability_f1_report,
+    reconstruct,
+)
 from vertex_voyage.tasks.link_prediction import (
     HadamardLogitsNet,
     LinkPredictionModelTrainer,
@@ -314,6 +321,58 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         return best, best_f1, best_model
 
+    def _log_pair_probability_terms(self, label: str, terms):
+        log(
+            "%s: p(true edge)=%f, p(reconstructed edge)=%f, p(true positive)=%f, F1=%f, pairs=%d"
+            % (
+                label,
+                terms.p_true_edge,
+                terms.p_reconstructed_edge,
+                terms.p_true_positive,
+                f1_from_pair_probability_terms(terms),
+                terms.pair_count,
+            )
+        )
+
+    @TimeMetric("pair_probability_f1")
+    def _report_pair_probability_f1(self, run, original_graph, reconstructed_graph, parts):
+        report = get_pair_probability_f1_report(original_graph, reconstructed_graph, parts)
+        run["pair_probability_f1"] = asdict(report)
+        self._log_pair_probability_terms("Within-partition pair terms", report.within)
+        self._log_pair_probability_terms("Cross-partition pair terms", report.cross)
+        for contribution in report.within_by_partition:
+            self._log_pair_probability_terms(
+                "Partition %d pair terms (weight=%f)" % (contribution.partition_id, contribution.weight),
+                contribution.terms,
+            )
+        log(
+            "Node-level F1 (micro-averaged over pairs, not comparable to the macro-averaged Global scores above): "
+            "S (within-partition F1): %f, cross-partition F1: %f, alpha: %f, delta: %f"
+            % (report.s, report.cross_f1, report.alpha, report.delta)
+        )
+        return report
+
+    def _log_macro_scoped_rate(self, label: str, rate):
+        log("%s: within=%f +- %f, cross=%f +- %f" % (
+            label, 
+            rate.within, rate.within_stddev, 
+            rate.cross, rate.cross_stddev
+        ))
+
+    @TimeMetric("macro_f1")
+    def _report_macro_f1(self, run, original_graph, reconstructed_graph, parts, global_f1):
+        report = get_macro_f1_report(original_graph, reconstructed_graph, parts, global_f1=global_f1)
+        run["macro_f1"] = asdict(report)
+        self._log_macro_scoped_rate("Macro recall by scope (p(reconstructed|true,u,within/cross))", report.recall_by_scope)
+        self._log_macro_scoped_rate("Macro precision by scope (p(true|reconstructed,u,within/cross))", report.precision_by_scope)
+        self._log_macro_scoped_rate("Macro true-edge partition share (p(within/cross|true,u))", report.true_edge_partition_share)
+        self._log_macro_scoped_rate("Macro reconstructed-edge partition share (p(within/cross|reconstructed,u))", report.reconstructed_edge_partition_share)
+        log(
+            "Vertices with true neighbors: %d, vertices with reconstructed neighbors: %d"
+            % (report.vertices_with_true_neighbors, report.vertices_with_reconstructed_neighbors)
+        )
+        return report
+
     @TimeMetric("link_prediction")
     def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges, model_trainer: LinkPredictionModelTrainer):
         log("Training link prediction model on full graph...")
@@ -565,10 +624,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     for u, v in original_graph.edges:
                         if u in nodes and v in nodes:
                             G.add_edge(u, v)
-                    try:
-                        precision, recall, f1_score = get_f1_score(G, g)
-                    except ZeroDivisionError:
-                        precision, recall, f1_score = 0.0, 0.0, 0.0
+                    precision, recall, f1_score = get_f1_score(G, g)
                 log(f"Buffer: {bi+1}/{total_buffers}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
                 if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
                     logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
@@ -734,7 +790,9 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             G = nx.Graph()
             G.add_edges_from(dataset.edges)
             global_precision, global_recall, global_f1 = get_f1_score(G, g)
-        log("Global scores: Precision: %f, Recall: %f, F1 Score: %f" % (global_precision, global_recall, global_f1))
+        log("Global scores (macro-averaged over nodes): Precision: %f, Recall: %f, F1 Score: %f" % (global_precision, global_recall, global_f1))
+        self._report_pair_probability_f1(run, G, g, parts)
+        self._report_macro_f1(run, G, g, parts, (global_precision, global_recall, global_f1))
         notify_plugins("test_completed", run)
         _overall.stop()
         self._report_timing(run)
