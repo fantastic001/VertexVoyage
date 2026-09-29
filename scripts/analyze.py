@@ -9,6 +9,12 @@ import numpy as np
 import pandas as pd
 import re 
 
+predefined_pattern = {
+    "\\f": r"[+-]?(?:\d*\.?\d+|\b(?:nan|inf(?:inity)?)\b)",
+    "\\:": r"[^:]*:",
+    "\\s": r"\s*"
+}
+
 parser = argparse.ArgumentParser(description="Analyze outputs from different iterations")
 parser.add_argument("spec_file", help="Specification file for the analysis")
 parser.add_argument("input_dir", help="Directory containing the output files to analyze")
@@ -28,7 +34,8 @@ def analyze_iteration(group_input: str, iteration: int, patterns: list):
     f = os.path.join(group_input, f"{iteration}.out")
     results = {}
     for pattern in patterns:
-        pattern["regex"] = pattern["regex"].replace("\\f", "\\d+(?:\.\\d+)?") # Replace \f with a regex for floating point numbers
+        for key, value in predefined_pattern.items():
+            pattern["regex"] = pattern["regex"].replace(key, value)
         with open(f, "r") as file:
             content = file.read()
             for line in content.splitlines():

@@ -7,6 +7,18 @@ patterns:
       - precision
       - recall
       - f1
+  - regex: "Macro recall by scope [^:]*: within=(\\f) \\+- (\\f), cross=(\\f) \\+- (\\f)"
+    names:
+      - p reconstructed given within and true 
+      - sigma of p reconstructed given within and true
+      - p reconstructed given cross and true
+      - sigma of p reconstructed given cross and true
+  - regex: "Macro precision by scope [^:]*: within=(\\f) \\+- (\\f), cross=(\\f) \\+- (\\f)"
+    names:
+      - p true given within and reconstructed
+      - sigma of p true given within and reconstructed
+      - p true given cross and reconstructed
+      - sigma of p true given cross and reconstructed
   - regex: "Node-level F1 \\(micro-averaged over pairs, not comparable to the macro-averaged Global scores above\\): S \\(within-partition F1\\): (\\f), cross-partition F1: (\\f), alpha: (\\f), delta: (\\f)"
     names:
       - S
