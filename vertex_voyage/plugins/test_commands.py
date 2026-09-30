@@ -372,6 +372,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             % (report.vertices_with_true_neighbors, report.vertices_with_reconstructed_neighbors)
         )
         log("Weighted F1: precision=%f, recall=%f, f1=%f" % (report.weighted_f1.precision, report.weighted_f1.recall, report.weighted_f1.f1))
+        log("Jaccard index: %f" % report.jaccard)
         return report
 
     @TimeMetric("link_prediction")
@@ -713,6 +714,9 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa)
         notify_plugins("test_partitioned", run)
         log("Total number of nodes: ", dataset.number_of_nodes())
+        log("Total number of edges: ", dataset.number_of_edges())
+        log("Total number of partitions: ", len(parts))
+        log("Density of the graph: ", nx.density(dataset))
         log("Graph partitioned")
         embs = {}
 

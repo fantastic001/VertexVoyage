@@ -30,3 +30,9 @@ patterns:
       - weighted_f1_precision
       - weighted_f1_recall
       - weighted_f1_f1
+  - regex: "Jaccard index: (\\f)"
+    names:
+      - "jaccard index"
+  - regex: "Density of the graph:  (\\f)"
+    names:
+      - density

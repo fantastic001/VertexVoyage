@@ -35,7 +35,7 @@ def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     reconstructed_graph.add_edges_from(reconstructed_edges)
     return reconstructed_graph
 
-def get_f1_score(G, reconstructed_graph, weighted: bool = False):
+def get_f1_score(G, reconstructed_graph, weighted: bool = False) -> tuple[float, float, float]:
     def _weight(n):
         return len(list(G.neighbors(n))) if weighted else 1
     nodes = G.nodes()
@@ -353,6 +353,8 @@ class MacroF1Report:
     # F1 score weighted by vertex degree
     weighted_f1: MacroF1Score
 
+    jaccard: float
+
 
 def get_macro_f1_report(
     G: nx.Graph,
@@ -455,6 +457,9 @@ def get_macro_f1_report(
         ),
         vertices_with_true_neighbors=vertices_with_true_neighbors,
         vertices_with_reconstructed_neighbors=vertices_with_reconstructed_neighbors,
+        jaccard=(
+            len(set(G.edges) & set(reconstructed_graph.edges)) / len(set(G.edges) | set(reconstructed_graph.edges))
+        ),
     )
     logger.info(f"Macro F1 report: {report}")
     return report
