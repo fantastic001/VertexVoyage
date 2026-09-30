@@ -50,5 +50,15 @@
                 "VERTEX_VOYAGE_FULL_BENCHMARK": "1",
             }
         }
+        {
+            "name": "Analysis script",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "scripts.analyze",
+            "args": [
+                "test/spec.yml",
+                "test2/"
+            ]
+        }
     ]
 }
