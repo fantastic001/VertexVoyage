@@ -40,9 +40,10 @@ def analyze_iteration(group_input: str, iteration: int, patterns: list):
         with open(f, "r") as file:
             content = file.read()
             for line in content.splitlines():
-                matches = re.findall(pattern["regex"], line)
-                if matches:
-                    for name, value in zip(pattern["names"], list(matches[0])):
+                # find first match
+                _match = re.search(pattern["regex"], line)
+                if _match:
+                    for name, value in zip(pattern["names"], list(_match.groups())):
                         results[name] = value
     return results
 
