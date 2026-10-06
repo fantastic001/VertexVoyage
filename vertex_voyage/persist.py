@@ -172,9 +172,7 @@ class PersistedRun:
     def __str__(self):
         return self.__repr__()
     def __del__(self):
-        logger.info("Deleting PersistedRun instance, saving all data to files.")
         if self.directory is None or self.directory == "":
-            logger.info("No directory provided, not persisting any data on delete.")
             return
         for key, value in self.data.items():
             file_path = os.path.join(self.directory, f"{key}.pkl")
