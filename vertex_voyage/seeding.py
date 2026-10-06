@@ -56,6 +56,11 @@ def _validate_seed(seed: int) -> None:
         raise ValueError(f"Invalid seed {seed!r}, expected an integer in [0, {MAX_SEED_EXCLUSIVE}).")
 
 
+def derive_iteration_seed(seed: int, iteration: int) -> int:
+    _validate_seed(seed)
+    return int(np.random.SeedSequence([seed, iteration]).generate_state(1)[0])
+
+
 def seed_shared_random_state(seed: int) -> None:
     _validate_seed(seed)
     logger.info(f"Seeding shared random state with seed {seed}")

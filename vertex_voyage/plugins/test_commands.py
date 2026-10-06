@@ -39,7 +39,7 @@ from vertex_voyage.tasks.link_prediction import (
 )
 from vertex_voyage.temporal import FromIterable, buffered, to_nx_graph
 from vertex_voyage.temporal_ordering import BFSOrdering, DFSOrdering, RandomOrdering
-from vertex_voyage.seeding import DEFAULT_SEED, seed_shared_random_state
+from vertex_voyage.seeding import DEFAULT_SEED, derive_iteration_seed, seed_shared_random_state
 from vertex_voyage.timing import TimeMetric
 from vertex_voyage.temporal_partitioning import (
     InMemoryPartition,
@@ -910,6 +910,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 partitioner.print_profile()
                 scores.append(run["iteration_f1s_%d" % it][-1])
             else:
+                iteration_seed = derive_iteration_seed(seed, it)
+                seed_shared_random_state(iteration_seed)
                 models = self._create_temporal_models(
                     algorithm=algorithm,
                     partitions=partitions,
@@ -919,7 +921,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     default_q=default_q,
                     long_run=long_run,
                     original_graph=original_graph,
-                    seed=seed,
+                    seed=iteration_seed,
                 )
                 parts: set[Partition] = set(models.keys())
                 partitioner = self._create_temporal_partitioner(
@@ -944,7 +946,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     semantic_walk_size=semantic_walk_size,
                     semantic_window_size=semantic_window_size,
                     semantic_retrain_threshold=semantic_retrain_threshold,
-                    seed=seed,
+                    seed=iteration_seed,
                 )
                 sorted_events = self._order_temporal_events(og_events, track_seen, ordering)
                 old_f1_score, iteration_precisions, iteration_recalls, iteration_f1s = self._process_temporal_buffers(
