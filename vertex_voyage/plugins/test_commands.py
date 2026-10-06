@@ -39,6 +39,7 @@ from vertex_voyage.tasks.link_prediction import (
 )
 from vertex_voyage.temporal import FromIterable, buffered, to_nx_graph
 from vertex_voyage.temporal_ordering import BFSOrdering, DFSOrdering, RandomOrdering
+from vertex_voyage.seeding import DEFAULT_SEED, seed_shared_random_state
 from vertex_voyage.timing import TimeMetric
 from vertex_voyage.temporal_partitioning import (
     InMemoryPartition,
@@ -190,7 +191,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         return dataset, removed_edges, positive_edges, negative_edges, test_edges
 
-    def _partition_for_test(self, run, dataset, partitions: int, alpha: float, threshold: float, use_lpa: bool):
+    def _partition_for_test(self, run, dataset, partitions: int, alpha: float, threshold: float, use_lpa: bool, seed: int):
         if not use_lpa:
             log("Partitioning graph with LFM-based partitioner...")
             return run(
@@ -201,10 +202,11 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 alpha=alpha,
                 threshold=threshold,
                 use_modified_lfm=True,
+                seed=seed,
             )
 
         log("Partitioning graph with label propagation...")
-        return run("partitions", label_propagation_partitioner, dataset, partitions)
+        return run("partitions", label_propagation_partitioner, dataset, partitions, seed=seed)
 
     def _log_partition_graph_stats(self, nx, pg):
         gg = nx.Graph()
@@ -256,6 +258,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         epochs: int,
         dim: int,
         break_early: bool,
+        seed: int,
     ):
         best = None
         best_f1 = -1
@@ -303,6 +306,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 n_walks=n_walks,
                 window_size=window_size,
                 epochs=local_epochs,
+                seed=seed,
                 **P
             )
             model.fit(pg, dataset.nodes)
@@ -427,6 +431,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         default_q: float,
         long_run: bool,
         original_graph,
+        seed: int,
     ):
         resolved_p, resolved_q = self._resolved_default_pq(default_p, default_q)
         n_walks, walk_size, window_size = self._walk_params(long_run)
@@ -439,7 +444,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 n_walks=n_walks,
                 walk_size=walk_size,
                 window_size=window_size,
-                retrain_threshold=int(0.1 * original_graph.number_of_nodes())
+                retrain_threshold=int(0.1 * original_graph.number_of_nodes()),
+                seed=seed,
             ) for p in range(partitions)
         }
 
@@ -468,6 +474,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         semantic_walk_size: int,
         semantic_window_size: int,
         semantic_retrain_threshold: int,
+        seed: int,
     ):
         partitioner = {
             "random": lambda **kw: RandomPartitioner.uniform(parts),
@@ -504,6 +511,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 n_walks=kw["semantic_n_walks"],
                 walk_size=kw["semantic_walk_size"],
                 window_size=kw["semantic_window_size"],
+                seed=kw["seed"],
             ),
             "semantic.dynnode2vec": lambda **kw: SemanticTemporalGraphPartitioner.dynnode2vec(
                 parts,
@@ -522,6 +530,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 walk_size=kw["semantic_walk_size"],
                 window_size=kw["semantic_window_size"],
                 retrain_threshold=kw["semantic_retrain_threshold"],
+                seed=kw["seed"],
             ),
         }[partitioner_name](
             replication_factor=replication_factor,
@@ -543,6 +552,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             semantic_walk_size=semantic_walk_size,
             semantic_window_size=semantic_window_size,
             semantic_retrain_threshold=semantic_retrain_threshold,
+            seed=seed,
         )
         return PartitionerProfile(partitioner)
 
@@ -650,6 +660,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         default_q: float,
         long_run: bool,
         epochs: int,
+        seed: int,
     ):
         resolved_p, resolved_q = self._resolved_default_pq(default_p, default_q)
         n_walks, walk_size, window_size = self._walk_params(long_run)
@@ -664,6 +675,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 walk_size=walk_size,
                 window_size=window_size,
                 epochs=epochs,
+                seed=seed,
             )
             node2vec.fit(original_graph, original_graph.nodes)
             run["full_model"] = node2vec
@@ -688,7 +700,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              use_lpa: bool = False,
              algorithm: str = "node2vec",
              link_prediction_model: str = "",
-             checkpoint: str = ""):
+             checkpoint: str = "",
+             seed: int = DEFAULT_SEED):
         import networkx as nx
 
         if link_prediction_model and link_prediction_model not in self.LINK_PREDICTION_MODEL_TRAINERS:
@@ -697,8 +710,9 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         TimeMetric.reset()
         _overall = TimeMetric("test").start()
+        seed_shared_random_state(seed)
 
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model, seed=seed)
         log("Processing dataset ")
         t = VertexEnumerator()
         with TimeMetric("init_dataset"):
@@ -711,7 +725,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Removed {len(removed_edges)} edges for testing link prediction.")
         notify_plugins("test_started", run)
         with TimeMetric("partition"):
-            parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa)
+            parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa, seed)
         notify_plugins("test_partitioned", run)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Total number of edges: ", dataset.number_of_edges())
@@ -759,6 +773,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 epochs=epochs,
                 dim=dim,
                 break_early=break_early,
+                seed=seed,
             )
             log("Best achieved F1 score: ", best_f1)
             notify_plugins("test_partitioned_model_trained", run)
@@ -832,7 +847,8 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                semantic_eps: float = 0.5,
                semantic_min_samples: int = 2,
                semantic_reassign_noise: bool = True,
-               semantic_embedding: str = "auto"):
+               semantic_embedding: str = "auto",
+               seed: int = DEFAULT_SEED):
         import networkx as nx
 
         if ordering and ordering not in self.EDGE_ORDERINGS:
@@ -840,10 +856,11 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         TimeMetric.reset()
         _overall = TimeMetric("temporal_test").start()
+        seed_shared_random_state(seed)
 
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed)
         log(f"Processing dataset {name}")
         with TimeMetric("load_dataset"):
             t = VertexEnumerator()
@@ -902,6 +919,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     default_q=default_q,
                     long_run=long_run,
                     original_graph=original_graph,
+                    seed=seed,
                 )
                 parts: set[Partition] = set(models.keys())
                 partitioner = self._create_temporal_partitioner(
@@ -926,6 +944,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     semantic_walk_size=semantic_walk_size,
                     semantic_window_size=semantic_window_size,
                     semantic_retrain_threshold=semantic_retrain_threshold,
+                    seed=seed,
                 )
                 sorted_events = self._order_temporal_events(og_events, track_seen, ordering)
                 old_f1_score, iteration_precisions, iteration_recalls, iteration_f1s = self._process_temporal_buffers(
@@ -959,6 +978,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 default_q=default_q,
                 long_run=long_run,
                 epochs=epochs,
+                seed=seed,
             )
         notify_plugins("temporal_test_completed", run)
         _overall.stop()

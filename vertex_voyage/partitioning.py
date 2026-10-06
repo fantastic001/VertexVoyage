@@ -324,16 +324,16 @@ class CSVFileProblem:
     def __call__(self):
         return nx.read_edgelist(self.filename, delimiter=self.separator)
 
-def label_propagation_partitioner(G: nx.Graph, partition_num: int):
+def label_propagation_partitioner(G: nx.Graph, partition_num: int, seed = None):
     """
     Partition the graph using label propagation algorithm.
     """
-    logger.info(f"Partitioning graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges into {partition_num} partitions using label propagation")
+    logger.info(f"Partitioning graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges into {partition_num} partitions using label propagation with seed={seed}")
     partitions = {i: [] for i in range(partition_num)}
     if isinstance(G, VVGraph):
-        labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=None)
+        labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=seed)
     else:
-        labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=None, weight='weight')
+        labels = nx.algorithms.community.label_propagation.asyn_lpa_communities(G, seed=seed, weight='weight')
     partitions =  to_constant_bin_number(list(labels), partition_num, key=len)
     partitions = [[list(label) for label in p] for p in partitions]
     partitions = [list(sum(part, [])) for part in partitions]

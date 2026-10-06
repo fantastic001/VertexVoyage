@@ -117,14 +117,17 @@ class Node2Vec:
     def embed_nodes(self, nodes):
         return [self.embed_node(node) for node in nodes]
 
+    def _allows_parallelism(self) -> bool:
+        return self.use_threads and self.seed is None
+
     def _random_walks(self, affected_nodes=None):
         walks = []
         self.G: nx.Graph
         if affected_nodes is None:
             affected_nodes = self.g_nodes
         if self.G.number_of_nodes() == 0:
-            return [] 
-        if self.use_threads and len(affected_nodes) > PARALLELIZATION_THRESHOLD:
+            return []
+        if self._allows_parallelism() and len(affected_nodes) > PARALLELIZATION_THRESHOLD:
             starts = [n for _ in range(self.n_walks) for n in affected_nodes]
             with mpp.Pool() as pool:
                 walks = pool.map(self._random_walk, starts)
@@ -167,7 +170,7 @@ class Node2Vec:
             epochs=self.epochs,
             alpha=self.learning_rate,
             seed=self.seed,
-            workers=cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self.use_threads else 1
+            workers=cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self._allows_parallelism() else 1
         )
         logger.info(f"Trained Word2Vec model with {len(x.wv)} unique nodes in vocabulary.")
         for node in self.nodes:
