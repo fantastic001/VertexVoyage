@@ -7,6 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 COPY install /install
 COPY run.sh /run.sh
+COPY vpn_connect.sh /usr/local/bin/vpn-connect
 
 RUN apt-get update && apt-get install -y xvfb libgtk-3-0 openconnect hicolor-icon-theme ssh sshpass socat && \
     tar -xvf /install/anyconnect*.tar.gz -C /install && \
