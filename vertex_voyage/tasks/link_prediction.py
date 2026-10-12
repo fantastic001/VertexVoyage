@@ -387,7 +387,7 @@ class Ranks:
     def add_scores(self, scores):
         # target score is the first one
         target_score = scores[0]
-        rank = 1 + sum(1 for score in scores[1:] if score > target_score)
+        rank = 1 + sum(1 for score in scores[1:] if score >= target_score)
         self.add_rank(rank)
 
 def heart_benchmark(embedding_model, model, g, positive_edges, ns=500, ps=1000):
