@@ -160,6 +160,7 @@ class Node2Vec:
         ]
         if len(walks) == 0:
             return np.zeros((len(self.nodes), self.dim))
+        workers = cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self._allows_parallelism() else 1
         x = Word2Vec(
             sentences=walks,
             vector_size=self.dim,
@@ -170,9 +171,8 @@ class Node2Vec:
             epochs=self.epochs,
             alpha=self.learning_rate,
             seed=self.seed,
-            workers=cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self._allows_parallelism() else 1
-        )
-        logger.info(f"Trained Word2Vec model with {len(x.wv)} unique nodes in vocabulary.")
+            workers=workers        )
+        logger.info(f"Trained Word2Vec model with {len(x.wv)} unique nodes in vocabulary and {workers} workers.")
         for node in self.nodes:
             if node not in x.wv:
                 logger.warning(f"Node {node} not found in Word2Vec vocabulary. This may indicate an issue with the random walks or encoding.")
