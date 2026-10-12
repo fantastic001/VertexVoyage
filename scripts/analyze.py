@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser(description="Analyze outputs from different ite
 parser.add_argument("spec_file", help="Specification file for the analysis")
 parser.add_argument("input_dir", help="Directory containing the output files to analyze")
 parser.add_argument("--verbose", action="store_true", help="Enable verbose output", default=False)
+parser.add_argument("--same-distributions-only", action="store_true", help="Show entries only for same distributions", default=False)
 args = parser.parse_args()
 
 spec = yaml.safe_load(open(args.spec_file))
@@ -115,8 +116,8 @@ for pattern_name in list(next(iter(summary.values())).keys()):
     data = []
     for group1, patterns1 in summary.items():
         for group2, patterns2 in summary.items():
-            group1_name = ", ".join("%s = %s" % (k, v) for k, v in group1)
-            group2_name = ", ".join("%s = %s" % (k, v) for k, v in group2)
+            group1_name = ", ".join("%s" % (v) for k, v in group1)
+            group2_name = ", ".join("%s" % (v) for k, v in group2)
             entry_name = "(%s) vs (%s)" % (group1_name, group2_name)
             if group1 >= group2:
                 continue
@@ -126,7 +127,8 @@ for pattern_name in list(next(iter(summary.values())).keys()):
                 if len(values1) > 1 and len(values2) > 1:
                     stat, p = S.mannwhitneyu(values1, values2, alternative='two-sided')
                     cohen_d = (np.mean(values1) - np.mean(values2)) / np.sqrt((np.std(values1) ** 2 + np.std(values2) ** 2) / 2)
-                    
+                    if args.same_distributions_only and p <= 0.05:
+                        continue
                     data.append({
                         "groups": entry_name,
                         "mannwhitneyu_stat": stat,
@@ -135,6 +137,8 @@ for pattern_name in list(next(iter(summary.values())).keys()):
                         "cohen_d": cohen_d
                     })
                 else:
+                    if args.same_distributions_only:
+                        continue
                     data.append(
                         {
                             "groups": entry_name,
