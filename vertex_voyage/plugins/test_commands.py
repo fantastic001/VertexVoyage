@@ -1,4 +1,6 @@
 
+from typing import Optional
+
 from vertex_voyage.cli import (
     ALGS,
     F1_COMPU_THRESHOLD,
@@ -47,6 +49,7 @@ from vertex_voyage.temporal_partitioning import (
     Partition,
     PartitionerProfile,
     RandomPartitioner,
+    TemporalGraphPartitioner,
 )
 from vertex_voyage.semantic_temporal_partitioning import (
     SemanticTemporalGraphPartitioner,
@@ -191,7 +194,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         return dataset, removed_edges, positive_edges, negative_edges, test_edges
 
-    def _partition_for_test(self, run, dataset, partitions: int, alpha: float, threshold: float, use_lpa: bool, seed: int):
+    def _partition_for_test(self, run, dataset, partitions: int, alpha: float, threshold: float, use_lpa: bool, seed: Optional[int]):
         if not use_lpa:
             log("Partitioning graph with LFM-based partitioner...")
             return run(
@@ -258,7 +261,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         epochs: int,
         dim: int,
         break_early: bool,
-        seed: int,
+        seed: Optional[int],
     ):
         best = None
         best_f1 = -1
@@ -380,7 +383,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         return report
 
     @TimeMetric("link_prediction")
-    def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges, model_trainer: LinkPredictionModelTrainer):
+    def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges, model_trainer: LinkPredictionModelTrainer, parts: list):
         log("Training link prediction model on full graph...")
 
         class EM:
@@ -393,9 +396,20 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             def embed_node(self, node):
                 return self.embedding_dict[node]
 
+        vertex_to_parts = {}
+        for i, part in enumerate(parts):
+            for v in part:
+                if v not in vertex_to_parts:
+                    vertex_to_parts[v] = set()
+                vertex_to_parts[v].add(i)
         em = EM(embedding_dict)
         full_model, train_losses, val_losses = run("lp_full", train_on_static_graph, dataset, em, model_trainer=model_trainer)
         log("Full model trained (Train loss: %f, Val loss: %f)" % (train_losses[-1], val_losses[-1]))
+        cross_part_positive_edges = list(filter( 
+            lambda edge: vertex_to_parts[edge[0]] & vertex_to_parts[edge[1]] == set(),
+            positive_edges
+        ))
+        within_part_positive_edges = [e for e in positive_edges if e not in cross_part_positive_edges]
 
         lp_precision, lp_recall, lp_f1, lp_accuracy = run(
             "lp_full_eval",
@@ -409,6 +423,32 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Full Model - Recall: {lp_recall:.4f}")
         log(f"Full Model - F1 Score: {lp_f1:.4f}")
         log(f"Full Model - Accuracy: {lp_accuracy:.4f}")
+        
+        lp_precision, lp_recall, lp_f1, lp_accuracy = run(
+            "lp_full_eval",
+            evaluate_predictions,
+            em,
+            full_model,
+            cross_part_positive_edges,
+            negative_edges,
+        )
+        log(f"Full Model - cross partitions - Precision: {lp_precision:.4f}")
+        log(f"Full Model - cross partitions - Recall: {lp_recall:.4f}")
+        log(f"Full Model - cross partitions - F1 Score: {lp_f1:.4f}")
+        log(f"Full Model - cross partitions - Accuracy: {lp_accuracy:.4f}")
+        
+        lp_precision, lp_recall, lp_f1, lp_accuracy = run(
+            "lp_full_eval",
+            evaluate_predictions,
+            em,
+            full_model,
+            within_part_positive_edges,
+            negative_edges,
+        )
+        log(f"Full Model - within partitions - Precision: {lp_precision:.4f}")
+        log(f"Full Model - within partitions Recall: {lp_recall:.4f}")
+        log(f"Full Model - within partitions F1 Score: {lp_f1:.4f}")
+        log(f"Full Model - within partitions Accuracy: {lp_accuracy:.4f}")
 
         with TimeMetric("link_prediction_evaluation"):
             ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=1000)
@@ -418,6 +458,43 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             log(f"Full Model - Hits@3: {ranks.hits_at_k(3):.4f}")
             log(f"Full Model - Hits@5: {ranks.hits_at_k(5):.4f}")
             log(f"Full Model - Hits@10: {ranks.hits_at_k(10):.4f}")
+        
+        with TimeMetric("link_prediction_evaluation_part_type"):
+            log(f"Calculating HeaRT benchmarks for {len(positive_edges)} positive edges")
+            if len(cross_part_positive_edges) > 0:
+                log("Evaluating on cross partition edges only: total cross partition edges: %d" % len(cross_part_positive_edges))
+                ranks = run(
+                    "lp_heart_benchmark_cross",
+                    heart_benchmark,
+                    em,
+                    full_model,
+                    dataset,
+                    cross_part_positive_edges,
+                    ns=500, ps=1000
+                )
+                log(f"Full Model - cross partition - Mean Rank: {ranks.mean_rank():.4f}")
+                log(f"Full Model - cross partition - MRR: {ranks.mrr():.4f}")
+                log(f"Full Model - cross partition - Hits@1: {ranks.hits_at_k(1):.4f}")
+                log(f"Full Model - cross partition - Hits@3: {ranks.hits_at_k(3):.4f}")
+                log(f"Full Model - cross partition - Hits@5: {ranks.hits_at_k(5):.4f}")
+                log(f"Full Model - cross partition - Hits@10: {ranks.hits_at_k(10):.4f}")
+            if len(within_part_positive_edges) > 0:
+                log("Evaluating on within partition edges only: total cross partition edges: %d" % len(within_part_positive_edges))
+                ranks = run(
+                    "lp_heart_benchmark_within",
+                    heart_benchmark,
+                    em,
+                    full_model,
+                    dataset,
+                    within_part_positive_edges,
+                    ns=500, ps=1000
+                )
+                log(f"Full Model - within partition - Mean Rank: {ranks.mean_rank():.4f}")
+                log(f"Full Model - within partition - MRR: {ranks.mrr():.4f}")
+                log(f"Full Model - within partition - Hits@1: {ranks.hits_at_k(1):.4f}")
+                log(f"Full Model - within partition - Hits@3: {ranks.hits_at_k(3):.4f}")
+                log(f"Full Model - within partition - Hits@5: {ranks.hits_at_k(5):.4f}")
+                log(f"Full Model - within partition - Hits@10: {ranks.hits_at_k(10):.4f}")
 
     @TimeMetric("create_models")
     def _create_temporal_models(
@@ -707,10 +784,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         if link_prediction_model and link_prediction_model not in self.LINK_PREDICTION_MODEL_TRAINERS:
             raise ValueError(f"link_prediction_model must be one of: '', {', '.join(self.LINK_PREDICTION_MODEL_TRAINERS)}")
         is_link_prediction_enabled = bool(link_prediction_model)
+        _seed: Optional[int] = None
+        if seed >= 0:
+            _seed = seed
 
         TimeMetric.reset()
         _overall = TimeMetric("test").start()
-        seed_shared_random_state(seed)
+        if _seed is not None:
+            seed_shared_random_state(seed)
 
         run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model, seed=seed)
         log("Processing dataset ")
@@ -725,7 +806,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Removed {len(removed_edges)} edges for testing link prediction.")
         notify_plugins("test_started", run)
         with TimeMetric("partition"):
-            parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa, seed)
+            parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa, _seed)
         notify_plugins("test_partitioned", run)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Total number of edges: ", dataset.number_of_edges())
@@ -773,7 +854,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 epochs=epochs,
                 dim=dim,
                 break_early=break_early,
-                seed=seed,
+                seed=_seed,
             )
             log("Best achieved F1 score: ", best_f1)
             notify_plugins("test_partitioned_model_trained", run)
@@ -803,6 +884,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 positive_edges,
                 negative_edges,
                 self.LINK_PREDICTION_MODEL_TRAINERS[link_prediction_model](),
+                parts
             )
 
         with TimeMetric("global_f1"):

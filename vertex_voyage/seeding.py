@@ -8,7 +8,7 @@ from vertex_voyage.config import get_config_int
 
 logger = logging.getLogger("Seeding")
 
-DEFAULT_SEED = get_config_int("default_seed", 42, "Seed used by seeded commands when none is given")
+DEFAULT_SEED = get_config_int("default_seed", -1, "Seed used by seeded commands when none is given")
 MAX_SEED_EXCLUSIVE = 2 ** 32
 
 
