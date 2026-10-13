@@ -20,9 +20,11 @@ from experiments.datasets import dataset_params
 from vertex_voyage.aggregation import (
     DEFAULT_AGGREGATOR_NAME,
     Aggregator,
+    aggregate_static_embeddings,
     aggregator_names,
     create_aggregator,
     is_aggregator_registered,
+    models_by_partition_position,
 )
 from vertex_voyage.graph_sampling import LazySampler, RoundRobinUniform
 from vertex_voyage.config import notify_plugins
@@ -143,11 +145,6 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     not (p == default_p and q == default_q)):
                     continue
                 yield p, q
-
-    def _append_embedding(self, embs: dict, node, embedding):
-        if node not in embs:
-            embs[node] = []
-        embs[node].append(embedding)
 
     def _initialize_test_dataset(self, run, name: str, link_prediction: bool, t: VertexEnumerator):
         dataset = _enumerated_event_stream(name, t)
@@ -686,6 +683,24 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             lambda: RoundRobinUniform(*[part.graph() for part in models])
         )
 
+    def _static_partition_sampler(self, dataset, parts) -> LazySampler:
+        return LazySampler(
+            lambda: RoundRobinUniform(
+                *[dataset.subgraph(part) for part in parts if len(part) > 0]
+            )
+        )
+
+    @TimeMetric("aggregate_partitions")
+    def _aggregate_static_partitions(self, dataset, parts, part_models, aggregator: str):
+        aggregation = aggregate_static_embeddings(
+            create_aggregator(aggregator),
+            self._static_partition_sampler(dataset, parts),
+            models_by_partition_position(part_models),
+            parts,
+            dataset.edges,
+        )
+        return aggregation.embed_nodes(dataset.nodes)
+
     @TimeMetric("process_buffers")
     def _process_temporal_buffers(
             self, *,
@@ -800,11 +815,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              algorithm: str = "node2vec",
              link_prediction_model: str = "",
              checkpoint: str = "",
+             aggregator: str = DEFAULT_AGGREGATOR_NAME,
              seed: int = DEFAULT_SEED):
         import networkx as nx
 
         if link_prediction_model and link_prediction_model not in self.LINK_PREDICTION_MODEL_TRAINERS:
             raise ValueError(f"link_prediction_model must be one of: '', {', '.join(self.LINK_PREDICTION_MODEL_TRAINERS)}")
+        if not is_aggregator_registered(aggregator):
+            raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
         is_link_prediction_enabled = bool(link_prediction_model)
         _seed: Optional[int] = None
         if seed >= 0:
@@ -815,7 +833,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         if _seed is not None:
             seed_shared_random_state(seed)
 
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model, seed=seed)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model, seed=seed, **self._persisted_aggregator_params(aggregator))
         log("Processing dataset ")
         t = VertexEnumerator()
         with TimeMetric("init_dataset"):
@@ -828,16 +846,16 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log(f"Removed {len(removed_edges)} edges for testing link prediction.")
         notify_plugins("test_started", run)
         with TimeMetric("partition"):
-            parts = self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa, _seed)
+            parts = list(self._partition_for_test(run, dataset, partitions, alpha, threshold, use_lpa, _seed))
         notify_plugins("test_partitioned", run)
         log("Total number of nodes: ", dataset.number_of_nodes())
         log("Total number of edges: ", dataset.number_of_edges())
         log("Total number of partitions: ", len(parts))
         log("Density of the graph: ", nx.density(dataset))
         log("Graph partitioned")
-        embs = {}
+        part_models = [None] * len(parts)
 
-        for part in parts:
+        for part_position, part in enumerate(parts):
             part_name = hash_set_persistently(part)
             log("Partition size: %d" % len(part))
             if len(part) == 0:
@@ -854,11 +872,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 part,
             )
             if was_cached:
-                part = list(part)
-                if best is None:
-                    continue
-                for node, e in zip(part, best):
-                    self._append_embedding(embs, node, e)
+                part_models[part_position] = best_model
                 continue
 
             with TimeMetric("train_partition"):
@@ -882,20 +896,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             notify_plugins("test_partitioned_model_trained", run)
             if best_model is not None:
                 run[f"model_{part_name}"] = best_model
-            part = list(part)
-            if best is None:
-                continue
-            for node, e in zip(part, best):
-                self._append_embedding(embs, node, e)
+            part_models[part_position] = best_model
 
         if skip_global:
             log("Skipping global F1 computation")
             _overall.stop()
             self._report_timing(run)
             return
-        for n in dataset.nodes:
-            embs[n] = np.mean(embs[n], axis=0)
-        embs = [embs[n] for n in dataset.nodes]
+        embs = self._aggregate_static_partitions(dataset, parts, part_models, aggregator)
         embedding_dict = {n: embs[i] for i, n in enumerate(dataset.nodes)}
         run["embedding_dict"] = embedding_dict
         if is_link_prediction_enabled:

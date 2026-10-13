@@ -15,6 +15,12 @@ from vertex_voyage.aggregation.registry import (
     is_aggregator_registered,
     register_aggregator,
 )
+from vertex_voyage.aggregation.static_partitions import (
+    StaticAggregation,
+    StaticPartitioner,
+    aggregate_static_embeddings,
+    models_by_partition_position,
+)
 
 __all__ = [
     "AggregationError",
@@ -25,9 +31,13 @@ __all__ = [
     "MeanAggregator",
     "NodeEmbedder",
     "PartitionModels",
+    "StaticAggregation",
+    "StaticPartitioner",
     "VertexPartitioner",
+    "aggregate_static_embeddings",
     "aggregator_names",
     "create_aggregator",
     "is_aggregator_registered",
+    "models_by_partition_position",
     "register_aggregator",
 ]

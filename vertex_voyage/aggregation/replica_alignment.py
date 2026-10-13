@@ -1,10 +1,11 @@
 from abc import abstractmethod
 from collections import deque
-from typing import Deque, List
+from typing import Callable, Deque, Dict, List, Sequence
 
 import numpy as np
 
 from vertex_voyage.aggregation.embeddings import (
+    NORM_FLOOR,
     unit_vector_or_none,
     zero_embedding_of_unplaced_vertex,
 )
@@ -16,6 +17,7 @@ from vertex_voyage.aggregation.interface import (
     PartitionModels,
     V,
     VertexPartitioner,
+    aggregation_error,
 )
 from vertex_voyage.aggregation.replica_links import (
     PartitionIndex,
@@ -23,7 +25,7 @@ from vertex_voyage.aggregation.replica_links import (
     ReplicaTable,
     replica_links_of_buffer,
 )
-from vertex_voyage.config import get_config_int
+from vertex_voyage.config import get_config_int, get_config_str
 from vertex_voyage.graph_sampling import GraphSampler
 
 DEFAULT_LINK_MEMORY = get_config_int(
@@ -32,11 +34,62 @@ DEFAULT_LINK_MEMORY = get_config_int(
     "Most recent replica links an aligning aggregator keeps fitting on",
 )
 REPLICA_AXIS = 0
+UNIT_LENGTH = 1.0
+
+OutputScale = Callable[[Sequence[float]], float]
+
+UNIT_OUTPUT_SCALE = "unit"
+REPLICA_NORM_OUTPUT_SCALE = "replica_norm"
+OUTPUT_SCALES: Dict[str, OutputScale] = {
+    UNIT_OUTPUT_SCALE: lambda replica_norms: UNIT_LENGTH,
+    REPLICA_NORM_OUTPUT_SCALE: lambda replica_norms: float(
+        np.mean(replica_norms)
+    ),
+}
+AGGREGATOR_OUTPUT_SCALE = "auto"
+DEFAULT_OUTPUT_SCALE = get_config_str(
+    "alignment_output_scale",
+    AGGREGATOR_OUTPUT_SCALE,
+    "Length of a merged embedding: unit, replica_norm (mean norm of its "
+    "replicas) or auto (the choice of each aggregator)",
+)
+
+
+def resolved_output_scale(requested: str, aggregator_choice: str) -> str:
+    if requested == AGGREGATOR_OUTPUT_SCALE:
+        return aggregator_choice
+    else:
+        return requested
+
+
+def output_scale_named(name: str) -> OutputScale:
+    if name in OUTPUT_SCALES:
+        return OUTPUT_SCALES[name]
+    else:
+        raise aggregation_error(
+            f"Unknown output scale {name!r}, expected one of: "
+            f"{', '.join(sorted(OUTPUT_SCALES))}"
+        )
 
 
 class ReplicaAlignmentAggregator(Aggregator[V, PartitionKey]):
-    def __init__(self, link_memory: int):
+    def __init__(
+        self,
+        link_memory: int,
+        output_scale: str,
+    ):
         self._links: Deque[ReplicaLink] = deque(maxlen=link_memory)
+        self._output_scale_name = output_scale
+        self._output_scale = output_scale_named(output_scale)
+
+    def __getstate__(self) -> dict:
+        state = dict(self.__dict__)
+        del state["_output_scale"]
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._output_scale = output_scale_named(self._output_scale_name)
 
     def update(
         self,
@@ -58,16 +111,24 @@ class ReplicaAlignmentAggregator(Aggregator[V, PartitionKey]):
     ) -> Embedding:
         partition_index = PartitionIndex(embedding_model, partitioner)
         models = list(embedding_model.values())
-        aligned = [
-            self._aligned_replica(partition, unit)
-            for partition, unit in (
-                (p, unit_vector_or_none(models[p].embed_node(vertex)))
+        replicas = [
+            (partition, raw, float(np.linalg.norm(raw)))
+            for partition, raw in (
+                (p, np.asarray(models[p].embed_node(vertex), dtype=float))
                 for p in sorted(partition_index.indexes_holding(vertex))
             )
-            if unit is not None
         ]
-        if len(aligned) > 0:
-            return self._merge_aligned_replicas(aligned)
+        embedded = [replica for replica in replicas if replica[2] > NORM_FLOOR]
+        if len(embedded) > 0:
+            merged = self._merge_aligned_replicas(
+                [
+                    self._aligned_replica(partition, raw / norm)
+                    for partition, raw, norm in embedded
+                ]
+            )
+            return merged * self._output_scale(
+                [norm for _, _, norm in embedded]
+            )
         else:
             return zero_embedding_of_unplaced_vertex(embedding_model, vertex)
 

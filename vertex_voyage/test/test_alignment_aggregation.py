@@ -321,12 +321,55 @@ class TestAlignmentAggregators(unittest.TestCase):
             "right": DictModel({"u": [0.0, 5.0]}, dim=2),
         }
         partitioner = FixedPartitioner({"u": {"left", "right"}})
-        embedding = self.aggregators["contrastive"].get(
-            models,
-            partitioner,
-            "u",
+        direction = np.ones(2) / np.sqrt(2)
+        mean_replica_norm = 3.5
+        scaled_embeddings = {
+            "replica_norm": mean_replica_norm * direction,
+            "unit": direction,
+        }
+        for output_scale, expected in scaled_embeddings.items():
+            with self.subTest(output_scale=output_scale):
+                aggregator = ContrastiveAlignmentAggregator(
+                    AlignmentSettings(output_scale=output_scale),
+                    SEED,
+                )
+                np.testing.assert_allclose(
+                    aggregator.get(models, partitioner, "u"),
+                    expected,
+                )
+
+    def test_each_aggregator_has_its_own_default_output_scale(self):
+        models = {"left": DictModel({"u": [0.0, 4.0]}, dim=2)}
+        partitioner = FixedPartitioner({"u": {"left"}})
+        default_outputs = {
+            "contrastive": [0.0, 4.0],
+            "triplet": [0.0, 1.0],
+        }
+        for name, expected in default_outputs.items():
+            with self.subTest(aggregator=name):
+                np.testing.assert_allclose(
+                    self.aggregators[name].get(models, partitioner, "u"),
+                    expected,
+                )
+
+    def test_requested_output_scale_overrides_aggregator_default(self):
+        models = {"left": DictModel({"u": [0.0, 4.0]}, dim=2)}
+        partitioner = FixedPartitioner({"u": {"left"}})
+        aggregator = TripletAlignmentAggregator(
+            AlignmentSettings(output_scale="replica_norm"),
+            SEED,
         )
-        np.testing.assert_allclose(embedding, np.ones(2) / np.sqrt(2))
+        np.testing.assert_allclose(
+            aggregator.get(models, partitioner, "u"),
+            [0.0, 4.0],
+        )
+
+    def test_unknown_output_scale_raises(self):
+        with self.assertLogs("Aggregation", level="ERROR"):
+            with self.assertRaises(AggregationError):
+                ContrastiveAlignmentAggregator(
+                    AlignmentSettings(output_scale="huge"),
+                )
 
     def test_vertex_without_replicas_gets_zero_embedding(self):
         for vertex in ("unseen", "unembedded"):
@@ -519,6 +562,25 @@ class TestProcrustesAggregator(unittest.TestCase):
                 self.problem.partitioner,
                 0,
             ),
+        )
+
+    def test_unreplicated_reference_vertex_keeps_its_raw_embedding(self):
+        models = {
+            "left": DictModel({"u": 3.0 * np.eye(DIM)[0]}),
+            "right": DictModel({}),
+        }
+        partitioner = FixedPartitioner({"u": {"left"}})
+        self.problem.train(self.aggregator)
+        np.testing.assert_allclose(
+            self.aggregator.get(models, partitioner, "u"),
+            3.0 * np.eye(DIM)[0],
+        )
+        unit_aggregator = ProcrustesAggregator(
+            ProcrustesSettings(output_scale="unit"),
+        )
+        np.testing.assert_allclose(
+            unit_aggregator.get(models, partitioner, "u"),
+            np.eye(DIM)[0],
         )
 
     def test_sweeps_are_configurable(self):

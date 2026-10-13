@@ -11,6 +11,9 @@ from vertex_voyage.aggregation.interface import (
 )
 from vertex_voyage.aggregation.replica_alignment import (
     DEFAULT_LINK_MEMORY,
+    DEFAULT_OUTPUT_SCALE,
+    REPLICA_NORM_OUTPUT_SCALE,
+    resolved_output_scale,
     ReplicaAlignmentAggregator,
 )
 from vertex_voyage.aggregation.replica_links import (
@@ -39,6 +42,7 @@ class ProcrustesSettings:
         "Passes over the partitions when fitting their rotations",
     )
     link_memory: int = DEFAULT_LINK_MEMORY
+    output_scale: str = DEFAULT_OUTPUT_SCALE
 
 
 def procrustes_rotation(source: np.ndarray, target: np.ndarray) -> np.ndarray:
@@ -118,7 +122,13 @@ class RotationFit:
 class ProcrustesAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
     def __init__(self, settings: Optional[ProcrustesSettings] = None):
         self._settings = ProcrustesSettings() if settings is None else settings
-        super().__init__(self._settings.link_memory)
+        super().__init__(
+            self._settings.link_memory,
+            resolved_output_scale(
+                self._settings.output_scale,
+                REPLICA_NORM_OUTPUT_SCALE,
+            ),
+        )
         self._rotations: List[np.ndarray] = []
 
     def _fit_alignment(

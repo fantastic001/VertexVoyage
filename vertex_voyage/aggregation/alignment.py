@@ -13,6 +13,10 @@ from vertex_voyage.aggregation.interface import (
 )
 from vertex_voyage.aggregation.replica_alignment import (
     DEFAULT_LINK_MEMORY,
+    DEFAULT_OUTPUT_SCALE,
+    REPLICA_NORM_OUTPUT_SCALE,
+    UNIT_OUTPUT_SCALE,
+    resolved_output_scale,
     ReplicaAlignmentAggregator,
 )
 from vertex_voyage.aggregation.replica_links import (
@@ -63,6 +67,7 @@ class AlignmentSettings:
         "Learning rate of the aligner optimiser",
     )
     link_memory: int = DEFAULT_LINK_MEMORY
+    output_scale: str = DEFAULT_OUTPUT_SCALE
     negative_pool: int = get_config_int(
         "alignment_negative_pool",
         256,
@@ -87,6 +92,7 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         margin: float,
         settings: Optional[AlignmentSettings] = None,
         seed: Optional[int] = None,
+        output_scale: str = REPLICA_NORM_OUTPUT_SCALE,
     ):
         require_useful_margin(margin)
         self._loss = loss
@@ -95,7 +101,10 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         self._rng = np.random.default_rng(
             np.random.randint(MAX_SEED_EXCLUSIVE) if seed is None else seed
         )
-        super().__init__(self._settings.link_memory)
+        super().__init__(
+            self._settings.link_memory,
+            resolved_output_scale(self._settings.output_scale, output_scale),
+        )
         self._model: Optional[ResidualAligner] = None
         self._optimiser: Optional[torch.optim.Optimizer] = None
         self._weights: Optional[AlignerWeights] = None
@@ -213,7 +222,13 @@ class ContrastiveAlignmentAggregator(AlignmentAggregator[V, PartitionKey]):
         settings: Optional[AlignmentSettings] = None,
         seed: Optional[int] = None,
     ):
-        super().__init__(contrastive_loss, CONTRASTIVE_MARGIN, settings, seed)
+        super().__init__(
+            contrastive_loss,
+            CONTRASTIVE_MARGIN,
+            settings,
+            seed,
+            REPLICA_NORM_OUTPUT_SCALE,
+        )
 
 
 class TripletAlignmentAggregator(AlignmentAggregator[V, PartitionKey]):
@@ -222,4 +237,10 @@ class TripletAlignmentAggregator(AlignmentAggregator[V, PartitionKey]):
         settings: Optional[AlignmentSettings] = None,
         seed: Optional[int] = None,
     ):
-        super().__init__(triplet_loss, TRIPLET_MARGIN, settings, seed)
+        super().__init__(
+            triplet_loss,
+            TRIPLET_MARGIN,
+            settings,
+            seed,
+            UNIT_OUTPUT_SCALE,
+        )
