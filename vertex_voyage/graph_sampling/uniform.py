@@ -6,6 +6,7 @@ from vertex_voyage.graph_sampling.interface import (
     GraphSampler,
     Rng,
     V,
+    no_candidates_error,
     require_rng,
     sampling_error,
 )
@@ -39,14 +40,16 @@ class UniformSampler(GraphSampler[V]):
         if len(neighbors) > 0:
             return choose_uniformly(rng, neighbors)
         else:
-            raise sampling_error(f"Node {node!r} has no neighbors")
+            raise no_candidates_error(f"Node {node!r} has no neighbors")
 
     def non_neighbor(self, rng: Rng, node: V) -> V:
         require_rng(rng)
         if self._snapshot.non_neighbor_count_of(node) > 0:
             return self._draw_existing_non_neighbor(rng, node)
         else:
-            raise sampling_error(f"Node {node!r} has no non-neighbors")
+            raise no_candidates_error(
+                f"Node {node!r} has no non-neighbors"
+            )
 
     def _draw_existing_non_neighbor(self, rng: Rng, node: V) -> V:
         for _ in range(MAX_REJECTION_ATTEMPTS):

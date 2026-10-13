@@ -3,6 +3,7 @@ from vertex_voyage.graph_sampling.interface import (
     AdjacencyGraph,
     Edge,
     GraphSampler,
+    NoCandidatesError,
     Rng,
     SamplingError,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "BiasedSampler",
     "Edge",
     "GraphSampler",
+    "NoCandidatesError",
     "Node2VecBias",
     "Rng",
     "RoundRobinSampler",

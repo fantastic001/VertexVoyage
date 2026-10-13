@@ -313,5 +313,84 @@ class TestRoundRobinUniform(unittest.TestCase):
         self.assertIn(sampler.node(self.rng), self.second)
 
 
+class TestWalk(FrequencyAssertions):
+    def setUp(self):
+        self.rng = np.random.default_rng(SEED)
+        self.graph = nx.Graph([(0, 1), (1, 2), (0, 2), (2, 3)])
+
+    def assert_follows_edges(self, graph, visited):
+        for source, target in zip(visited, visited[1:]):
+            self.assertTrue(graph.has_edge(source, target))
+
+    def test_uniform_walk_has_requested_length_and_follows_edges(self):
+        visited = UniformSampler(self.graph).walk(self.rng, 0, 25)
+        self.assertEqual(len(visited), 25)
+        self.assertEqual(visited[0], 0)
+        self.assert_follows_edges(self.graph, visited)
+
+    def test_walk_of_length_one_is_the_start(self):
+        self.assertEqual(UniformSampler(self.graph).walk(self.rng, 3, 1), [3])
+
+    def test_walk_stops_at_dead_end(self):
+        sampler = UniformSampler(nx.DiGraph([(0, 1), (1, 2)]))
+        self.assertEqual(sampler.walk(self.rng, 0, 10), [0, 1, 2])
+
+    def test_walk_from_isolated_node_is_the_start(self):
+        sampler = UniformSampler(nx.empty_graph(2))
+        self.assertEqual(sampler.walk(self.rng, 0, 5), [0])
+
+    def test_same_seed_reproduces_walk(self):
+        sampler = UniformSampler(self.graph)
+        first = sampler.walk(np.random.default_rng(SEED), 0, 20)
+        second = sampler.walk(np.random.default_rng(SEED), 0, 20)
+        self.assertEqual(first, second)
+
+    def test_biased_walk_passes_previous_node_to_bias(self):
+        never_return = BiasedSampler(
+            nx.cycle_graph(5),
+            lambda previous, candidate: float(candidate != previous),
+        )
+        visited = never_return.walk(self.rng, 0, 30)
+        self.assertEqual(len(visited), 30)
+        for before, after in zip(visited, visited[2:]):
+            self.assertNotEqual(before, after)
+
+    def test_biased_walk_third_node_follows_node2vec_transition(self):
+        graph = nx.Graph([(0, 2), (0, 1), (1, 2), (2, 3)])
+        sampler = BiasedSampler(graph, Node2VecBias(graph, p=0.5, q=2.0))
+        third_nodes = []
+        while len(third_nodes) < DRAW_COUNT:
+            visited = sampler.walk(self.rng, 0, 3)
+            if visited[1] == 2:
+                third_nodes.append(visited[2])
+            else:
+                continue
+        self.assert_frequencies(third_nodes, {0: 4 / 7, 1: 2 / 7, 3: 1 / 7})
+
+    def test_round_robin_walk_alternates_graphs(self):
+        first = nx.Graph([(0, 1)])
+        second = nx.Graph([(1, 2)])
+        sampler = RoundRobinUniform(first, second)
+        self.assertEqual(sampler.walk(self.rng, 0, 4), [0, 1, 2, 1])
+
+    def test_round_robin_walk_stops_at_dead_end(self):
+        sampler = RoundRobinUniform(
+            nx.DiGraph([(0, 1)]),
+            nx.DiGraph([(0, 1)]),
+        )
+        self.assertEqual(sampler.walk(self.rng, 0, 5), [0, 1])
+
+    def test_unknown_start_raises(self):
+        with self.assertRaises(SamplingError):
+            UniformSampler(self.graph).walk(self.rng, "missing", 3)
+
+    def test_invalid_length_raises(self):
+        sampler = UniformSampler(self.graph)
+        for length in (0, -1, 2.5, True):
+            with self.subTest(length=length):
+                with self.assertRaises(SamplingError):
+                    sampler.walk(self.rng, 0, length)
+
+
 if __name__ == "__main__":
     unittest.main()

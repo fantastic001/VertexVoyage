@@ -10,6 +10,7 @@ from vertex_voyage.graph_sampling.interface import (
     GraphSampler,
     Rng,
     V,
+    no_candidates_error,
     require_rng,
     sampling_error,
 )
@@ -48,7 +49,7 @@ class BiasedSampler(GraphSampler[V]):
         if len(candidates) > 0:
             return self._choose_next_node(rng, previous, candidates)
         else:
-            raise sampling_error(f"Node {node!r} has no neighbors")
+            raise no_candidates_error(f"Node {node!r} has no neighbors")
 
     def non_neighbor(
         self,
@@ -61,7 +62,9 @@ class BiasedSampler(GraphSampler[V]):
         if len(candidates) > 0:
             return self._choose_next_node(rng, previous, candidates)
         else:
-            raise sampling_error(f"Node {node!r} has no non-neighbors")
+            raise no_candidates_error(
+                f"Node {node!r} has no non-neighbors"
+            )
 
     def _choose_next_node(
         self,
@@ -76,6 +79,14 @@ class BiasedSampler(GraphSampler[V]):
                 self._beta(previous, candidate) for candidate in candidates
             ]
             return choose_weighted(rng, candidates, weights)
+
+    def _next_walk_node(
+        self,
+        rng: Rng,
+        node: V,
+        previous: Optional[V],
+    ) -> V:
+        return self.neighbor(rng, node, previous)
 
     def edge(self, rng: Rng) -> Edge:
         require_rng(rng)
