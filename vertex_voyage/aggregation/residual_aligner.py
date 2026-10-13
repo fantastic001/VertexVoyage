@@ -7,12 +7,58 @@ import torch
 from vertex_voyage.aggregation.embeddings import unit_vector_or_none
 from vertex_voyage.aggregation.interface import Embedding
 
-AlignmentLoss = Callable[[torch.Tensor, torch.Tensor, float], torch.Tensor]
-
 DISTANCE_EPSILON = 1e-12
 NO_PENALTY = 0.0
 LEFT = 0
 RIGHT = 1
+ATTRACTION_TERM = "attraction"
+REPULSION_TERM = "repulsion"
+RANKING_TERM = "ranking"
+LOSS_NOT_COMPUTED = "loss not computed"
+
+
+@dataclass(frozen=True)
+class LossTerm:
+    name: str
+    mean: torch.Tensor
+    pair_count: int
+
+    def mean_value(self) -> float:
+        return float(self.mean.detach())
+
+    def summed_value(self) -> float:
+        return self.mean_value() * self.pair_count
+
+    def report(self) -> str:
+        return "%s mean %f sum %f over %d pairs" % (
+            self.name,
+            self.mean_value(),
+            self.summed_value(),
+            self.pair_count,
+        )
+
+
+LossTerms = Tuple[LossTerm, ...]
+AlignmentLoss = Callable[[torch.Tensor, torch.Tensor, float], LossTerms]
+
+
+def mean_loss_of(terms: LossTerms) -> torch.Tensor:
+    return torch.stack([term.mean for term in terms]).sum()
+
+
+def summed_loss_of(terms: LossTerms) -> float:
+    return sum(term.summed_value() for term in terms)
+
+
+def loss_report_of(terms: LossTerms) -> str:
+    if len(terms) > 0:
+        return "loss %f, summed loss %f (%s)" % (
+            float(mean_loss_of(terms).detach()),
+            summed_loss_of(terms),
+            "; ".join(term.report() for term in terms),
+        )
+    else:
+        return LOSS_NOT_COMPUTED
 
 
 class ResidualAligner(torch.nn.Module):
@@ -62,27 +108,40 @@ def contrastive_loss(
     out: torch.Tensor,
     links: torch.Tensor,
     margin: float,
-) -> torch.Tensor:
+) -> LossTerms:
     negatives = torch.stack(
         [random_rows(out, len(links)), random_rows(out, len(links))],
         dim=1,
     )
     hinge = torch.clamp(margin - pair_distance(out, negatives), min=NO_PENALTY)
-    return (pair_distance(out, links) ** 2).mean() + (hinge ** 2).mean()
+    return (
+        LossTerm(
+            ATTRACTION_TERM,
+            (pair_distance(out, links) ** 2).mean(),
+            len(links),
+        ),
+        LossTerm(REPULSION_TERM, (hinge ** 2).mean(), len(negatives)),
+    )
 
 
 def triplet_loss(
     out: torch.Tensor,
     links: torch.Tensor,
     margin: float,
-) -> torch.Tensor:
+) -> LossTerms:
     both = torch.cat([links, links.flip(dims=(1,))])
     negatives = torch.stack(
         [both[:, LEFT], random_rows(out, len(both))],
         dim=1,
     )
     gap = pair_distance(out, both) - pair_distance(out, negatives)
-    return torch.clamp(gap + margin, min=NO_PENALTY).mean()
+    return (
+        LossTerm(
+            RANKING_TERM,
+            torch.clamp(gap + margin, min=NO_PENALTY).mean(),
+            len(both),
+        ),
+    )
 
 
 @dataclass(frozen=True)

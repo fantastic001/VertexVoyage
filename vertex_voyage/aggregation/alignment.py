@@ -27,8 +27,11 @@ from vertex_voyage.aggregation.replica_links import (
 from vertex_voyage.aggregation.residual_aligner import (
     AlignerWeights,
     AlignmentLoss,
+    LossTerms,
     ResidualAligner,
     contrastive_loss,
+    loss_report_of,
+    mean_loss_of,
     triplet_loss,
     weights_of,
 )
@@ -47,6 +50,12 @@ TRIPLET_MARGIN = get_config_float(
     "Distance by which the triplet loss keeps negatives behind positives",
 )
 LARGEST_USEFUL_MARGIN = 2.0
+EPOCH_LOSS_LOG_INTERVAL = get_config_int(
+    "alignment_epoch_loss_log_interval",
+    1,
+    "Aligner epochs between two loss log lines, 0 silences them",
+)
+FIRST_EPOCH = 1
 
 
 @dataclass(frozen=True)
@@ -73,6 +82,25 @@ class AlignmentSettings:
         256,
         "Replicas drawn from the sampler as extra negatives per buffer",
     )
+
+
+def is_logged_epoch(epoch: int) -> bool:
+    if EPOCH_LOSS_LOG_INTERVAL > 0:
+        return epoch % EPOCH_LOSS_LOG_INTERVAL == 0
+    else:
+        return False
+
+
+def log_loss_of_epoch(epoch: int, epoch_count: int, terms: LossTerms) -> None:
+    if is_logged_epoch(epoch):
+        logger.info(
+            "Aligner epoch %d/%d, %s",
+            epoch,
+            epoch_count,
+            loss_report_of(terms),
+        )
+    else:
+        logger.debug("Aligner epoch %d/%d not logged", epoch, epoch_count)
 
 
 def require_useful_margin(margin: float) -> None:
@@ -165,19 +193,20 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
             table.partition_count(),
             vectors.shape[1],
         )
-        loss_value = float("nan")
-        for _ in range(self._settings.train_steps):
+        terms: LossTerms = ()
+        epoch_count = self._settings.train_steps
+        for epoch in range(FIRST_EPOCH, epoch_count + FIRST_EPOCH):
             self._optimiser.zero_grad()
-            loss = self._loss(model(vectors, partitions), links, self._margin)
-            loss.backward()
+            terms = self._loss(model(vectors, partitions), links, self._margin)
+            mean_loss_of(terms).backward()
             self._optimiser.step()
-            loss_value = float(loss.detach())
+            log_loss_of_epoch(epoch, epoch_count, terms)
         self._weights = weights_of(model)
         logger.info(
-            "Aligner trained on %d links over %d replicas, loss %f",
+            "Aligner trained on %d links over %d replicas, %s",
             len(row_pairs),
             len(table),
-            loss_value,
+            loss_report_of(terms),
         )
 
     def _aligner_of_shape(

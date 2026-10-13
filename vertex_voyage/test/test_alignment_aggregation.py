@@ -1,5 +1,6 @@
 import pickle
 import unittest
+from unittest import mock
 
 import networkx as nx
 import numpy as np
@@ -10,6 +11,7 @@ from vertex_voyage.aggregation import (
     Aggregator,
     create_aggregator,
 )
+from vertex_voyage.aggregation import alignment
 from vertex_voyage.aggregation.alignment import (
     AlignmentAggregator,
     AlignmentSettings,
@@ -31,8 +33,12 @@ from vertex_voyage.aggregation.replica_links import (
     replica_links_of_buffer,
 )
 from vertex_voyage.aggregation.residual_aligner import (
+    LOSS_NOT_COMPUTED,
     ResidualAligner,
     contrastive_loss,
+    loss_report_of,
+    mean_loss_of,
+    summed_loss_of,
     triplet_loss,
     weights_of,
 )
@@ -227,7 +233,7 @@ class TestResidualAligner(unittest.TestCase):
         out = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
         links = torch.tensor([[0, 1]])
         self.assertAlmostEqual(
-            float(contrastive_loss(out, links, 1e-3)),
+            float(mean_loss_of(contrastive_loss(out, links, 1e-3))),
             0.0,
             places=5,
         )
@@ -235,24 +241,100 @@ class TestResidualAligner(unittest.TestCase):
     def test_triplet_loss_orders_distances(self):
         out = torch.tensor([[1.0, 0.0], [1.0, 0.0], [-1.0, 0.0]])
         torch.manual_seed(SEED)
-        close = float(triplet_loss(out, torch.tensor([[0, 1]]), 0.5))
+        close = mean_loss_of(triplet_loss(out, torch.tensor([[0, 1]]), 0.5))
         torch.manual_seed(SEED)
-        far = float(triplet_loss(out, torch.tensor([[0, 2]]), 0.5))
-        self.assertLess(close, far)
+        far = mean_loss_of(triplet_loss(out, torch.tensor([[0, 2]]), 0.5))
+        self.assertLess(float(close), float(far))
+
+    def test_contrastive_terms_sum_to_the_summed_loss(self):
+        out = torch.tensor([[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0]])
+        links = torch.tensor([[0, 1], [0, 2]])
+        terms = contrastive_loss(out, links, 1.0)
+        attraction, repulsion = terms
+        self.assertEqual(
+            [term.name for term in terms],
+            ["attraction", "repulsion"],
+        )
+        self.assertAlmostEqual(attraction.summed_value(), 6.0, places=5)
+        self.assertAlmostEqual(
+            summed_loss_of(terms),
+            float(mean_loss_of(terms)) * len(links),
+            places=5,
+        )
+        self.assertAlmostEqual(
+            summed_loss_of(terms),
+            attraction.summed_value() + repulsion.summed_value(),
+            places=5,
+        )
+
+    def test_loss_report_names_every_term(self):
+        out = torch.tensor([[1.0, 0.0], [-1.0, 0.0]])
+        links = torch.tensor([[0, 1]])
+        report = loss_report_of(contrastive_loss(out, links, 1.0))
+        for expected in ("summed loss", "attraction", "repulsion"):
+            self.assertIn(expected, report)
+        self.assertIn("ranking", loss_report_of(triplet_loss(out, links, 0.5)))
+
+    def test_loss_report_of_no_terms_says_not_computed(self):
+        self.assertEqual(loss_report_of(()), LOSS_NOT_COMPUTED)
 
     def test_losses_are_finite_and_differentiable(self):
         links = torch.tensor([[0, 3], [1, 4], [2, 2]])
         for loss in (contrastive_loss, triplet_loss):
             with self.subTest(loss=loss.__name__):
-                value = loss(
-                    self.model(self.vectors, self.partitions),
-                    links,
-                    1.0,
+                value = mean_loss_of(
+                    loss(
+                        self.model(self.vectors, self.partitions),
+                        links,
+                        1.0,
+                    )
                 )
                 value.backward()
                 self.assertTrue(torch.isfinite(value))
                 for parameter in self.model.parameters():
                     self.assertTrue(torch.isfinite(parameter.grad).all())
+
+
+class TestEpochLossLogging(unittest.TestCase):
+    EPOCH_COUNT = 6
+    TERMS = contrastive_loss(
+        torch.tensor([[1.0, 0.0], [-1.0, 0.0]]),
+        torch.tensor([[0, 1]]),
+        1.0,
+    )
+
+    def epoch_lines_at_interval(self, interval):
+        with mock.patch.object(
+            alignment,
+            "EPOCH_LOSS_LOG_INTERVAL",
+            interval,
+        ):
+            with self.assertLogs("Aggregation", level="DEBUG") as captured:
+                for epoch in range(1, self.EPOCH_COUNT + 1):
+                    alignment.log_loss_of_epoch(
+                        epoch,
+                        self.EPOCH_COUNT,
+                        self.TERMS,
+                    )
+        return [
+            record.getMessage()
+            for record in captured.records
+            if record.levelname == "INFO"
+        ]
+
+    def test_logged_epochs_follow_the_interval(self):
+        logged_epochs_at = {0: 0, 1: 6, 2: 3, 4: 1, 7: 0}
+        for interval, expected in logged_epochs_at.items():
+            with self.subTest(interval=interval):
+                self.assertEqual(
+                    len(self.epoch_lines_at_interval(interval)),
+                    expected,
+                )
+
+    def test_epoch_line_carries_epoch_and_terms(self):
+        last_line = self.epoch_lines_at_interval(1)[-1]
+        for expected in ("epoch 6/6", "summed loss", "attraction"):
+            self.assertIn(expected, last_line)
 
 
 class TestAlignmentAggregators(unittest.TestCase):
