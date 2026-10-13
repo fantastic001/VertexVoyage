@@ -4,10 +4,16 @@ import networkx as nx
 import numpy as np
 
 from vertex_voyage.aggregation import (
+    DEFAULT_AGGREGATOR_NAME,
     AggregationError,
     Aggregator,
     MeanAggregator,
+    aggregator_names,
+    create_aggregator,
+    is_aggregator_registered,
+    register_aggregator,
 )
+from vertex_voyage.aggregation import registry
 from vertex_voyage.graph_sampling import UniformSampler
 from vertex_voyage.temporal_partitioning import (
     InMemoryPartition,
@@ -123,6 +129,48 @@ class TestMeanAggregator(unittest.TestCase):
         with self.assertLogs("Aggregation", level="ERROR"):
             with self.assertRaises(AggregationError):
                 self.aggregator.get({}, self.partitioner, "unseen")
+
+
+class TestAggregatorRegistry(unittest.TestCase):
+    def setUp(self):
+        registered = dict(registry._AGGREGATOR_FACTORIES)
+        self.addCleanup(registry._AGGREGATOR_FACTORIES.update, registered)
+        self.addCleanup(registry._AGGREGATOR_FACTORIES.clear)
+
+    def test_default_aggregator_is_mean(self):
+        self.assertEqual(DEFAULT_AGGREGATOR_NAME, "mean")
+        self.assertIsInstance(
+            create_aggregator(DEFAULT_AGGREGATOR_NAME),
+            MeanAggregator,
+        )
+
+    def test_each_creation_returns_new_aggregator(self):
+        self.assertIsNot(create_aggregator("mean"), create_aggregator("mean"))
+
+    def test_registered_aggregator_can_be_created(self):
+        register_aggregator("count", PartitionCountAggregator)
+        self.assertTrue(is_aggregator_registered("count"))
+        self.assertEqual(aggregator_names(), ["count", "mean"])
+        self.assertIsInstance(
+            create_aggregator("count"),
+            PartitionCountAggregator,
+        )
+
+    def test_unknown_aggregator_raises(self):
+        with self.assertLogs("Aggregation", level="ERROR"):
+            with self.assertRaises(AggregationError):
+                create_aggregator("missing")
+
+    def test_invalid_registration_raises(self):
+        invalid_registrations = {
+            "duplicate name": ("mean", MeanAggregator),
+            "factory not callable": ("broken", "not a factory"),
+        }
+        for reason, (name, factory) in invalid_registrations.items():
+            with self.subTest(reason=reason):
+                with self.assertLogs("Aggregation", level="ERROR"):
+                    with self.assertRaises(AggregationError):
+                        register_aggregator(name, factory)
 
 
 if __name__ == "__main__":

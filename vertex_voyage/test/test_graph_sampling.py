@@ -7,6 +7,7 @@ import numpy as np
 from vertex_voyage.graph_sampling import (
     BiasedSampler,
     GraphSampler,
+    LazySampler,
     Node2VecBias,
     RoundRobinSampler,
     RoundRobinUniform,
@@ -390,6 +391,47 @@ class TestWalk(FrequencyAssertions):
             with self.subTest(length=length):
                 with self.assertRaises(SamplingError):
                     sampler.walk(self.rng, 0, length)
+
+
+class TestLazySampler(unittest.TestCase):
+    def setUp(self):
+        self.rng = np.random.default_rng(SEED)
+        self.build_count = 0
+        self.graph = nx.DiGraph([(0, 1), (1, 2)])
+        self.sampler = LazySampler(self.build_counted_sampler)
+
+    def build_counted_sampler(self) -> UniformSampler:
+        self.build_count += 1
+        return UniformSampler(self.graph)
+
+    def test_sampler_is_not_built_until_used(self):
+        self.assertIsInstance(self.sampler, GraphSampler)
+        self.assertEqual(self.build_count, 0)
+
+    def test_sampler_is_built_once_and_delegated_to(self):
+        self.assertIn(self.sampler.node(self.rng), self.graph)
+        self.assertEqual(self.sampler.neighbor(self.rng, 0), 1)
+        self.assertEqual(self.sampler.non_neighbor(self.rng, 0), 2)
+        self.assertTrue(self.graph.has_edge(*self.sampler.edge(self.rng)))
+        self.assertFalse(self.graph.has_edge(*self.sampler.non_edge(self.rng)))
+        self.assertEqual(self.sampler.walk(self.rng, 0, 5), [0, 1, 2])
+        self.assertEqual(self.build_count, 1)
+
+    def test_walk_keeps_bias_of_wrapped_sampler(self):
+        cycle = nx.cycle_graph(5)
+        sampler = LazySampler(
+            lambda: BiasedSampler(
+                cycle,
+                lambda previous, candidate: float(candidate != previous),
+            )
+        )
+        visited = sampler.walk(self.rng, 0, 30)
+        for before, after in zip(visited, visited[2:]):
+            self.assertNotEqual(before, after)
+
+    def test_rejects_non_callable_factory(self):
+        with self.assertRaises(SamplingError):
+            LazySampler(UniformSampler(self.graph))
 
 
 if __name__ == "__main__":

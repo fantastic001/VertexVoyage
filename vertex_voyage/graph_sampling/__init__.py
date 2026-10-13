@@ -7,6 +7,7 @@ from vertex_voyage.graph_sampling.interface import (
     Rng,
     SamplingError,
 )
+from vertex_voyage.graph_sampling.lazy import LazySampler
 from vertex_voyage.graph_sampling.node2vec_bias import Node2VecBias
 from vertex_voyage.graph_sampling.round_robin import (
     RoundRobinSampler,
@@ -20,6 +21,7 @@ __all__ = [
     "BiasedSampler",
     "Edge",
     "GraphSampler",
+    "LazySampler",
     "NoCandidatesError",
     "Node2VecBias",
     "Rng",

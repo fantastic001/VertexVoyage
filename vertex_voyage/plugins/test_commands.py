@@ -17,6 +17,14 @@ from dataclasses import asdict
 import numpy as np
 
 from experiments.datasets import dataset_params
+from vertex_voyage.aggregation import (
+    DEFAULT_AGGREGATOR_NAME,
+    Aggregator,
+    aggregator_names,
+    create_aggregator,
+    is_aggregator_registered,
+)
+from vertex_voyage.graph_sampling import LazySampler, RoundRobinUniform
 from vertex_voyage.config import notify_plugins
 from vertex_voyage.distger import DistGER
 from vertex_voyage.node2vec import Node2Vec
@@ -667,6 +675,17 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             sorted_events.append(event)
         return sorted_events
 
+    def _persisted_aggregator_params(self, aggregator: str) -> dict:
+        if aggregator == DEFAULT_AGGREGATOR_NAME:
+            return {}
+        else:
+            return {"aggregator": aggregator}
+
+    def _partition_graph_sampler(self, models) -> LazySampler:
+        return LazySampler(
+            lambda: RoundRobinUniform(*[part.graph() for part in models])
+        )
+
     @TimeMetric("process_buffers")
     def _process_temporal_buffers(
             self, *,
@@ -677,6 +696,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             models, 
             original_graph,
             iteration: int,
+            aggregator: Aggregator,
             run = None,
         ):
         total_edges = 0
@@ -699,11 +719,13 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 for part, partition_buffer in partitioner.get_partition_buffers(buffer):
                         with TimeMetric("model_update_part"):
                             models[part].update(partition_buffer)
+            with TimeMetric("aggregator_update"):
+                aggregator.update(self._partition_graph_sampler(models), models, partitioner, buffer)
             with TimeMetric("embedding"):
                 if run is not None:
-                    embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes)
+                    embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes, aggregator)
                 else:
-                    embeddings = partitioner.get_distributed_embedding(models, nodes)
+                    embeddings = partitioner.get_distributed_embedding(models, nodes, aggregator)
 
             if processed_after_last_f1 >= F1_COMPU_THRESHOLD or bi == total_buffers - 1 or bi == 0:
                 processed_after_last_f1 = 0
@@ -930,11 +952,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                semantic_min_samples: int = 2,
                semantic_reassign_noise: bool = True,
                semantic_embedding: str = "auto",
+               aggregator: str = DEFAULT_AGGREGATOR_NAME,
                seed: int = DEFAULT_SEED):
         import networkx as nx
 
         if ordering and ordering not in self.EDGE_ORDERINGS:
             raise ValueError(f"ordering must be one of: '', {', '.join(self.EDGE_ORDERINGS)}")
+        if not is_aggregator_registered(aggregator):
+            raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
 
         TimeMetric.reset()
         _overall = TimeMetric("temporal_test").start()
@@ -942,7 +967,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed)
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed, **self._persisted_aggregator_params(aggregator))
         log(f"Processing dataset {name}")
         with TimeMetric("load_dataset"):
             t = VertexEnumerator()
@@ -1031,6 +1056,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     seed=iteration_seed,
                 )
                 sorted_events = self._order_temporal_events(og_events, track_seen, ordering)
+                iteration_aggregator = create_aggregator(aggregator)
                 old_f1_score, iteration_precisions, iteration_recalls, iteration_f1s = self._process_temporal_buffers(
                     nx=nx,
                     sorted_events=sorted_events,
@@ -1039,12 +1065,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     models=models,
                     original_graph=original_graph,
                     iteration=it,
+                    aggregator=iteration_aggregator,
                     run = run if checkpoint_iterations else None
                 )
                 log("Event stream processing completed")
                 scores.append(old_f1_score)
                 run["models_%d" % it] = models
                 run["partitioner_%d" % it] = partitioner
+                run["aggregator_%d" % it] = iteration_aggregator
                 run["iteration_precisions_%d" % it] = iteration_precisions
                 run["iteration_recalls_%d" % it] = iteration_recalls
                 run["iteration_f1s_%d" % it] = iteration_f1s
