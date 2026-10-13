@@ -1,6 +1,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Optional, Set
+from vertex_voyage.aggregation import Aggregator, MeanAggregator
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random, choice, shuffle
 import numpy as np 
@@ -158,17 +159,9 @@ class TemporalGraphPartitioner:
                 partition_buffers.setdefault(partition, []).append(event)
         return list(partition_buffers.items())
 
-    def get_distributed_embedding(self, models, nodes):
-        results = []
-        for node in nodes:
-            node_partitions = self.get(node)
-            if not node_partitions:
-                logger.warning(f"Node {node} is not in any partition, returning zero embedding")
-                results.append(np.zeros(models[next(iter(models))].dim))
-            else:
-                results.append(np.mean([models[partition].embed_node(node) for partition in node_partitions], axis=0))
-                logger.debug(f"Node {node} is in partitions {[partition.id for partition in node_partitions]}, embedding dim: {results[-1].shape}")
-        return results
+    def get_distributed_embedding(self, models, nodes, aggregator: Optional[Aggregator] = None):
+        chosen_aggregator = MeanAggregator() if aggregator is None else aggregator
+        return [chosen_aggregator.get(models, self, node) for node in nodes]
 
 class CatchAllPartitioner(TemporalGraphPartitioner):
     """
