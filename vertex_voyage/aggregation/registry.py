@@ -6,19 +6,40 @@ from vertex_voyage.aggregation.interface import (
     logger,
 )
 from vertex_voyage.aggregation.mean import MeanAggregator
+from vertex_voyage.aggregation.procrustes import ProcrustesAggregator
 from vertex_voyage.config import get_config_str
 
 AggregatorFactory = Callable[[], Aggregator]
 
 MEAN_AGGREGATOR_NAME = "mean"
+CONTRASTIVE_AGGREGATOR_NAME = "contrastive"
+TRIPLET_AGGREGATOR_NAME = "triplet"
+PROCRUSTES_AGGREGATOR_NAME = "procrustes"
 DEFAULT_AGGREGATOR_NAME = get_config_str(
     "default_aggregator",
     MEAN_AGGREGATOR_NAME,
     "Aggregator combining partition embeddings when none is given",
 )
 
+
+
+def create_contrastive_alignment_aggregator() -> Aggregator:
+    from vertex_voyage.aggregation.alignment import (
+        ContrastiveAlignmentAggregator,
+    )
+    return ContrastiveAlignmentAggregator()
+
+
+def create_triplet_alignment_aggregator() -> Aggregator:
+    from vertex_voyage.aggregation.alignment import TripletAlignmentAggregator
+    return TripletAlignmentAggregator()
+
+
 _AGGREGATOR_FACTORIES: Dict[str, AggregatorFactory] = {
     MEAN_AGGREGATOR_NAME: MeanAggregator,
+    CONTRASTIVE_AGGREGATOR_NAME: create_contrastive_alignment_aggregator,
+    TRIPLET_AGGREGATOR_NAME: create_triplet_alignment_aggregator,
+    PROCRUSTES_AGGREGATOR_NAME: ProcrustesAggregator,
 }
 
 

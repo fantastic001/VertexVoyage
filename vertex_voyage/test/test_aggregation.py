@@ -150,7 +150,10 @@ class TestAggregatorRegistry(unittest.TestCase):
     def test_registered_aggregator_can_be_created(self):
         register_aggregator("count", PartitionCountAggregator)
         self.assertTrue(is_aggregator_registered("count"))
-        self.assertEqual(aggregator_names(), ["count", "mean"])
+        self.assertEqual(
+            aggregator_names(),
+            ["contrastive", "count", "mean", "procrustes", "triplet"],
+        )
         self.assertIsInstance(
             create_aggregator("count"),
             PartitionCountAggregator,

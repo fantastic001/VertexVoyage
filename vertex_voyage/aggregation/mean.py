@@ -2,6 +2,9 @@ from typing import Collection, List
 
 import numpy as np
 
+from vertex_voyage.aggregation.embeddings import (
+    zero_embedding_of_unplaced_vertex,
+)
 from vertex_voyage.aggregation.interface import (
     Aggregator,
     EdgeBuffer,
@@ -48,11 +51,7 @@ class MeanAggregator(Aggregator[V, PartitionKey]):
                 axis=PARTITION_AXIS,
             )
         else:
-            logger.warning(
-                "Vertex %r is in no partition, returning zero embedding",
-                vertex,
-            )
-            return np.zeros(self._embedding_dimension_of(embedding_model))
+            return zero_embedding_of_unplaced_vertex(embedding_model, vertex)
 
     @staticmethod
     def _embed_in_each_partition(
@@ -66,13 +65,4 @@ class MeanAggregator(Aggregator[V, PartitionKey]):
         else:
             raise aggregation_error(
                 f"No embedding model for partitions {missing!r}"
-            )
-
-    @staticmethod
-    def _embedding_dimension_of(embedding_model: PartitionModels) -> int:
-        if len(embedding_model) > 0:
-            return next(iter(embedding_model.values())).dim
-        else:
-            raise aggregation_error(
-                "Cannot aggregate without any embedding model"
             )
