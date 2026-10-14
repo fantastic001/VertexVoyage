@@ -1,13 +1,10 @@
 from dataclasses import dataclass
 from typing import Callable, Tuple
 
-import numpy as np
 import torch
 
-from vertex_voyage.aggregation.embeddings import unit_vector_or_none
 from vertex_voyage.aggregation.interface import Embedding
 
-DISTANCE_EPSILON = 1e-12
 NO_PENALTY = 0.0
 LEFT = 0
 RIGHT = 1
@@ -46,15 +43,11 @@ def mean_loss_of(terms: LossTerms) -> torch.Tensor:
     return torch.stack([term.mean for term in terms]).sum()
 
 
-def summed_loss_of(terms: LossTerms) -> float:
-    return sum(term.summed_value() for term in terms)
-
-
 def loss_report_of(terms: LossTerms) -> str:
     if len(terms) > 0:
         return "loss %f, summed loss %f (%s)" % (
             float(mean_loss_of(terms).detach()),
-            summed_loss_of(terms),
+            sum(term.summed_value() for term in terms),
             "; ".join(term.report() for term in terms),
         )
     else:
@@ -94,14 +87,20 @@ class ResidualAligner(torch.nn.Module):
         same_partitions = self.partition_count == partition_count
         return same_partitions and self.dimension == dimension
 
+    def align(self, partition: int, unit: Embedding) -> Embedding:
+        with torch.no_grad():
+            aligned = self(
+                torch.as_tensor(unit, dtype=torch.float32).reshape(1, -1),
+                torch.tensor([partition]),
+            )
+        return aligned[0].numpy().astype(float)
+
 
 def pair_distance(out: torch.Tensor, pairs: torch.Tensor) -> torch.Tensor:
-    difference = out[pairs[:, LEFT]] - out[pairs[:, RIGHT]]
-    return torch.sqrt((difference ** 2).sum(dim=1) + DISTANCE_EPSILON)
-
-
-def random_rows(out: torch.Tensor, count: int) -> torch.Tensor:
-    return torch.randint(len(out), (count,))
+    return torch.nn.functional.pairwise_distance(
+        out[pairs[:, LEFT]],
+        out[pairs[:, RIGHT]],
+    )
 
 
 def contrastive_loss(
@@ -109,10 +108,7 @@ def contrastive_loss(
     links: torch.Tensor,
     margin: float,
 ) -> LossTerms:
-    negatives = torch.stack(
-        [random_rows(out, len(links)), random_rows(out, len(links))],
-        dim=1,
-    )
+    negatives = torch.randint(len(out), (len(links), 2))
     hinge = torch.clamp(margin - pair_distance(out, negatives), min=NO_PENALTY)
     return (
         LossTerm(
@@ -130,46 +126,15 @@ def triplet_loss(
     margin: float,
 ) -> LossTerms:
     both = torch.cat([links, links.flip(dims=(1,))])
-    negatives = torch.stack(
-        [both[:, LEFT], random_rows(out, len(both))],
-        dim=1,
-    )
-    gap = pair_distance(out, both) - pair_distance(out, negatives)
     return (
         LossTerm(
             RANKING_TERM,
-            torch.clamp(gap + margin, min=NO_PENALTY).mean(),
+            torch.nn.functional.triplet_margin_loss(
+                out[both[:, LEFT]],
+                out[both[:, RIGHT]],
+                out[torch.randint(len(out), (len(both),))],
+                margin=margin,
+            ),
             len(both),
         ),
-    )
-
-
-@dataclass(frozen=True)
-class AlignerWeights:
-    first: Tuple[Tuple[np.ndarray, np.ndarray], ...]
-    second: Tuple[np.ndarray, np.ndarray]
-
-    def align(self, partition: int, unit: Embedding) -> Embedding:
-        first_weight, first_bias = self.first[partition]
-        second_weight, second_bias = self.second
-        hidden = np.maximum(first_weight @ unit + first_bias, NO_PENALTY)
-        moved = unit + second_weight @ hidden + second_bias
-        aligned = unit_vector_or_none(moved)
-        if aligned is None:
-            return unit
-        else:
-            return aligned
-
-
-def as_numpy(parameter: torch.Tensor) -> np.ndarray:
-    return parameter.detach().numpy().astype(float)
-
-
-def weights_of(model: ResidualAligner) -> AlignerWeights:
-    return AlignerWeights(
-        first=tuple(
-            (as_numpy(layer.weight), as_numpy(layer.bias))
-            for layer in model.first
-        ),
-        second=(as_numpy(model.second.weight), as_numpy(model.second.bias)),
     )

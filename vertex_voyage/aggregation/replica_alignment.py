@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from collections import deque
+from dataclasses import dataclass
 from typing import Callable, Deque, Dict, List, Sequence
 
 import numpy as np
@@ -28,11 +29,6 @@ from vertex_voyage.aggregation.replica_links import (
 from vertex_voyage.config import get_config_int, get_config_str
 from vertex_voyage.graph_sampling import GraphSampler
 
-DEFAULT_LINK_MEMORY = get_config_int(
-    "alignment_link_memory",
-    20000,
-    "Most recent replica links an aligning aggregator keeps fitting on",
-)
 REPLICA_AXIS = 0
 UNIT_LENGTH = 1.0
 
@@ -42,54 +38,45 @@ UNIT_OUTPUT_SCALE = "unit"
 REPLICA_NORM_OUTPUT_SCALE = "replica_norm"
 OUTPUT_SCALES: Dict[str, OutputScale] = {
     UNIT_OUTPUT_SCALE: lambda replica_norms: UNIT_LENGTH,
-    REPLICA_NORM_OUTPUT_SCALE: lambda replica_norms: float(
-        np.mean(replica_norms)
-    ),
+    REPLICA_NORM_OUTPUT_SCALE: np.mean,
 }
 AGGREGATOR_OUTPUT_SCALE = "auto"
-DEFAULT_OUTPUT_SCALE = get_config_str(
-    "alignment_output_scale",
-    AGGREGATOR_OUTPUT_SCALE,
-    "Length of a merged embedding: unit, replica_norm (mean norm of its "
-    "replicas) or auto (the choice of each aggregator)",
-)
 
 
-def resolved_output_scale(requested: str, aggregator_choice: str) -> str:
-    if requested == AGGREGATOR_OUTPUT_SCALE:
-        return aggregator_choice
-    else:
-        return requested
-
-
-def output_scale_named(name: str) -> OutputScale:
-    if name in OUTPUT_SCALES:
-        return OUTPUT_SCALES[name]
-    else:
-        raise aggregation_error(
-            f"Unknown output scale {name!r}, expected one of: "
-            f"{', '.join(sorted(OUTPUT_SCALES))}"
-        )
+@dataclass(frozen=True)
+class ReplicaAlignmentSettings:
+    link_memory: int = get_config_int(
+        "alignment_link_memory",
+        20000,
+        "Most recent replica links an aligning aggregator keeps fitting on",
+    )
+    output_scale: str = get_config_str(
+        "alignment_output_scale",
+        AGGREGATOR_OUTPUT_SCALE,
+        "Length of a merged embedding: unit, replica_norm (mean norm of its "
+        "replicas) or auto (the choice of each aggregator)",
+    )
 
 
 class ReplicaAlignmentAggregator(Aggregator[V, PartitionKey]):
     def __init__(
         self,
-        link_memory: int,
-        output_scale: str,
+        settings: ReplicaAlignmentSettings,
+        aggregator_output_scale: str,
     ):
-        self._links: Deque[ReplicaLink] = deque(maxlen=link_memory)
-        self._output_scale_name = output_scale
-        self._output_scale = output_scale_named(output_scale)
-
-    def __getstate__(self) -> dict:
-        state = dict(self.__dict__)
-        del state["_output_scale"]
-        return state
-
-    def __setstate__(self, state: dict) -> None:
-        self.__dict__.update(state)
-        self._output_scale = output_scale_named(self._output_scale_name)
+        if settings.output_scale == AGGREGATOR_OUTPUT_SCALE:
+            self._output_scale_name = aggregator_output_scale
+        else:
+            self._output_scale_name = settings.output_scale
+        if self._output_scale_name in OUTPUT_SCALES:
+            self._links: Deque[ReplicaLink] = deque(
+                maxlen=settings.link_memory
+            )
+        else:
+            raise aggregation_error(
+                f"Unknown output scale {self._output_scale_name!r}, "
+                f"expected one of: {', '.join(sorted(OUTPUT_SCALES))}"
+            )
 
     def update(
         self,
@@ -126,9 +113,8 @@ class ReplicaAlignmentAggregator(Aggregator[V, PartitionKey]):
                     for partition, raw, norm in embedded
                 ]
             )
-            return merged * self._output_scale(
-                [norm for _, _, norm in embedded]
-            )
+            output_scale = OUTPUT_SCALES[self._output_scale_name]
+            return merged * output_scale([norm for _, _, norm in embedded])
         else:
             return zero_embedding_of_unplaced_vertex(embedding_model, vertex)
 

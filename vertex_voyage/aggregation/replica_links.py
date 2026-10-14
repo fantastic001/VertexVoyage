@@ -92,16 +92,6 @@ def links_between_replicas_of_vertex(
     ]
 
 
-def is_replica_link(link: ReplicaLink) -> bool:
-    (_, left_vertex), (_, right_vertex) = link
-    return left_vertex == right_vertex
-
-
-def is_cross_partition_link(link: ReplicaLink) -> bool:
-    (left_partition, _), (right_partition, _) = link
-    return left_partition != right_partition
-
-
 def replica_links_of_buffer(
     partition_index: PartitionIndex,
     buffer: EdgeBuffer,

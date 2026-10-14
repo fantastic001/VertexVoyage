@@ -15,3 +15,4 @@ tabulate
 maturin
 psutil
 torch
+scipy

@@ -14,10 +14,7 @@ from vertex_voyage.graph_sampling import (
     SamplingError,
     UniformSampler,
 )
-from vertex_voyage.graph_sampling.choice import (
-    CumulativeDistribution,
-    choose_weighted,
-)
+from vertex_voyage.graph_sampling.choice import choose_weighted
 from vertex_voyage.vv_graph import VVGraph
 
 SEED = 7
@@ -50,30 +47,39 @@ class FrequencyAssertions(unittest.TestCase):
             )
 
 
-class TestCumulativeDistribution(FrequencyAssertions):
-    def test_never_draws_zero_weight_index(self):
+class TestChooseWeighted(FrequencyAssertions):
+    def test_never_draws_zero_weight_item(self):
         rng = np.random.default_rng(SEED)
-        distribution = CumulativeDistribution([0, 0, 3, 0, 1, 0])
-        draws = [distribution.draw_index(rng) for _ in range(DRAW_COUNT)]
-        self.assert_frequencies(draws, {2: 0.75, 4: 0.25})
+        items = "abcdef"
+        weights = [0, 0, 3, 0, 1, 0]
+        draws = [
+            choose_weighted(rng, items, weights) for _ in range(DRAW_COUNT)
+        ]
+        self.assert_frequencies(draws, {"c": 0.75, "e": 0.25})
 
     def test_rejects_invalid_weights(self):
-        for weights in ([1, -1], [1, float("nan")], [float("inf")]):
-            with self.subTest(weights=weights):
-                with self.assertRaises(SamplingError):
-                    CumulativeDistribution(weights)
-
-    def test_zero_total_weight_cannot_be_drawn(self):
         rng = np.random.default_rng(SEED)
-        for weights in ([], [0, 0]):
+        invalid_weights = (
+            [1, -1],
+            [2, -1],
+            [1, float("nan")],
+            [float("inf")],
+            [],
+            [0, 0],
+        )
+        for weights in invalid_weights:
             with self.subTest(weights=weights):
                 with self.assertRaises(SamplingError):
-                    CumulativeDistribution(weights).draw_index(rng)
+                    choose_weighted(rng, list(range(len(weights))), weights)
 
     def test_choose_weighted_rejects_length_mismatch(self):
         rng = np.random.default_rng(SEED)
         with self.assertRaises(SamplingError):
             choose_weighted(rng, ["a", "b"], [1.0])
+
+    def test_keeps_tuple_items_whole(self):
+        rng = np.random.default_rng(SEED)
+        self.assertEqual(choose_weighted(rng, [(1, 2)], [1.0]), (1, 2))
 
 
 class TestUniformSampler(FrequencyAssertions):

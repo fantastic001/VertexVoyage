@@ -1,11 +1,17 @@
-from typing import Dict, FrozenSet, Generic, List, Tuple
+from typing import Dict, FrozenSet, Generic, Optional, Tuple
 
-from vertex_voyage.graph_sampling.choice import CumulativeDistribution
+from vertex_voyage.graph_sampling.choice import (
+    choose_uniformly,
+    choose_weighted,
+)
 from vertex_voyage.graph_sampling.interface import (
     AdjacencyGraph,
+    Edge,
+    GraphSampler,
     Rng,
     V,
     logger,
+    require_rng,
     sampling_error,
 )
 
@@ -43,36 +49,41 @@ class GraphSnapshot(Generic[V]):
             if self.is_non_neighbor(node, candidate)
         )
 
-    def degree_of(self, node: V) -> int:
-        return len(self.neighbors_of(node))
-
     def non_neighbor_count_of(self, node: V) -> int:
         excluded = len(self.neighbor_set_of(node) | {node})
         return len(self.nodes) - excluded
 
 
-class ArcSourceSampler(Generic[V]):
-    def __init__(self, snapshot: GraphSnapshot):
-        self._snapshot = snapshot
-        self._edge_sources = CumulativeDistribution(
-            self._count_per_node(snapshot.degree_of)
+class SnapshotSampler(GraphSampler[V]):
+    def __init__(self, graph: AdjacencyGraph):
+        self._snapshot: GraphSnapshot = GraphSnapshot(graph)
+        self._arc_counts_by_source = tuple(
+            len(self._snapshot.neighbors_of(node))
+            for node in self._snapshot.nodes
         )
-        self._non_edge_sources = CumulativeDistribution(
-            self._count_per_node(snapshot.non_neighbor_count_of)
+        self._non_arc_counts_by_source = tuple(
+            self._snapshot.non_neighbor_count_of(node)
+            for node in self._snapshot.nodes
         )
 
-    def _count_per_node(self, count_of) -> List[int]:
-        return [count_of(node) for node in self._snapshot.nodes]
+    def node(self, rng: Rng) -> V:
+        require_rng(rng)
+        return choose_uniformly(rng, self._snapshot.nodes)
 
-    def edge_source(self, rng: Rng) -> V:
-        if self._edge_sources.total_weight > 0:
-            return self._snapshot.nodes[self._edge_sources.draw_index(rng)]
-        else:
-            raise sampling_error("Graph has no edges")
+    def edge(self, rng: Rng) -> Edge:
+        require_rng(rng)
+        source = choose_weighted(
+            rng,
+            self._snapshot.nodes,
+            self._arc_counts_by_source,
+        )
+        return (source, self.neighbor(rng, source))
 
-    def non_edge_source(self, rng: Rng) -> V:
-        if self._non_edge_sources.total_weight > 0:
-            index = self._non_edge_sources.draw_index(rng)
-            return self._snapshot.nodes[index]
-        else:
-            raise sampling_error("Graph has no non-edges")
+    def non_edge(self, rng: Rng) -> Edge:
+        require_rng(rng)
+        source = choose_weighted(
+            rng,
+            self._snapshot.nodes,
+            self._non_arc_counts_by_source,
+        )
+        return (source, self.non_neighbor(rng, source))

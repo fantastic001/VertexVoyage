@@ -12,12 +12,10 @@ from vertex_voyage.aggregation.interface import (
     logger,
 )
 from vertex_voyage.aggregation.replica_alignment import (
-    DEFAULT_LINK_MEMORY,
-    DEFAULT_OUTPUT_SCALE,
     REPLICA_NORM_OUTPUT_SCALE,
     UNIT_OUTPUT_SCALE,
-    resolved_output_scale,
     ReplicaAlignmentAggregator,
+    ReplicaAlignmentSettings,
 )
 from vertex_voyage.aggregation.replica_links import (
     PartitionIndex,
@@ -25,7 +23,6 @@ from vertex_voyage.aggregation.replica_links import (
     RowPair,
 )
 from vertex_voyage.aggregation.residual_aligner import (
-    AlignerWeights,
     AlignmentLoss,
     LossTerms,
     ResidualAligner,
@@ -33,7 +30,6 @@ from vertex_voyage.aggregation.residual_aligner import (
     loss_report_of,
     mean_loss_of,
     triplet_loss,
-    weights_of,
 )
 from vertex_voyage.config import get_config_float, get_config_int
 from vertex_voyage.graph_sampling import GraphSampler, SamplingError
@@ -59,7 +55,7 @@ FIRST_EPOCH = 1
 
 
 @dataclass(frozen=True)
-class AlignmentSettings:
+class AlignmentSettings(ReplicaAlignmentSettings):
     hidden_width_factor: int = get_config_int(
         "alignment_hidden_width_factor",
         2,
@@ -75,8 +71,6 @@ class AlignmentSettings:
         0.01,
         "Learning rate of the aligner optimiser",
     )
-    link_memory: int = DEFAULT_LINK_MEMORY
-    output_scale: str = DEFAULT_OUTPUT_SCALE
     negative_pool: int = get_config_int(
         "alignment_negative_pool",
         256,
@@ -84,15 +78,9 @@ class AlignmentSettings:
     )
 
 
-def is_logged_epoch(epoch: int) -> bool:
-    if EPOCH_LOSS_LOG_INTERVAL > 0:
-        return epoch % EPOCH_LOSS_LOG_INTERVAL == 0
-    else:
-        return False
-
-
 def log_loss_of_epoch(epoch: int, epoch_count: int, terms: LossTerms) -> None:
-    if is_logged_epoch(epoch):
+    logging_enabled = EPOCH_LOSS_LOG_INTERVAL > 0
+    if logging_enabled and epoch % EPOCH_LOSS_LOG_INTERVAL == 0:
         logger.info(
             "Aligner epoch %d/%d, %s",
             epoch,
@@ -129,13 +117,9 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         self._rng = np.random.default_rng(
             np.random.randint(MAX_SEED_EXCLUSIVE) if seed is None else seed
         )
-        super().__init__(
-            self._settings.link_memory,
-            resolved_output_scale(self._settings.output_scale, output_scale),
-        )
+        super().__init__(self._settings, output_scale)
         self._model: Optional[ResidualAligner] = None
         self._optimiser: Optional[torch.optim.Optimizer] = None
-        self._weights: Optional[AlignerWeights] = None
 
     def _fit_alignment(
         self,
@@ -175,7 +159,7 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         partitions: List[int],
     ) -> None:
         if len(partitions) > 0:
-            chosen = partitions[int(self._rng.integers(len(partitions)))]
+            chosen = int(self._rng.choice(partitions))
             row = table.row_of((chosen, vertex))
             logger.debug("Negative replica %r got row %r", vertex, row)
         else:
@@ -201,7 +185,6 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
             mean_loss_of(terms).backward()
             self._optimiser.step()
             log_loss_of_epoch(epoch, epoch_count, terms)
-        self._weights = weights_of(model)
         logger.info(
             "Aligner trained on %d links over %d replicas, %s",
             len(row_pairs),
@@ -237,10 +220,8 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
             return self._model
 
     def _aligned_replica(self, partition: int, unit: Embedding) -> Embedding:
-        if self._weights is None:
-            return unit
-        elif partition < len(self._weights.first):
-            return self._weights.align(partition, unit)
+        if self._model is not None and partition < self._model.partition_count:
+            return self._model.align(partition, unit)
         else:
             return unit
 

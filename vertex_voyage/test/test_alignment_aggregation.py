@@ -22,7 +22,6 @@ from vertex_voyage.aggregation.procrustes import (
     ProcrustesAggregator,
     ProcrustesSettings,
     anchor_links,
-    procrustes_rotation,
 )
 from vertex_voyage.aggregation.replica_links import (
     PartitionIndex,
@@ -38,9 +37,7 @@ from vertex_voyage.aggregation.residual_aligner import (
     contrastive_loss,
     loss_report_of,
     mean_loss_of,
-    summed_loss_of,
     triplet_loss,
-    weights_of,
 )
 from vertex_voyage.graph_sampling import UniformSampler
 from vertex_voyage.temporal import Event
@@ -219,12 +216,11 @@ class TestResidualAligner(unittest.TestCase):
         out = self.model(same_vector, torch.tensor([0, 1]))
         self.assertFalse(torch.allclose(out[0], out[1]))
 
-    def test_numpy_weights_match_torch_forward(self):
+    def test_single_vector_alignment_matches_batch_forward(self):
         out = self.model(self.vectors, self.partitions).detach().numpy()
-        weights = weights_of(self.model)
         for row, partition in enumerate(self.partitions.tolist()):
             np.testing.assert_allclose(
-                weights.align(partition, self.vectors[row].numpy()),
+                self.model.align(partition, self.vectors[row].numpy()),
                 out[row],
                 atol=1e-5,
             )
@@ -257,12 +253,12 @@ class TestResidualAligner(unittest.TestCase):
         )
         self.assertAlmostEqual(attraction.summed_value(), 6.0, places=5)
         self.assertAlmostEqual(
-            summed_loss_of(terms),
+            sum(term.summed_value() for term in terms),
             float(mean_loss_of(terms)) * len(links),
             places=5,
         )
         self.assertAlmostEqual(
-            summed_loss_of(terms),
+            float(mean_loss_of(terms)) * len(links),
             attraction.summed_value() + repulsion.summed_value(),
             places=5,
         )
@@ -472,7 +468,7 @@ class TestAlignmentAggregators(unittest.TestCase):
             FixedPartitioner({}),
             [("a", "b")],
         )
-        self.assertIsNone(aggregator._weights)
+        self.assertIsNone(aggregator._model)
 
     def test_aligner_survives_pickling(self):
         aggregator = self.aggregators["contrastive"]
@@ -510,14 +506,6 @@ class TestProcrustesAggregator(unittest.TestCase):
             create_aggregator("procrustes"),
             ProcrustesAggregator,
         )
-
-    def test_rotation_maps_source_onto_target(self):
-        rng = np.random.default_rng(SEED)
-        source = unit_rows(rng.normal(size=(20, DIM)))
-        rotation = random_rotation(rng)
-        fitted = procrustes_rotation(source, source @ rotation)
-        np.testing.assert_allclose(fitted, rotation, atol=1e-8)
-        np.testing.assert_allclose(fitted @ fitted.T, np.eye(DIM), atol=1e-8)
 
     def test_anchors_prefer_replica_links_over_cut_links(self):
         intra = ((0, "u"), (0, "v"))

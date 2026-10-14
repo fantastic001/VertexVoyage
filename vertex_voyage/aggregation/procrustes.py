@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
 import numpy as np
+from scipy.linalg import orthogonal_procrustes
 
 from vertex_voyage.aggregation.interface import (
     Embedding,
@@ -10,19 +11,15 @@ from vertex_voyage.aggregation.interface import (
     logger,
 )
 from vertex_voyage.aggregation.replica_alignment import (
-    DEFAULT_LINK_MEMORY,
-    DEFAULT_OUTPUT_SCALE,
     REPLICA_NORM_OUTPUT_SCALE,
-    resolved_output_scale,
     ReplicaAlignmentAggregator,
+    ReplicaAlignmentSettings,
 )
 from vertex_voyage.aggregation.replica_links import (
     PartitionIndex,
     ReplicaLink,
     ReplicaTable,
     RowPair,
-    is_cross_partition_link,
-    is_replica_link,
 )
 from vertex_voyage.config import get_config_int
 from vertex_voyage.graph_sampling import GraphSampler
@@ -35,39 +32,30 @@ RIGHT = 1
 
 
 @dataclass(frozen=True)
-class ProcrustesSettings:
+class ProcrustesSettings(ReplicaAlignmentSettings):
     sweeps: int = get_config_int(
         "alignment_procrustes_sweeps",
         10,
         "Passes over the partitions when fitting their rotations",
     )
-    link_memory: int = DEFAULT_LINK_MEMORY
-    output_scale: str = DEFAULT_OUTPUT_SCALE
-
-
-def procrustes_rotation(source: np.ndarray, target: np.ndarray) -> np.ndarray:
-    left, _, right = np.linalg.svd(source.T @ target)
-    return left @ right
 
 
 def anchor_links(links: Sequence[ReplicaLink]) -> List[ReplicaLink]:
-    replica_links = [link for link in links if is_replica_link(link)]
+    replica_links = [
+        ((p, u), (q, v)) for (p, u), (q, v) in links if u == v
+    ]
     if len(replica_links) > 0:
         return replica_links
     else:
-        return [link for link in links if is_cross_partition_link(link)]
-
-
-def in_both_directions(row_pairs: Sequence[RowPair]) -> np.ndarray:
-    pairs = np.asarray(row_pairs, dtype=np.int64).reshape(-1, 2)
-    return np.vstack([pairs, pairs[:, ::-1]])
+        return [((p, u), (q, v)) for (p, u), (q, v) in links if p != q]
 
 
 class RotationFit:
     def __init__(self, table: ReplicaTable, row_pairs: Sequence[RowPair]):
         self._raw = table.vectors().astype(float)
         self._partitions = table.partitions()
-        self._pairs = in_both_directions(row_pairs)
+        pairs = np.asarray(row_pairs, dtype=np.int64).reshape(-1, 2)
+        self._pairs = np.vstack([pairs, pairs[:, ::-1]])
         self._aligned = self._raw.copy()
         self._settled_partitions = {REFERENCE_PARTITION}
         self.rotations = [
@@ -96,7 +84,7 @@ class RotationFit:
     def _refit_rotation_of(self, partition: int) -> float:
         mine = self._anchors_from_settled_partitions(partition)
         if len(mine) > 0:
-            rotation = procrustes_rotation(
+            rotation, _ = orthogonal_procrustes(
                 self._raw[mine[:, LEFT]],
                 self._aligned[mine[:, RIGHT]],
             )
@@ -122,13 +110,7 @@ class RotationFit:
 class ProcrustesAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
     def __init__(self, settings: Optional[ProcrustesSettings] = None):
         self._settings = ProcrustesSettings() if settings is None else settings
-        super().__init__(
-            self._settings.link_memory,
-            resolved_output_scale(
-                self._settings.output_scale,
-                REPLICA_NORM_OUTPUT_SCALE,
-            ),
-        )
+        super().__init__(self._settings, REPLICA_NORM_OUTPUT_SCALE)
         self._rotations: List[np.ndarray] = []
 
     def _fit_alignment(
