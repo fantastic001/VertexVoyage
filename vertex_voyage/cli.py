@@ -262,7 +262,7 @@ class Commands:
             assert all(isinstance(emb, np.ndarray) for emb in embeddings)
             assert all(isinstance(x, int) for x in dataset.nodes)
             reconstructed = reconstruct(dataset.number_of_edges(), embeddings)
-            _, _, f1_score = get_f1_score(dataset, reconstructed)
+            _, _, f1_score, _, _ = get_f1_score(dataset, reconstructed)
             # calculate ARI 
             from sklearn.cluster import KMeans
             single_embeddings = gsp.load(

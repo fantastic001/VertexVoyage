@@ -6,6 +6,7 @@ from typing import Hashable, Iterable, Optional
 
 import networkx as nx
 import numpy as np
+import scipy.stats
 from vertex_voyage_native import get_reconstructed_edges
 
 import logging
@@ -35,33 +36,46 @@ def reconstruct(k: int, embedding: list[np.array], nodes = None) -> nx.Graph:
     reconstructed_graph.add_edges_from(reconstructed_edges)
     return reconstructed_graph
 
-def get_f1_score(G, reconstructed_graph, weighted: bool = False) -> tuple[float, float, float]:
+def get_f1_score(G, reconstructed_graph, weighted: bool = False) -> tuple[float, float, float, float, float]:
     def _weight(n):
         return len(list(G.neighbors(n))) if weighted else 1
     nodes = G.nodes()
     weights = {n: _weight(n) for n in nodes}
     N = lambda n: set(G.neighbors(n))
     RN = lambda n: set(reconstructed_graph.neighbors(n))
+    micro_recalls = [
+        w * len(N(n).intersection(RN(n))) / len(N(n)) if len(N(n)) > 0 else 0
+        for n, w in weights.items()
+    ]
+    degrees = {n: len(N(n)) for n in nodes}
+    micro_precisions = [
+        w * len(N(n).intersection(RN(n))) / len(RN(n)) if len(RN(n)) > 0 else 0
+        for n, w in weights.items()
+    ]
     recall = sum(
-        [
-            w*len(N(n).intersection(RN(n))) / len(N(n)) if len(N(n)) > 0 else 0 
-            for n, w in weights.items()
-        ]
+        micro_recalls
     ) / sum(weights.values())
     nodes_with_reconstructed_neighbors = [n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0]
     if len(nodes_with_reconstructed_neighbors) == 0:
-        return 0, 0, 0
+        return 0, 0, 0, 0, 0
     precision = sum(
-        [
-            w * len(N(n).intersection(RN(n))) / len(RN(n)) if len(RN(n)) > 0 else 0
-            for n, w in weights.items() 
-        ]
+        micro_precisions
     ) / sum(weights.values())
     if precision + recall == 0:
-        return 0, 0, 0
+        return 0, 0, 0, 0, 0
     f1 = 2 * (precision * recall) / (precision + recall)
     logger.info(f"Precision: {precision}, Recall: {recall}, F1 Score: {f1}")
-    return precision, recall, f1
+    degree_recall_spearman = scipy.stats.spearmanr(
+        [degrees[n] for n in nodes],
+        [micro_recalls[i] for i, n in enumerate(nodes)]
+    ).statistic
+    degree_precision_spearman = scipy.stats.spearmanr(
+        [degrees[n] for n in nodes],
+        [micro_precisions[i] for i, n in enumerate(nodes)]
+    ).statistic
+    logger.info(f"Degree-Recall Correlation: {degree_recall_spearman}")
+    logger.info(f"Degree-Precision Correlation: {degree_precision_spearman}")
+    return precision, recall, f1, degree_recall_spearman, degree_precision_spearman
 
 class EdgeScope(Enum):
     WITHIN_PARTITION = "within_partition"
@@ -405,9 +419,11 @@ def get_macro_f1_report(
 
     if global_f1 is None:
         global_f1 = get_f1_score(G, reconstructed_graph)
+    # Unpack the returned tuple to match the new return signature
+    global_f1 = global_f1[:3]
     weighted_f1 = get_f1_score(G, reconstructed_graph, weighted=True)
     global_precision, global_recall, global_f1_score = global_f1
-    weighted_precision, weighted_recall, weighted_f1_score = weighted_f1
+    weighted_precision, weighted_recall, weighted_f1_score, _, _ = weighted_f1
 
     weighted_f1_score_obj = MacroF1Score(
         precision=weighted_precision,

@@ -242,7 +242,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         part = list(part)
         emb = model.embed_nodes(part)
         log("Nodes embedded")
-        precision, recall, f1 = get_f1_score(pg, reconstruct(pg.number_of_edges(), emb, part))
+        precision, recall, f1, _, _ = get_f1_score(pg, reconstruct(pg.number_of_edges(), emb, part))
         log("Partition scores: Precision: %f, Recall: %f, F1 Score: %f" % (precision, recall, f1))
         if f1 > best_f1:
             best_f1 = f1
@@ -322,7 +322,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             g = reconstruct(pg.number_of_edges(), emb, part)
             PG = nx.Graph()
             PG.add_edges_from(pg.edges)
-            precision, recall, f1 = get_f1_score(PG, g)
+            precision, recall, f1, _, _ = get_f1_score(PG, g)
             if f1 > best_f1:
                 best_f1 = f1
                 best = emb
@@ -750,7 +750,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     for u, v in original_graph.edges:
                         if u in nodes and v in nodes:
                             G.add_edge(u, v)
-                    precision, recall, f1_score = get_f1_score(G, g)
+                    precision, recall, f1_score, _, _ = get_f1_score(G, g)
                 log(f"Buffer: {bi+1}/{total_buffers}, Precision: {precision}, Recall: {recall}, F1 score: {f1_score}")
                 if old_f1_score > 0 and f1_score < old_f1_score * 0.5:
                     logger.warn(f"F1 score dropped significantly from {old_f1_score} to {f1_score} at buffer {bi+1}")
@@ -795,7 +795,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             run["full_model"] = node2vec
         full_emb = node2vec.embed_nodes(original_graph.nodes)
         full_g = reconstruct(original_graph.number_of_edges(), full_emb, list(original_graph.nodes))
-        _, _, full_f1_score = get_f1_score(original_graph, full_g)
+        _, _, full_f1_score, _, _ = get_f1_score(original_graph, full_g)
         log("F1 score for full graph using Node2Vec: ", full_f1_score)
 
     def test(self, *,
@@ -921,8 +921,10 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             g = reconstruct(dataset.number_of_edges(), embs, list(dataset.nodes))
             G = nx.Graph()
             G.add_edges_from(dataset.edges)
-            global_precision, global_recall, global_f1 = get_f1_score(G, g)
+            global_precision, global_recall, global_f1, drc, dpc = get_f1_score(G, g)
         log("Global scores (macro-averaged over nodes): Precision: %f, Recall: %f, F1 Score: %f" % (global_precision, global_recall, global_f1))
+        log("Degree-recall correlation: %f" % drc)
+        log("Degree-precision correlation: %f" % dpc)
         self._report_pair_probability_f1(run, G, g, parts)
         self._report_macro_f1(run, G, g, parts, (global_precision, global_recall, global_f1))
         notify_plugins("test_completed", run)

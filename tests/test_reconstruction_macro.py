@@ -40,7 +40,7 @@ def test_precomputed_global_f1_is_reused_not_recomputed():
 def test_global_f1_matches_get_f1_score_regardless_of_partitions():
     original = build_graph(PATH_EDGES)
     reconstructed = build_reconstructed_graph(original, RECONSTRUCTED_EDGES)
-    expected_precision, expected_recall, expected_f1 = get_f1_score(
+    expected_precision, expected_recall, expected_f1, _, _ = get_f1_score(
         original, reconstructed
     )
 
@@ -135,4 +135,4 @@ def test_get_f1_score_does_not_raise_without_reconstructed_edges():
     reconstructed = nx.Graph()
     reconstructed.add_nodes_from([0, 1])
 
-    assert get_f1_score(original, reconstructed) == (0, 0, 0)
+    assert get_f1_score(original, reconstructed) == (0, 0, 0, 0, 0)

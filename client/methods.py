@@ -360,7 +360,7 @@ class Client:
                 original.add_edge(edge[0], edge[1])
             reconstructed = reconstruct(len(edges), emb, vertices)
             try:
-                _, _, f1 = get_f1_score(original, reconstructed)
+                _, _, f1, _, _ = get_f1_score(original, reconstructed)
                 y.append(f1)
             except ZeroDivisionError:
                 y.append(0)

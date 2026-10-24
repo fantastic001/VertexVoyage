@@ -296,7 +296,7 @@ def get_f1_reconstruction_score(embedding_func):
         for k in embeddings:
             embeddings[k] /= node_count[k]
         reconstructed_graph = reconstruct(G.number_of_edges(), list(embeddings.values()), list(embeddings.keys()))
-        _, _, f = get_f1_score(G, reconstructed_graph)
+        _, _, f, _, _ = get_f1_score(G, reconstructed_graph)
         return f
     return f
 def get_node2vec_embedding(dim,

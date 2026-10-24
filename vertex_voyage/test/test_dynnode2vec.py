@@ -141,7 +141,7 @@ class TestDynNode2Vec(unittest.TestCase):
             embeddings, 
             list(G.nodes())
         )
-        _, _, f1 = get_f1_score(G, reconstructed)
+        _, _, f1, _, _ = get_f1_score(G, reconstructed)
         self.assertGreater(f1, 0.5)
     
     def test_zacharys_karate_club_buffered(self):
@@ -175,7 +175,7 @@ class TestDynNode2Vec(unittest.TestCase):
             embeddings, 
             list(G.nodes())
         )
-        _, _, f1 = get_f1_score(G, reconstructed)
+        _, _, f1, _, _ = get_f1_score(G, reconstructed)
         self.assertGreater(f1, 0.4725)
 
 if __name__ == "__main__":

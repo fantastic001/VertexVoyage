@@ -90,7 +90,7 @@ class TestPartitioning(unittest.TestCase):
             result.append(embeddings[node])
         reconstructed_graph = reconstruct(k, result, list(G.nodes()))
         nodes = G.nodes()
-        _, _, f1 = get_f1_score(G, reconstructed_graph)
+        _, _, f1, _, _ = get_f1_score(G, reconstructed_graph)
         self.assertGreaterEqual(f1, 0.40)
 
     def test_partitioning_corruption(self):
