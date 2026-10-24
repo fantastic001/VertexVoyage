@@ -372,9 +372,12 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         ))
 
     @TimeMetric("macro_f1")
-    def _report_macro_f1(self, run, original_graph, reconstructed_graph, parts, global_f1):
+    def _compute_macro_f1(self, run, original_graph, reconstructed_graph, parts, global_f1):
         report = get_macro_f1_report(original_graph, reconstructed_graph, parts, global_f1=global_f1)
         run["macro_f1"] = asdict(report)
+        return report
+
+    def _report_macro_f1(self, report):
         self._log_macro_scoped_rate("Macro recall by scope (p(reconstructed|true,u,within/cross))", report.recall_by_scope)
         self._log_macro_scoped_rate("Macro precision by scope (p(true|reconstructed,u,within/cross))", report.precision_by_scope)
         self._log_macro_scoped_rate("Macro true-edge partition share (p(within/cross|true,u))", report.true_edge_partition_share)
@@ -925,8 +928,10 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         log("Global scores (macro-averaged over nodes): Precision: %f, Recall: %f, F1 Score: %f" % (global_precision, global_recall, global_f1))
         log("Degree-recall correlation: %f" % drc)
         log("Degree-precision correlation: %f" % dpc)
+        macro_f1_report = self._compute_macro_f1(run, G, g, parts, (global_precision, global_recall, global_f1))
+        log("Q (within-partition recall, p(reconstructed|true,u,within)): %f +- %f" % (macro_f1_report.recall_by_scope.within, macro_f1_report.recall_by_scope.within_stddev))
         self._report_pair_probability_f1(run, G, g, parts)
-        self._report_macro_f1(run, G, g, parts, (global_precision, global_recall, global_f1))
+        self._report_macro_f1(macro_f1_report)
         notify_plugins("test_completed", run)
         _overall.stop()
         self._report_timing(run)
