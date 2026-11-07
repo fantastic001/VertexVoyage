@@ -419,44 +419,35 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         ))
         within_part_positive_edges = [e for e in positive_edges if e not in cross_part_positive_edges]
 
-        lp_precision, lp_recall, lp_f1, lp_accuracy = run(
-            "lp_full_eval",
-            evaluate_predictions,
-            em,
-            full_model,
-            positive_edges,
-            negative_edges,
+        threshold_evaluation_scopes = (
+            ("lp_full_eval", "Full Model", positive_edges),
+            (
+                "lp_full_eval_cross",
+                "Full Model - cross partitions",
+                cross_part_positive_edges,
+            ),
+            (
+                "lp_full_eval_within",
+                "Full Model - within partitions",
+                within_part_positive_edges,
+            ),
         )
-        log(f"Full Model - Precision: {lp_precision:.4f}")
-        log(f"Full Model - Recall: {lp_recall:.4f}")
-        log(f"Full Model - F1 Score: {lp_f1:.4f}")
-        log(f"Full Model - Accuracy: {lp_accuracy:.4f}")
-        
-        lp_precision, lp_recall, lp_f1, lp_accuracy = run(
-            "lp_full_eval",
-            evaluate_predictions,
-            em,
-            full_model,
-            cross_part_positive_edges,
-            negative_edges,
-        )
-        log(f"Full Model - cross partitions - Precision: {lp_precision:.4f}")
-        log(f"Full Model - cross partitions - Recall: {lp_recall:.4f}")
-        log(f"Full Model - cross partitions - F1 Score: {lp_f1:.4f}")
-        log(f"Full Model - cross partitions - Accuracy: {lp_accuracy:.4f}")
-        
-        lp_precision, lp_recall, lp_f1, lp_accuracy = run(
-            "lp_full_eval",
-            evaluate_predictions,
-            em,
-            full_model,
-            within_part_positive_edges,
-            negative_edges,
-        )
-        log(f"Full Model - within partitions - Precision: {lp_precision:.4f}")
-        log(f"Full Model - within partitions Recall: {lp_recall:.4f}")
-        log(f"Full Model - within partitions F1 Score: {lp_f1:.4f}")
-        log(f"Full Model - within partitions Accuracy: {lp_accuracy:.4f}")
+        for run_key, label, scope_positive_edges in threshold_evaluation_scopes:
+            if len(scope_positive_edges) > 0:
+                lp_precision, lp_recall, lp_f1, lp_accuracy = run(
+                    run_key,
+                    evaluate_predictions,
+                    em,
+                    full_model,
+                    scope_positive_edges,
+                    negative_edges,
+                )
+                log(f"{label} - Precision: {lp_precision:.4f}")
+                log(f"{label} - Recall: {lp_recall:.4f}")
+                log(f"{label} - F1 Score: {lp_f1:.4f}")
+                log(f"{label} - Accuracy: {lp_accuracy:.4f}")
+            else:
+                log(f"{label} - no positive edges, threshold metrics skipped")
 
         with TimeMetric("link_prediction_evaluation"):
             ranks = run("lp_heart_benchmark", heart_benchmark, em, full_model, dataset, positive_edges, ns=500, ps=1000)
