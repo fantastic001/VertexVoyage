@@ -4,6 +4,9 @@ from typing import List, Optional
 import numpy as np
 import torch
 
+from vertex_voyage.aggregation.aligner_configuration import (
+    AlignerConfiguration,
+)
 from vertex_voyage.aggregation.aligner_training import (
     VALIDATION_MODE_OF_FLAG,
     AlignerTrainer,
@@ -177,12 +180,24 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
             self._settings.validation,
             self._settings.validation_fraction,
         )
-        self._rng = np.random.default_rng(
-            np.random.randint(MAX_SEED_EXCLUSIVE) if seed is None else seed
-        )
+        if seed is None:
+            self._seed = int(np.random.randint(MAX_SEED_EXCLUSIVE))
+        else:
+            self._seed = seed
+        self._rng = np.random.default_rng(self._seed)
         super().__init__(self._settings, output_scale)
+        logger.info("Aligner configuration: %s", self.configuration().report())
         self._model: Optional[ResidualAligner] = None
         self._optimiser: Optional[torch.optim.Optimizer] = None
+
+    def configuration(self) -> AlignerConfiguration:
+        return AlignerConfiguration(
+            self._objective,
+            self._output_scale_name,
+            self._seed,
+            self._settings,
+            EPOCH_LOSS_LOG_INTERVAL,
+        )
 
     def _fit_alignment(
         self,
