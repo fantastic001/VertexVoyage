@@ -65,6 +65,41 @@ datasets = {
     "Enron": lambda: FileEventSequence("data/enron.txt"),
     "StackOverflow": lambda: FileEventSequence("data/stackoverflow.txt"),
     "DGraph-Fin": lambda: FileEventSequence("data/dgraph-fin-small.txt"),
+
+    "ER-5000-10": lambda: FileEventSequence("data/ER-5000-10.txt"),
+    "ER-5000-20": lambda: FileEventSequence("data/ER-5000-20.txt"),
+    "ER-5000-30": lambda: FileEventSequence("data/ER-5000-30.txt"),
+    "ER-5000-40": lambda: FileEventSequence("data/ER-5000-40.txt"),
+    "ER-5000-50": lambda: FileEventSequence("data/ER-5000-50.txt"),
+    "ER-500-10": lambda: FileEventSequence("data/ER-500-10.txt"),
+    "ER-500-20": lambda: FileEventSequence("data/ER-500-20.txt"),
+    "ER-500-30": lambda: FileEventSequence("data/ER-500-30.txt"),
+    "ER-500-40": lambda: FileEventSequence("data/ER-500-40.txt"),
+    "ER-500-50": lambda: FileEventSequence("data/ER-500-50.txt"),
+
+    "ER-1000-10": lambda: FileEventSequence("data/ER-1000-10.txt"),
+    "ER-1000-20": lambda: FileEventSequence("data/ER-1000-20.txt"),
+    "ER-1000-30": lambda: FileEventSequence("data/ER-1000-30.txt"),
+    "ER-1000-40": lambda: FileEventSequence("data/ER-1000-40.txt"),
+    "ER-1000-50": lambda: FileEventSequence("data/ER-1000-50.txt"),
+
+    "ER-1000-1": lambda: FileEventSequence("data/ER-1000-1.txt"),
+    "ER-1000-2": lambda: FileEventSequence("data/ER-1000-2.txt"),
+    "ER-1000-3": lambda: FileEventSequence("data/ER-1000-3.txt"),
+    "ER-1000-4": lambda: FileEventSequence("data/ER-1000-4.txt"),
+    "ER-1000-5": lambda: FileEventSequence("data/ER-1000-5.txt"),
+
+    "ER-500-1": lambda: FileEventSequence("data/ER-500-1.txt"),
+    "ER-500-2": lambda: FileEventSequence("data/ER-500-2.txt"),
+    "ER-500-3": lambda: FileEventSequence("data/ER-500-3.txt"),
+    "ER-500-4": lambda: FileEventSequence("data/ER-500-4.txt"),
+    "ER-500-5": lambda: FileEventSequence("data/ER-500-5.txt"),
+
+    "ER-200-1": lambda: FileEventSequence("data/ER-200-1.txt"),
+    "ER-200-2": lambda: FileEventSequence("data/ER-200-2.txt"),
+    "ER-200-3": lambda: FileEventSequence("data/ER-200-3.txt"),
+    "ER-200-4": lambda: FileEventSequence("data/ER-200-4.txt"),
+    "ER-200-5": lambda: FileEventSequence("data/ER-200-5.txt"),
 }
 
 
