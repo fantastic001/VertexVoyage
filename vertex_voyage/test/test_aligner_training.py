@@ -20,6 +20,7 @@ from vertex_voyage.aggregation.aligner_training import (
     term_gradient_of,
 )
 from vertex_voyage.aggregation.alignment import ContrastiveAlignmentAggregator
+from vertex_voyage.aggregation.alignment_objective import UniformObjective
 from vertex_voyage.aggregation.residual_aligner import (
     ATTRACTION_TERM,
     REPULSION_TERM,
@@ -55,8 +56,7 @@ def small_trainer(model: ResidualAligner) -> AlignerTrainer:
     return AlignerTrainer(
         model,
         torch.optim.SGD(model.parameters(), lr=0.1),
-        contrastive_loss,
-        1.0,
+        UniformObjective(contrastive_loss, 1.0),
         VANISHING_NORM,
     )
 
