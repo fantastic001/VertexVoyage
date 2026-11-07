@@ -180,10 +180,8 @@ class PersistedRun:
                 pickle.dump(value, f)
     
     def clear(self):
-        logger.info("Clearing all data from PersistedRun.")
         self.data = {}
         if self.directory is None or self.directory == "":
-            logger.info("No directory provided, not clearing any files.")
             return
         for file in os.listdir(self.directory):
             if file.endswith(".pkl"):
@@ -194,7 +192,6 @@ class PersistedRun:
         if key in self.data:
             del self.data[key]
         if self.directory is None or self.directory == "":
-            logger.info("No directory provided, not deleting any files.")
             return
         file_path = os.path.join(self.directory, f"{key}.pkl")
         if os.path.exists(file_path):

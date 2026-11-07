@@ -127,7 +127,6 @@ def load_plugins():
     result = []
     for plugin in plugins:
         try:
-            logger.info(f"Loading plugin {plugin}")
             result.append((plugin, importlib.import_module(plugin)))
         except ImportError as e:
             logger.error(f"Error loading plugin {plugin}: {e}")
@@ -159,12 +158,10 @@ def get_symbols_satisfying(predicate):
     visited = set()
     for name, plugin in plugins:
         for symbol in dir(plugin):
-            logger.info(f"Checking symbol {symbol} in plugin {name}")
             if (name, symbol) in visited:
                 continue
             visited.add((name, symbol))
             if predicate(getattr(plugin, symbol)):
-                logger.info(f"Symbol {symbol} in plugin {name} satisfies predicate")
                 result.append(getattr(plugin, symbol))
     return result
 
