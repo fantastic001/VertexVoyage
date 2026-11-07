@@ -13,6 +13,11 @@ from vertex_voyage.aggregation.aligner_training import (
     link_splitter_of,
     row_pair_tensor_of,
 )
+from vertex_voyage.aggregation.alignment_objective import (
+    INVERSE_CROSS_FRACTION_LINK_WEIGHTING,
+    cross_partition_fraction_of,
+    objective_of,
+)
 from vertex_voyage.aggregation.interface import (
     Embedding,
     PartitionKey,
@@ -41,6 +46,7 @@ from vertex_voyage.config import (
     get_config_bool,
     get_config_float,
     get_config_int,
+    get_config_str,
 )
 from vertex_voyage.graph_sampling import GraphSampler, SamplingError
 from vertex_voyage.seeding import MAX_SEED_EXCLUSIVE
@@ -103,6 +109,12 @@ class AlignmentSettings(ReplicaAlignmentSettings):
         1e-7,
         "Gradient norm below which the aligner gradient counts as vanishing",
     )
+    link_weighting: str = get_config_str(
+        "alignment_link_weighting",
+        INVERSE_CROSS_FRACTION_LINK_WEIGHTING,
+        "Weighting of positive links: uniform, or inverse_cross_fraction "
+        "(cross-partition links weighted by 1/delta, delta being their share)",
+    )
 
 
 def log_epoch_outcome(
@@ -155,9 +167,12 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         output_scale: str = REPLICA_NORM_OUTPUT_SCALE,
     ):
         require_useful_margin(margin)
-        self._loss = loss
-        self._margin = margin
         self._settings = AlignmentSettings() if settings is None else settings
+        self._objective = objective_of(
+            self._settings.link_weighting,
+            loss,
+            margin,
+        )
         self._splitter = link_splitter_of(
             self._settings.validation,
             self._settings.validation_fraction,
@@ -229,11 +244,15 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         partitions = torch.from_numpy(table.partitions())
         training_links = row_pair_tensor_of(training_pairs)
         validation_links = row_pair_tensor_of(validation_pairs)
+        logger.info(
+            "Aligner link weighting %s, cross-partition fraction %f",
+            self._settings.link_weighting,
+            cross_partition_fraction_of(partitions, training_links),
+        )
         trainer = AlignerTrainer(
             self._aligner_of_shape(table.partition_count(), vectors.shape[1]),
             self._optimiser,
-            self._loss,
-            self._margin,
+            self._objective,
             self._settings.vanishing_gradient_norm,
         )
         history = TrainingHistory()

@@ -12,6 +12,7 @@ ATTRACTION_TERM = "attraction"
 REPULSION_TERM = "repulsion"
 RANKING_TERM = "ranking"
 LOSS_NOT_COMPUTED = "loss not computed"
+UNWEIGHTED = 1.0
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,10 @@ class LossTerm:
     name: str
     mean: torch.Tensor
     pair_count: int
+    weight: float = UNWEIGHTED
+
+    def weighted_mean(self) -> torch.Tensor:
+        return self.mean * self.weight
 
     def mean_value(self) -> float:
         return float(self.mean.detach())
@@ -27,12 +32,16 @@ class LossTerm:
         return self.mean_value() * self.pair_count
 
     def report(self) -> str:
-        return "%s mean %f sum %f over %d pairs" % (
+        unweighted_report = "%s mean %f sum %f over %d pairs" % (
             self.name,
             self.mean_value(),
             self.summed_value(),
             self.pair_count,
         )
+        if self.weight == UNWEIGHTED:
+            return unweighted_report
+        else:
+            return "%s weight %f" % (unweighted_report, self.weight)
 
 
 LossTerms = Tuple[LossTerm, ...]
@@ -40,7 +49,7 @@ AlignmentLoss = Callable[[torch.Tensor, torch.Tensor, float], LossTerms]
 
 
 def mean_loss_of(terms: LossTerms) -> torch.Tensor:
-    return torch.stack([term.mean for term in terms]).sum()
+    return torch.stack([term.weighted_mean() for term in terms]).sum()
 
 
 def loss_report_of(terms: LossTerms) -> str:

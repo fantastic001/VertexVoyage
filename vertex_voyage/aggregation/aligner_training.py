@@ -14,10 +14,10 @@ from typing import (
 
 import torch
 
+from vertex_voyage.aggregation.alignment_objective import AlignmentObjective
 from vertex_voyage.aggregation.interface import aggregation_error, logger
 from vertex_voyage.aggregation.replica_links import ReplicaLink
 from vertex_voyage.aggregation.residual_aligner import (
-    AlignmentLoss,
     LossTerm,
     LossTerms,
     loss_report_of,
@@ -130,9 +130,10 @@ class TermGradient:
 
 
 def term_gradient_of(term: LossTerm, parameters: Parameters) -> TermGradient:
-    if term.mean.requires_grad:
+    weighted_mean = term.weighted_mean()
+    if weighted_mean.requires_grad:
         gradients = torch.autograd.grad(
-            term.mean,
+            weighted_mean,
             parameters,
             retain_graph=True,
             allow_unused=True,
@@ -216,14 +217,12 @@ class AlignerTrainer:
         self,
         model: torch.nn.Module,
         optimiser: torch.optim.Optimizer,
-        loss: AlignmentLoss,
-        margin: float,
+        objective: AlignmentObjective,
         vanishing_norm: float,
     ):
         self._model = model
         self._optimiser = optimiser
-        self._loss = loss
-        self._margin = margin
+        self._objective = objective
         self._vanishing_norm = vanishing_norm
         self._parameters = list(model.parameters())
 
@@ -259,10 +258,10 @@ class AlignerTrainer:
         links: torch.Tensor,
     ) -> Tuple[LossTerms, GradientReport]:
         self._optimiser.zero_grad()
-        terms = self._loss(
+        terms = self._objective.terms_of(
             self._model(vectors, partitions),
+            partitions,
             links,
-            self._margin,
         )
         gradients = GradientReport(
             tuple(term_gradient_of(term, self._parameters) for term in terms),
@@ -280,10 +279,10 @@ class AlignerTrainer:
     ) -> LossTerms:
         if len(links) > 0:
             with torch.no_grad():
-                return self._loss(
+                return self._objective.terms_of(
                     self._model(vectors, partitions),
+                    partitions,
                     links,
-                    self._margin,
                 )
         else:
             logger.debug("No validation links, validation loss skipped")
