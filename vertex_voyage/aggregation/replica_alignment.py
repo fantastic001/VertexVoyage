@@ -47,7 +47,7 @@ AGGREGATOR_OUTPUT_SCALE = "auto"
 class ReplicaAlignmentSettings:
     link_memory: int = get_config_int(
         "alignment_link_memory",
-        20000,
+        1000000,
         "Most recent replica links an aligning aggregator keeps fitting on",
     )
     output_scale: str = get_config_str(
