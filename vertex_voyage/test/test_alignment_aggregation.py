@@ -12,6 +12,11 @@ from vertex_voyage.aggregation import (
     create_aggregator,
 )
 from vertex_voyage.aggregation import alignment
+from vertex_voyage.aggregation.aligner_training import (
+    EpochOutcome,
+    GradientReport,
+    TermGradient,
+)
 from vertex_voyage.aggregation.alignment import (
     AlignmentAggregator,
     AlignmentSettings,
@@ -298,6 +303,14 @@ class TestEpochLossLogging(unittest.TestCase):
         torch.tensor([[0, 1]]),
         1.0,
     )
+    OUTCOME = EpochOutcome(
+        TERMS,
+        GradientReport(
+            (TermGradient("attraction", (torch.ones(2),)),),
+            1e-7,
+        ),
+        (),
+    )
 
     def epoch_lines_at_interval(self, interval):
         with mock.patch.object(
@@ -307,10 +320,10 @@ class TestEpochLossLogging(unittest.TestCase):
         ):
             with self.assertLogs("Aggregation", level="DEBUG") as captured:
                 for epoch in range(1, self.EPOCH_COUNT + 1):
-                    alignment.log_loss_of_epoch(
+                    alignment.log_epoch_outcome(
                         epoch,
                         self.EPOCH_COUNT,
-                        self.TERMS,
+                        self.OUTCOME,
                     )
         return [
             record.getMessage()
@@ -329,7 +342,13 @@ class TestEpochLossLogging(unittest.TestCase):
 
     def test_epoch_line_carries_epoch_and_terms(self):
         last_line = self.epoch_lines_at_interval(1)[-1]
-        for expected in ("epoch 6/6", "summed loss", "attraction"):
+        for expected in (
+            "epoch 6/6",
+            "summed loss",
+            "attraction",
+            "gradient norm",
+            "validation",
+        ):
             self.assertIn(expected, last_line)
 
 

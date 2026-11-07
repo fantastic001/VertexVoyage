@@ -4,6 +4,15 @@ from typing import List, Optional
 import numpy as np
 import torch
 
+from vertex_voyage.aggregation.aligner_training import (
+    VALIDATION_MODE_OF_FLAG,
+    AlignerTrainer,
+    EpochOutcome,
+    TrainingHistory,
+    ValidationMode,
+    link_splitter_of,
+    row_pair_tensor_of,
+)
 from vertex_voyage.aggregation.interface import (
     Embedding,
     PartitionKey,
@@ -24,14 +33,15 @@ from vertex_voyage.aggregation.replica_links import (
 )
 from vertex_voyage.aggregation.residual_aligner import (
     AlignmentLoss,
-    LossTerms,
     ResidualAligner,
     contrastive_loss,
-    loss_report_of,
-    mean_loss_of,
     triplet_loss,
 )
-from vertex_voyage.config import get_config_float, get_config_int
+from vertex_voyage.config import (
+    get_config_bool,
+    get_config_float,
+    get_config_int,
+)
 from vertex_voyage.graph_sampling import GraphSampler, SamplingError
 from vertex_voyage.seeding import MAX_SEED_EXCLUSIVE
 
@@ -76,19 +86,53 @@ class AlignmentSettings(ReplicaAlignmentSettings):
         256,
         "Replicas drawn from the sampler as extra negatives per buffer",
     )
+    validation: ValidationMode = VALIDATION_MODE_OF_FLAG[
+        get_config_bool(
+            "alignment_validation",
+            False,
+            "Hold out edges as validation links and log their loss per epoch",
+        )
+    ]
+    validation_fraction: float = get_config_float(
+        "alignment_validation_fraction",
+        0.2,
+        "Fraction of edges held out for validation when it is enabled",
+    )
+    vanishing_gradient_norm: float = get_config_float(
+        "alignment_vanishing_gradient_norm",
+        1e-7,
+        "Gradient norm below which the aligner gradient counts as vanishing",
+    )
 
 
-def log_loss_of_epoch(epoch: int, epoch_count: int, terms: LossTerms) -> None:
+def log_epoch_outcome(
+    epoch: int,
+    epoch_count: int,
+    outcome: EpochOutcome,
+) -> None:
     logging_enabled = EPOCH_LOSS_LOG_INTERVAL > 0
     if logging_enabled and epoch % EPOCH_LOSS_LOG_INTERVAL == 0:
         logger.info(
             "Aligner epoch %d/%d, %s",
             epoch,
             epoch_count,
-            loss_report_of(terms),
+            outcome.report(),
         )
+        log_vanishing_gradient_of_epoch(epoch, outcome)
     else:
         logger.debug("Aligner epoch %d/%d not logged", epoch, epoch_count)
+
+
+def log_vanishing_gradient_of_epoch(epoch: int, outcome: EpochOutcome) -> None:
+    if outcome.gradients.total_vanishes():
+        logger.warning(
+            "Vanishing aligner gradient at epoch %d, below %e: %s",
+            epoch,
+            outcome.gradients.vanishing_norm,
+            ", ".join(outcome.gradients.vanishing_names()),
+        )
+    else:
+        logger.debug("Aligner gradient at epoch %d is not vanishing", epoch)
 
 
 def require_useful_margin(margin: float) -> None:
@@ -114,6 +158,10 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         self._loss = loss
         self._margin = margin
         self._settings = AlignmentSettings() if settings is None else settings
+        self._splitter = link_splitter_of(
+            self._settings.validation,
+            self._settings.validation_fraction,
+        )
         self._rng = np.random.default_rng(
             np.random.randint(MAX_SEED_EXCLUSIVE) if seed is None else seed
         )
@@ -127,10 +175,16 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         sampler: GraphSampler,
         partition_index: PartitionIndex,
     ) -> None:
-        row_pairs = table.rows_of_links(self._links)
+        training_links, validation_links = self._splitter.split(self._links)
+        training_pairs = table.rows_of_links(training_links)
+        validation_pairs = table.rows_of_links(validation_links)
         self._add_sampled_negative_replicas(table, sampler, partition_index)
-        if len(row_pairs) > 0:
-            self._train_aligner_on_links(table, row_pairs)
+        if len(training_pairs) > 0:
+            self._train_aligner_on_links(
+                table,
+                training_pairs,
+                validation_pairs,
+            )
         else:
             logger.debug("No embedded replica links yet, aligner not trained")
 
@@ -168,29 +222,40 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
     def _train_aligner_on_links(
         self,
         table: ReplicaTable,
-        row_pairs: List[RowPair],
+        training_pairs: List[RowPair],
+        validation_pairs: List[RowPair],
     ) -> None:
         vectors = torch.from_numpy(table.vectors())
         partitions = torch.from_numpy(table.partitions())
-        links = torch.tensor(row_pairs, dtype=torch.long)
-        model = self._aligner_of_shape(
-            table.partition_count(),
-            vectors.shape[1],
+        training_links = row_pair_tensor_of(training_pairs)
+        validation_links = row_pair_tensor_of(validation_pairs)
+        trainer = AlignerTrainer(
+            self._aligner_of_shape(table.partition_count(), vectors.shape[1]),
+            self._optimiser,
+            self._loss,
+            self._margin,
+            self._settings.vanishing_gradient_norm,
         )
-        terms: LossTerms = ()
+        history = TrainingHistory()
         epoch_count = self._settings.train_steps
         for epoch in range(FIRST_EPOCH, epoch_count + FIRST_EPOCH):
-            self._optimiser.zero_grad()
-            terms = self._loss(model(vectors, partitions), links, self._margin)
-            mean_loss_of(terms).backward()
-            self._optimiser.step()
-            log_loss_of_epoch(epoch, epoch_count, terms)
+            outcome = trainer.run_epoch(
+                vectors,
+                partitions,
+                training_links,
+                validation_links,
+            )
+            history.record(outcome)
+            log_epoch_outcome(epoch, epoch_count, outcome)
         logger.info(
-            "Aligner trained on %d links over %d replicas, %s",
-            len(row_pairs),
+            "Aligner trained on %d links, validated on %d, "
+            "over %d replicas, %s",
+            len(training_pairs),
+            len(validation_pairs),
             len(table),
-            loss_report_of(terms),
+            history.report(),
         )
+        history.log_vanishing_summary()
 
     def _aligner_of_shape(
         self,
