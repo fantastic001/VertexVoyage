@@ -105,20 +105,18 @@ class PersistedRun:
         logger.info(f"Setting item with key: {key}")
         self.data[key] = value
         if self.directory is None or self.directory == "":
-            logger.info(f"No directory provided, not persisting key {key}.")
             return
         file_path = os.path.join(self.directory, f"{key}.pkl")
         with open(file_path, "wb") as f:
-            logger.info(f"Saving value for key {key} to file {file_path}.")
             pickle.dump(value, f)
     def __call__(self, key, cls, *args, **kwargs):
-        logger.info(f"Calling PersistedRun with key: {key}, class: {cls}, args: {args}, kwargs: {kwargs}")
+        logger.debug(f"Calling PersistedRun with key: {key}, class: {cls}, args: {args}, kwargs: {kwargs}")
         if key in self.data:
             logger.info(f"Key {key} found in memory, returning value.")
             return self.data[key]
         else:
             if self.directory is None or self.directory == "":
-                logger.info(f"No directory provided, creating new instance of {cls} with args: {args} and kwargs: {kwargs}.")
+                logger.debug(f"No directory provided, creating new instance of {cls} with args: {args} and kwargs: {kwargs}.")
                 instance = cls(*args, **kwargs)
                 self.data[key] = instance
                 return instance

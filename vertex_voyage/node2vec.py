@@ -174,8 +174,6 @@ class Node2Vec:
             workers=workers        )
         logger.info(f"Trained Word2Vec model with {len(x.wv)} unique nodes in vocabulary and {workers} workers.")
         for node in self.nodes:
-            if node not in x.wv:
-                logger.warning(f"Node {node} not found in Word2Vec vocabulary. This may indicate an issue with the random walks or encoding.")
             logger.debug(f"Node {node} has embedding: {x.wv[node] if node in x.wv else 'Not found'}")
         return x.wv
 
