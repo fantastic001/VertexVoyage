@@ -107,6 +107,30 @@ class RotationFit:
         return float((left * right).sum(axis=1).mean())
 
 
+def fitted_rotations_of(
+    table: ReplicaTable,
+    links: Sequence[ReplicaLink],
+    sweeps: int,
+) -> Optional[List[np.ndarray]]:
+    row_pairs = table.rows_of_links(anchor_links(links))
+    if len(row_pairs) > 0:
+        fit = RotationFit(table, row_pairs)
+        for _ in range(sweeps):
+            if fit.sweep_over_partitions() <= ROTATION_CHANGE_TOLERANCE:
+                break
+            else:
+                continue
+        logger.info(
+            "Rotations fitted on %d anchors, mean anchor cosine %f",
+            len(row_pairs),
+            fit.mean_anchor_cosine(),
+        )
+        return fit.rotations
+    else:
+        logger.debug("No cross-partition anchors, no rotations fitted")
+        return None
+
+
 class ProcrustesAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
     def __init__(self, settings: Optional[ProcrustesSettings] = None):
         self._settings = ProcrustesSettings() if settings is None else settings
@@ -119,22 +143,15 @@ class ProcrustesAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         sampler: GraphSampler,
         partition_index: PartitionIndex,
     ) -> None:
-        row_pairs = table.rows_of_links(anchor_links(self._links))
-        if len(row_pairs) > 0:
-            fit = RotationFit(table, row_pairs)
-            for _ in range(self._settings.sweeps):
-                if fit.sweep_over_partitions() <= ROTATION_CHANGE_TOLERANCE:
-                    break
-                else:
-                    continue
-            self._rotations = fit.rotations
-            logger.info(
-                "Rotations fitted on %d anchors, mean anchor cosine %f",
-                len(row_pairs),
-                fit.mean_anchor_cosine(),
-            )
+        rotations = fitted_rotations_of(
+            table,
+            list(self._links),
+            self._settings.sweeps,
+        )
+        if rotations is not None:
+            self._rotations = rotations
         else:
-            logger.debug("No cross-partition anchors yet, rotations kept")
+            logger.debug("Rotations kept from the previous fit")
 
     def _aligned_replica(self, partition: int, unit: Embedding) -> Embedding:
         if partition < len(self._rotations):

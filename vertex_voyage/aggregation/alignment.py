@@ -7,6 +7,10 @@ import torch
 from vertex_voyage.aggregation.aligner_configuration import (
     AlignerConfiguration,
 )
+from vertex_voyage.aggregation.aligner_initialisation import (
+    RANDOM_INITIALISATION,
+    aligner_initialisation_of,
+)
 from vertex_voyage.aggregation.aligner_training import (
     VALIDATION_MODE_OF_FLAG,
     AlignerTrainer,
@@ -36,6 +40,7 @@ from vertex_voyage.aggregation.replica_alignment import (
 )
 from vertex_voyage.aggregation.replica_links import (
     PartitionIndex,
+    ReplicaLink,
     ReplicaTable,
     RowPair,
 )
@@ -118,6 +123,12 @@ class AlignmentSettings(ReplicaAlignmentSettings):
         "Weighting of positive links: uniform, or inverse_cross_fraction "
         "(cross-partition links weighted by 1/delta, delta being their share)",
     )
+    initialisation: str = get_config_str(
+        "alignment_initialisation",
+        RANDOM_INITIALISATION,
+        "Starting parameters of a new aligner: random, identity (zero "
+        "residual) or procrustes (per-partition rotations fitted on anchors)",
+    )
 
 
 def log_epoch_outcome(
@@ -176,6 +187,9 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
             loss,
             margin,
         )
+        self._initialisation = aligner_initialisation_of(
+            self._settings.initialisation
+        )
         self._splitter = link_splitter_of(
             self._settings.validation,
             self._settings.validation_fraction,
@@ -212,6 +226,7 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         if len(training_pairs) > 0:
             self._train_aligner_on_links(
                 table,
+                training_links,
                 training_pairs,
                 validation_pairs,
             )
@@ -252,6 +267,7 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
     def _train_aligner_on_links(
         self,
         table: ReplicaTable,
+        training_replica_links: List[ReplicaLink],
         training_pairs: List[RowPair],
         validation_pairs: List[RowPair],
     ) -> None:
@@ -265,7 +281,7 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
             cross_partition_fraction_of(partitions, training_links),
         )
         trainer = AlignerTrainer(
-            self._aligner_of_shape(table.partition_count(), vectors.shape[1]),
+            self._aligner_for_table(table, training_replica_links),
             self._optimiser,
             self._objective,
             self._settings.vanishing_gradient_norm,
@@ -291,11 +307,13 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
         )
         history.log_vanishing_summary()
 
-    def _aligner_of_shape(
+    def _aligner_for_table(
         self,
-        partition_count: int,
-        dimension: int,
+        table: ReplicaTable,
+        links: List[ReplicaLink],
     ) -> ResidualAligner:
+        partition_count = table.partition_count()
+        dimension = table.vectors().shape[1]
         if self._model is not None and self._model.has_shape(
             partition_count,
             dimension,
@@ -312,6 +330,7 @@ class AlignmentAggregator(ReplicaAlignmentAggregator[V, PartitionKey]):
                 dimension,
                 self._settings.hidden_width_factor * dimension,
             )
+            self._initialisation.initialise(self._model, table, links)
             self._optimiser = torch.optim.Adam(
                 self._model.parameters(),
                 lr=self._settings.learning_rate,
