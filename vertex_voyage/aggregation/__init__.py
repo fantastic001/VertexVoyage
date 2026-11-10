@@ -10,6 +10,8 @@ from vertex_voyage.aggregation.interface import (
 from vertex_voyage.aggregation.mean import MeanAggregator
 from vertex_voyage.aggregation.registry import (
     DEFAULT_AGGREGATOR_NAME,
+    UNALIGNED_AGGREGATOR_NAME,
+    aggregator_name_for_partitions,
     aggregator_names,
     create_aggregator,
     is_aggregator_registered,
@@ -33,8 +35,10 @@ __all__ = [
     "PartitionModels",
     "StaticAggregation",
     "StaticPartitioner",
+    "UNALIGNED_AGGREGATOR_NAME",
     "VertexPartitioner",
     "aggregate_static_embeddings",
+    "aggregator_name_for_partitions",
     "aggregator_names",
     "create_aggregator",
     "is_aggregator_registered",

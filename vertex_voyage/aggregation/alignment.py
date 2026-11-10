@@ -8,7 +8,7 @@ from vertex_voyage.aggregation.aligner_configuration import (
     AlignerConfiguration,
 )
 from vertex_voyage.aggregation.aligner_initialisation import (
-    RANDOM_INITIALISATION,
+    IDENTITY_INITIALISATION,
     aligner_initialisation_of,
 )
 from vertex_voyage.aggregation.aligner_training import (
@@ -21,7 +21,7 @@ from vertex_voyage.aggregation.aligner_training import (
     row_pair_tensor_of,
 )
 from vertex_voyage.aggregation.alignment_objective import (
-    INVERSE_CROSS_FRACTION_LINK_WEIGHTING,
+    UNIFORM_LINK_WEIGHTING,
     cross_partition_fraction_of,
     objective_of,
 )
@@ -119,13 +119,13 @@ class AlignmentSettings(ReplicaAlignmentSettings):
     )
     link_weighting: str = get_config_str(
         "alignment_link_weighting",
-        INVERSE_CROSS_FRACTION_LINK_WEIGHTING,
+        UNIFORM_LINK_WEIGHTING,
         "Weighting of positive links: uniform, or inverse_cross_fraction "
         "(cross-partition links weighted by 1/delta, delta being their share)",
     )
     initialisation: str = get_config_str(
         "alignment_initialisation",
-        RANDOM_INITIALISATION,
+        IDENTITY_INITIALISATION,
         "Starting parameters of a new aligner: random, identity (zero "
         "residual) or procrustes (per-partition rotations fitted on anchors)",
     )

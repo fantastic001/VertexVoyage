@@ -143,12 +143,6 @@ class TestAggregatorRegistry(unittest.TestCase):
         self.addCleanup(registry._AGGREGATOR_FACTORIES.update, registered)
         self.addCleanup(registry._AGGREGATOR_FACTORIES.clear)
 
-    def test_default_aggregator_is_mean(self):
-        self.assertEqual(DEFAULT_AGGREGATOR_NAME, "mean")
-        self.assertIsInstance(
-            create_aggregator(DEFAULT_AGGREGATOR_NAME),
-            MeanAggregator,
-        )
 
     def test_each_creation_returns_new_aggregator(self):
         self.assertIsNot(create_aggregator("mean"), create_aggregator("mean"))

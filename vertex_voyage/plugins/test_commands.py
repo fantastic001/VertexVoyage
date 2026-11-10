@@ -19,8 +19,10 @@ import numpy as np
 from experiments.datasets import dataset_params
 from vertex_voyage.aggregation import (
     DEFAULT_AGGREGATOR_NAME,
+    UNALIGNED_AGGREGATOR_NAME,
     Aggregator,
     aggregate_static_embeddings,
+    aggregator_name_for_partitions,
     aggregator_names,
     create_aggregator,
     is_aggregator_registered,
@@ -667,7 +669,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         return sorted_events
 
     def _persisted_aggregator_params(self, aggregator: str) -> dict:
-        if aggregator == DEFAULT_AGGREGATOR_NAME:
+        if aggregator == UNALIGNED_AGGREGATOR_NAME:
             return {}
         else:
             return {"aggregator": aggregator}
@@ -817,6 +819,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             raise ValueError(f"link_prediction_model must be one of: '', {', '.join(self.LINK_PREDICTION_MODEL_TRAINERS)}")
         if not is_aggregator_registered(aggregator):
             raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
+        aggregator = aggregator_name_for_partitions(aggregator, partitions)
         is_link_prediction_enabled = bool(link_prediction_model)
         _seed: Optional[int] = None
         if seed >= 0:
@@ -966,6 +969,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             raise ValueError(f"ordering must be one of: '', {', '.join(self.EDGE_ORDERINGS)}")
         if not is_aggregator_registered(aggregator):
             raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
+        aggregator = aggregator_name_for_partitions(aggregator, partitions)
 
         TimeMetric.reset()
         _overall = TimeMetric("temporal_test").start()
