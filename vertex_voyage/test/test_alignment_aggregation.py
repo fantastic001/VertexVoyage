@@ -534,6 +534,12 @@ class TestProcrustesAggregator(unittest.TestCase):
         self.assertEqual(anchor_links([intra, cut]), [cut])
         self.assertEqual(anchor_links([intra]), [])
 
+    def test_self_loops_are_not_anchors(self):
+        self_loop = ((0, "u"), (0, "u"))
+        cut = ((0, "u"), (1, "w"))
+        self.assertEqual(anchor_links([self_loop, cut]), [cut])
+        self.assertEqual(anchor_links([self_loop]), [])
+
     def test_update_recovers_exact_rotation_between_partitions(self):
         self.assertLess(self.problem.replica_cosine(self.aggregator), 0.3)
         self.problem.train(self.aggregator)

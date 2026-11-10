@@ -139,6 +139,40 @@ class TestLoadRotations(unittest.TestCase):
                     rtol=TOLERANCE,
                 )
 
+    def test_identity_rotations_keep_every_layer_trainable(self):
+        cases = {
+            "all identity": [np.eye(DIM)] * PARTITIONS,
+            "reference identity": [np.eye(DIM), self.rotations()[1]],
+        }
+        for label, rotations in cases.items():
+            with self.subTest(label):
+                model = fresh_aligner()
+                with self.assertLogs("Aggregation", level="INFO"):
+                    load_rotations_into(model, rotations)
+                vectors = unit_inputs()
+                partitions = alternating_partitions()
+                out = model(vectors, partitions)
+                torch.testing.assert_close(
+                    out.detach(),
+                    self.expected_rotated(vectors, partitions, rotations),
+                    atol=TOLERANCE,
+                    rtol=TOLERANCE,
+                )
+                (out * torch.roll(out, 1, dims=0)).sum().backward()
+                for layer in model.first:
+                    self.assertGreater(float(layer.weight.grad.abs().max()), 0)
+                self.assertGreater(
+                    float(model.second.weight.grad.abs().max()),
+                    0,
+                )
+
+    def test_identity_rotations_are_counted_in_the_log(self):
+        model = fresh_aligner()
+        rotations = [np.eye(DIM), self.rotations()[1]]
+        with self.assertLogs("Aggregation", level="INFO") as logs:
+            load_rotations_into(model, rotations)
+        self.assertIn("1 of 2 Procrustes rotations", logs.output[0])
+
     def test_narrow_hidden_layer_is_rejected(self):
         with self.assertLogs("Aggregation", level="ERROR"):
             with self.assertRaises(AggregationError):
@@ -151,6 +185,21 @@ class TestLoadRotations(unittest.TestCase):
 
 
 class TestProcrustesInitialisation(unittest.TestCase):
+    def test_self_loops_alone_fall_back_to_identity(self):
+        replicas = MisalignedReplicas()
+        model = fresh_aligner()
+        node = replicas.nodes[0]
+        with self.assertLogs("Aggregation", level="WARNING"):
+            ProcrustesInitialisation(1).initialise(
+                model,
+                ReplicaTable(list(replicas.models.values())),
+                [((0, node), (0, node))],
+            )
+        vectors = unit_inputs()
+        with torch.no_grad():
+            out = model(vectors, alternating_partitions())
+        torch.testing.assert_close(out, vectors)
+
     def test_no_anchors_falls_back_to_identity(self):
         model = fresh_aligner()
         with self.assertLogs("Aggregation", level="WARNING"):

@@ -40,14 +40,22 @@ class ProcrustesSettings(ReplicaAlignmentSettings):
     )
 
 
+def is_cut_link(link: ReplicaLink) -> bool:
+    (left_partition, _), (right_partition, _) = link
+    return left_partition != right_partition
+
+
+def is_replica_link(link: ReplicaLink) -> bool:
+    (_, left_vertex), (_, right_vertex) = link
+    return is_cut_link(link) and left_vertex == right_vertex
+
+
 def anchor_links(links: Sequence[ReplicaLink]) -> List[ReplicaLink]:
-    replica_links = [
-        ((p, u), (q, v)) for (p, u), (q, v) in links if u == v
-    ]
+    replica_links = [link for link in links if is_replica_link(link)]
     if len(replica_links) > 0:
         return replica_links
     else:
-        return [((p, u), (q, v)) for (p, u), (q, v) in links if p != q]
+        return [link for link in links if is_cut_link(link)]
 
 
 class RotationFit:
