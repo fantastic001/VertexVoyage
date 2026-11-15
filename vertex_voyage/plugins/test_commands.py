@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from vertex_voyage.cli import (
     ALGS,
@@ -29,7 +29,11 @@ from vertex_voyage.aggregation import (
     models_by_partition_position,
 )
 from vertex_voyage.graph_sampling import LazySampler, RoundRobinUniform
-from vertex_voyage.config import notify_plugins
+from vertex_voyage.config import get_config_float, notify_plugins
+from vertex_voyage.partition_training import (
+    PartitionTraining,
+    configured_partition_training,
+)
 from vertex_voyage.distger import DistGER
 from vertex_voyage.node2vec import Node2Vec
 from vertex_voyage.partitioning import label_propagation_partitioner, partition_graph
@@ -68,6 +72,79 @@ from vertex_voyage.semantic_temporal_partitioning import (
 )
 
 logger = logging.getLogger("CLI")
+
+DEFAULT_RETRAIN_THRESHOLD_FRACTION = 0.1
+
+
+WALK_PARAMETER_OF_LONG_RUN = 0
+
+
+def overriding_walk_parameter(current: int, override: int, name: str) -> int:
+    if override > WALK_PARAMETER_OF_LONG_RUN:
+        return override
+    elif override == WALK_PARAMETER_OF_LONG_RUN:
+        return current
+    else:
+        logger.error("Walk parameter %s is negative: %r", name, override)
+        raise ValueError(
+            f"{name} must not be negative, got {override!r}"
+        )
+
+
+class WalkParameters(NamedTuple):
+    n_walks: int
+    walk_size: int
+    window_size: int
+
+    def overridden_by(
+        self,
+        n_walks: int,
+        walk_size: int,
+        window_size: int,
+    ) -> "WalkParameters":
+        return WalkParameters(
+            overriding_walk_parameter(self.n_walks, n_walks, "n_walks"),
+            overriding_walk_parameter(
+                self.walk_size, walk_size, "walk_size"
+            ),
+            overriding_walk_parameter(
+                self.window_size, window_size, "window_size"
+            ),
+        )
+
+    def overridden_by_dataset(self, params: dict) -> "WalkParameters":
+        return WalkParameters(
+            params.get("n_walks", self.n_walks),
+            params.get("walk_size", self.walk_size),
+            params.get("window_size", self.window_size),
+        )
+
+
+def persisted_walk_overrides(
+    n_walks: int,
+    walk_size: int,
+    window_size: int,
+) -> dict:
+    overrides = {
+        "n_walks": n_walks,
+        "walk_size": walk_size,
+        "window_size": window_size,
+    }
+    return {
+        name: value
+        for name, value in overrides.items()
+        if value != WALK_PARAMETER_OF_LONG_RUN
+    }
+
+
+def retrain_threshold_of(graph) -> int:
+    fraction = get_config_float(
+        "retrain_threshold",
+        DEFAULT_RETRAIN_THRESHOLD_FRACTION,
+        "Fraction of the vertices of the dataset below which a partition "
+        "model is retrained from scratch instead of updated",
+    )
+    return int(fraction * graph.number_of_nodes())
 
 class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
     P_Q_GRID = [0.25, 0.5, 1, 2, 4]
@@ -115,25 +192,34 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             default_q if default_q > 0 else 0.5,
         )
 
-    def _walk_params(self, long_run: bool):
+    def _dataset_walk_params(
+        self,
+        name: str,
+        long_run: bool,
+        use_dataset_params: bool,
+    ) -> WalkParameters:
+        defaults = self._walk_params(long_run)
+        if use_dataset_params:
+            return defaults.overridden_by_dataset(dataset_params.get(name, {}))
+        else:
+            return defaults
+
+    def _walk_params(self, long_run: bool) -> WalkParameters:
         if long_run:
-            return (
+            return WalkParameters(
                 self.LONG_RUN_WALK_PARAMS["n_walks"],
                 self.LONG_RUN_WALK_PARAMS["walk_size"],
                 self.LONG_RUN_WALK_PARAMS["window_size"],
             )
-        return (
+        return WalkParameters(
             self.SHORT_RUN_WALK_PARAMS["n_walks"],
             self.SHORT_RUN_WALK_PARAMS["walk_size"],
             self.SHORT_RUN_WALK_PARAMS["window_size"],
         )
 
-    def _apply_dataset_params(self, name: str, n_walks: int, walk_size: int, window_size: int, epochs: int, dim: int, p: float, q: float):
+    def _apply_dataset_params(self, name: str, epochs: int, dim: int, p: float, q: float):
         params: dict = dataset_params.get(name, {})
         return (
-            params.get('n_walks', n_walks),
-            params.get('walk_size', walk_size),
-            params.get('window_size', window_size),
             params.get('epochs', epochs),
             params.get('dim', dim),
             params.get('p', p),
@@ -263,7 +349,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         dataset,
         default_p: float,
         default_q: float,
-        long_run: bool,
+        walk_params: WalkParameters,
         use_dataset_params: bool,
         epochs: int,
         dim: int,
@@ -276,25 +362,19 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         part = list(part)
 
         for p, q in self._iter_pq_candidates(default_p, default_q):
-            n_walks, walk_size, window_size = self._walk_params(long_run)
+            n_walks, walk_size, window_size = walk_params
             local_epochs = epochs
             local_dim = dim
             local_p = p
             local_q = q
             if use_dataset_params:
                 (
-                    n_walks,
-                    walk_size,
-                    window_size,
                     local_epochs,
                     local_dim,
                     local_p,
                     local_q,
                 ) = self._apply_dataset_params(
                     name,
-                    n_walks,
-                    walk_size,
-                    window_size,
                     local_epochs,
                     local_dim,
                     local_p,
@@ -507,14 +587,16 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         epochs: int,
         default_p: float,
         default_q: float,
-        long_run: bool,
+        walk_params: WalkParameters,
         original_graph,
         seed: int,
+        training: PartitionTraining,
     ):
         resolved_p, resolved_q = self._resolved_default_pq(default_p, default_q)
-        n_walks, walk_size, window_size = self._walk_params(long_run)
-        return {
-            InMemoryPartition.empty(id=p): ALGS[algorithm](
+        n_walks, walk_size, window_size = walk_params
+        return training.models_of_partitions(
+            [InMemoryPartition.empty(id=p) for p in range(partitions)],
+            lambda: ALGS[algorithm](
                 dim=dim,
                 epochs=epochs,
                 p=resolved_p,
@@ -522,10 +604,10 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 n_walks=n_walks,
                 walk_size=walk_size,
                 window_size=window_size,
-                retrain_threshold=int(0.1 * original_graph.number_of_nodes()),
+                retrain_threshold=retrain_threshold_of(original_graph),
                 seed=seed,
-            ) for p in range(partitions)
-        }
+            ),
+        )
 
     @TimeMetric("create_partitioner")
     def _create_temporal_partitioner(
@@ -708,6 +790,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             original_graph,
             iteration: int,
             aggregator: Aggregator,
+            training: PartitionTraining,
             run = None,
         ):
         total_edges = 0
@@ -727,9 +810,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
             total_edges += len(buffer)
             with TimeMetric("model_update"):
-                for part, partition_buffer in partitioner.get_partition_buffers(buffer):
-                        with TimeMetric("model_update_part"):
-                            models[part].update(partition_buffer)
+                training.update_models(models, partitioner, buffer)
             with TimeMetric("aggregator_update"):
                 aggregator.update(self._partition_graph_sampler(models), models, partitioner, buffer)
             with TimeMetric("embedding"):
@@ -768,12 +849,12 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         dim: int,
         default_p: float,
         default_q: float,
-        long_run: bool,
+        walk_params: WalkParameters,
         epochs: int,
         seed: int,
     ):
         resolved_p, resolved_q = self._resolved_default_pq(default_p, default_q)
-        n_walks, walk_size, window_size = self._walk_params(long_run)
+        n_walks, walk_size, window_size = walk_params
         if "full_model" in run:
             node2vec = run["full_model"]
         else:
@@ -806,6 +887,9 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              default_q: float = 0,
              epochs: int = 10,
              long_run: bool = False,
+             n_walks: int = 0,
+             walk_size: int = 0,
+             window_size: int = 0,
              use_dataset_params: bool = False,
              use_lpa: bool = False,
              algorithm: str = "node2vec",
@@ -820,6 +904,11 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         if not is_aggregator_registered(aggregator):
             raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
         aggregator = aggregator_name_for_partitions(aggregator, partitions)
+        walk_params = self._dataset_walk_params(
+            name,
+            long_run,
+            use_dataset_params,
+        ).overridden_by(n_walks, walk_size, window_size)
         is_link_prediction_enabled = bool(link_prediction_model)
         _seed: Optional[int] = None
         if seed >= 0:
@@ -830,7 +919,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         if _seed is not None:
             seed_shared_random_state(seed)
 
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model, seed=seed, **self._persisted_aggregator_params(aggregator))
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, alpha=alpha, threshold=threshold, algorithm=algorithm, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, use_lpa=use_lpa, link_prediction_model=link_prediction_model, seed=seed, **self._persisted_aggregator_params(aggregator), **persisted_walk_overrides(n_walks, walk_size, window_size))
         log("Processing dataset ")
         t = VertexEnumerator()
         with TimeMetric("init_dataset"):
@@ -882,7 +971,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 dataset=dataset,
                 default_p=default_p,
                 default_q=default_q,
-                long_run=long_run,
+                walk_params=walk_params,
                 use_dataset_params=use_dataset_params,
                 epochs=epochs,
                 dim=dim,
@@ -939,6 +1028,9 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
              default_q: float = 0,
              epochs: int = 10,
              long_run: bool = False,
+             n_walks: int = 0,
+             walk_size: int = 0,
+             window_size: int = 0,
              use_dataset_params: bool = False,
              algorithm: str = "dynnode2vec",
              track_seen: bool = False,
@@ -970,14 +1062,22 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         if not is_aggregator_registered(aggregator):
             raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
         aggregator = aggregator_name_for_partitions(aggregator, partitions)
+        walk_params = self._dataset_walk_params(
+            name,
+            long_run,
+            use_dataset_params,
+        ).overridden_by(n_walks, walk_size, window_size)
 
         TimeMetric.reset()
         _overall = TimeMetric("temporal_test").start()
         seed_shared_random_state(seed)
+        training = configured_partition_training()
+        log(f"Training partitions with {type(training).__name__}")
+        log(f"Walking with {walk_params}")
 
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed, **self._persisted_aggregator_params(aggregator))
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed, **self._persisted_aggregator_params(aggregator), **persisted_walk_overrides(n_walks, walk_size, window_size))
         log(f"Processing dataset {name}")
         with TimeMetric("load_dataset"):
             t = VertexEnumerator()
@@ -996,9 +1096,9 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             default_p = params.get('p', default_p)
             default_q = params.get('q', default_q)
 
-        semantic_n_walks, semantic_walk_size, semantic_window_size = self._walk_params(long_run)
+        semantic_n_walks, semantic_walk_size, semantic_window_size = walk_params
         semantic_resolved_p, semantic_resolved_q = self._resolved_default_pq(default_p, default_q)
-        semantic_retrain_threshold = int(0.1 * original_graph.number_of_nodes())
+        semantic_retrain_threshold = retrain_threshold_of(original_graph)
         effective_semantic_k = replication_factor if semantic_k <= 0 else semantic_k
         if semantic_embedding == "auto":
             if partitioner_name == "semantic.node2vec":
@@ -1030,13 +1130,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 iteration_seed = derive_iteration_seed(seed, it)
                 seed_shared_random_state(iteration_seed)
                 models = self._create_temporal_models(
+                    training=training,
                     algorithm=algorithm,
                     partitions=partitions,
                     dim=dim,
                     epochs=epochs,
                     default_p=default_p,
                     default_q=default_q,
-                    long_run=long_run,
+                    walk_params=walk_params,
                     original_graph=original_graph,
                     seed=iteration_seed,
                 )
@@ -1076,6 +1177,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     original_graph=original_graph,
                     iteration=it,
                     aggregator=iteration_aggregator,
+                    training=training,
                     run = run if checkpoint_iterations else None
                 )
                 log("Event stream processing completed")
@@ -1098,7 +1200,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 dim=dim,
                 default_p=default_p,
                 default_q=default_q,
-                long_run=long_run,
+                walk_params=walk_params,
                 epochs=epochs,
                 seed=seed,
             )

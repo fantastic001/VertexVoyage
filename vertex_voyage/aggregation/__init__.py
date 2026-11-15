@@ -8,6 +8,10 @@ from vertex_voyage.aggregation.interface import (
     VertexPartitioner,
 )
 from vertex_voyage.aggregation.mean import MeanAggregator
+from vertex_voyage.aggregation.random_selection import (
+    RandomPartitionAggregator,
+    RandomReplicaAggregator,
+)
 from vertex_voyage.aggregation.registry import (
     DEFAULT_AGGREGATOR_NAME,
     UNALIGNED_AGGREGATOR_NAME,
@@ -33,6 +37,8 @@ __all__ = [
     "MeanAggregator",
     "NodeEmbedder",
     "PartitionModels",
+    "RandomPartitionAggregator",
+    "RandomReplicaAggregator",
     "StaticAggregation",
     "StaticPartitioner",
     "UNALIGNED_AGGREGATOR_NAME",

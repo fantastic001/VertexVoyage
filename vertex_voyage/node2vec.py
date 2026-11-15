@@ -5,6 +5,11 @@ import tensorflow as tf
 import random 
 from vertex_voyage.vv_graph import VVGraph
 from vertex_voyage.word2vec import word2vec
+from vertex_voyage.walk_strategy import configured_walk_strategy
+from vertex_voyage.word2vec_training import (
+    configured_word2vec_training,
+    training_arguments_of_fresh_model,
+)
 import vertex_voyage.config as cfg 
 import multiprocessing.pool as mpp
 import vertex_voyage_native
@@ -14,6 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 PARALLELIZATION_THRESHOLD = cfg.get_config_int("parallelization_threshold", 10000, "Threshold for parallelization")
+VOCABULARY_MINIMUM_COUNT = 0
 
 class Node2Vec:
 
@@ -41,6 +47,8 @@ class Node2Vec:
         self.negative_sample_num = negative_sample_num
         self.seed = seed
         self.use_threads = use_threads
+        self.walk_strategy = configured_walk_strategy()
+        self.word2vec_training = configured_word2vec_training()
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
@@ -101,12 +109,21 @@ class Node2Vec:
             self.nodes = self.g_nodes
         self.walks = self._random_walks()
         logger.info(f"Generated {len(self.walks)} random walks.")
-        self.W = self._train() 
-        W = np.zeros((len(self.g_nodes), self.dim))
-        for i, node in enumerate(self.g_nodes):
-            W[i] = self.embed_node(node)
-        self.W = W
+        self._load_vectors_from(self._train())
         return self.W
+
+    def _load_vectors_from(self, keyed_vectors):
+        self.W = keyed_vectors
+        matrix = np.zeros((len(self.g_nodes), self.dim))
+        for i, node in enumerate(self.g_nodes):
+            matrix[i] = self.embed_node(node)
+        self.W = matrix
+
+    def vertices(self):
+        return self.g_nodes
+
+    def next_vertex(self, previous, current):
+        return self._get_next(previous, current)
 
     def embed_node(self, node):
         node_idx = self.node_to_idx.get(node)
@@ -140,14 +157,7 @@ class Node2Vec:
     
     def _random_walk(self, node):
         logger.debug(f"Starting random walk from node: {node}")
-        walk = [node]
-        current = node
-        prev = None
-        for _ in range(self.walk_size - 1):
-            next_node = self._get_next(prev, current)
-            walk.append(next_node)
-            prev = current
-            current = next_node
+        walk = self.walk_strategy.walk_from(node, self.walk_size, self)
         result = [self.node_to_idx.get(n, None) for n in walk]
         logger.debug(f"Completed random walk: {result}")
         return result
@@ -162,9 +172,9 @@ class Node2Vec:
             return np.zeros((len(self.nodes), self.dim))
         workers = cfg.get_config_int("workers", 6, "Number of workers during word2vec training") if self._allows_parallelism() else 1
         x = Word2Vec(
-            sentences=walks,
             vector_size=self.dim,
             window=self.window_size,
+            min_count=VOCABULARY_MINIMUM_COUNT,
             null_word=-1,
             sg=1,
             negative=self.negative_sample_num,
@@ -172,6 +182,12 @@ class Node2Vec:
             alpha=self.learning_rate,
             seed=self.seed,
             workers=workers        )
+        x.build_vocab(walks)
+        self.word2vec_training.train(
+            x,
+            walks,
+            training_arguments_of_fresh_model(x),
+        )
         logger.info(f"Trained Word2Vec model with {len(x.wv)} unique nodes in vocabulary and {workers} workers.")
         for node in self.nodes:
             logger.debug(f"Node {node} has embedding: {x.wv[node] if node in x.wv else 'Not found'}")

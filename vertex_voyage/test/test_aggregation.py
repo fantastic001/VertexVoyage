@@ -152,7 +152,15 @@ class TestAggregatorRegistry(unittest.TestCase):
         self.assertTrue(is_aggregator_registered("count"))
         self.assertEqual(
             aggregator_names(),
-            ["contrastive", "count", "mean", "procrustes", "triplet"],
+            [
+                "contrastive",
+                "count",
+                "mean",
+                "procrustes",
+                "random_partition",
+                "random_replica",
+                "triplet",
+            ],
         )
         self.assertIsInstance(
             create_aggregator("count"),

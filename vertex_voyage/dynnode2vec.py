@@ -5,6 +5,9 @@ from venv import logger
 
 from vertex_voyage.node2vec import Node2Vec
 import vertex_voyage.word2vec as w2v
+from vertex_voyage.word2vec_training import (
+    training_arguments_of_updated_model,
+)
 from vertex_voyage.temporal import Event 
 from vertex_voyage.vv_graph import VVGraph
 
@@ -75,17 +78,15 @@ class DynNode2Vec(Node2Vec):
             else:
                 logger.info("Continuing training from gensim Word2Vec model")
                 old_model.build_vocab(walks, update=True)
-                old_model.train(
-                    corpus_iterable = walks,
-                    total_examples=old_model.corpus_count,
-                    epochs=self.epochs,
-                    callbacks=[],
+                self.word2vec_training.train(
+                    old_model,
+                    walks,
+                    training_arguments_of_updated_model(
+                        old_model,
+                        self.epochs,
+                    ),
                 )
-                self.W = old_model.wv
-                W = np.zeros((len(self.g_nodes), self.dim))
-                for i, node in enumerate(self.g_nodes):
-                    W[i] = self.embed_node(node)
-                self.W = W
+                self._load_vectors_from(old_model.wv)
                 model = old_model
         else:
             logger.info("Training new model from scratch")
@@ -104,17 +105,12 @@ class DynNode2Vec(Node2Vec):
                 workers=cfg.get_config_int("dynnode2vec_workers", 6, "Number of workers during word2vec training for DynNode2Vec") if self._allows_parallelism() else 1
             )
             model.build_vocab(walks)
-            model.train(
-                corpus_iterable=walks,
-                total_examples=model.corpus_count,
-                epochs=model.epochs,
-                callbacks=[],
+            self.word2vec_training.train(
+                model,
+                walks,
+                training_arguments_of_updated_model(model, model.epochs),
             )
-            self.W = model.wv
-            W = np.zeros((len(self.g_nodes), self.dim))
-            for i, node in enumerate(self.g_nodes):
-                W[i] = self.embed_node(node)
-            self.W = W
+            self._load_vectors_from(model.wv)
         return model
     def update(self, events: list[Event]):
         affected_nodes = {event.src for event in events} | {event.dest for event in events}

@@ -7,6 +7,10 @@ from vertex_voyage.aggregation.interface import (
 )
 from vertex_voyage.aggregation.mean import MeanAggregator
 from vertex_voyage.aggregation.procrustes import ProcrustesAggregator
+from vertex_voyage.aggregation.random_selection import (
+    RandomPartitionAggregator,
+    RandomReplicaAggregator,
+)
 from vertex_voyage.config import get_config_int, get_config_str
 
 AggregatorFactory = Callable[[], Aggregator]
@@ -15,6 +19,8 @@ MEAN_AGGREGATOR_NAME = "mean"
 CONTRASTIVE_AGGREGATOR_NAME = "contrastive"
 TRIPLET_AGGREGATOR_NAME = "triplet"
 PROCRUSTES_AGGREGATOR_NAME = "procrustes"
+RANDOM_PARTITION_AGGREGATOR_NAME = "random_partition"
+RANDOM_REPLICA_AGGREGATOR_NAME = "random_replica"
 DEFAULT_AGGREGATOR_NAME = get_config_str(
     "default_aggregator",
     TRIPLET_AGGREGATOR_NAME,
@@ -48,6 +54,8 @@ _AGGREGATOR_FACTORIES: Dict[str, AggregatorFactory] = {
     CONTRASTIVE_AGGREGATOR_NAME: create_contrastive_alignment_aggregator,
     TRIPLET_AGGREGATOR_NAME: create_triplet_alignment_aggregator,
     PROCRUSTES_AGGREGATOR_NAME: ProcrustesAggregator,
+    RANDOM_PARTITION_AGGREGATOR_NAME: RandomPartitionAggregator,
+    RANDOM_REPLICA_AGGREGATOR_NAME: RandomReplicaAggregator,
 }
 
 
