@@ -340,3 +340,10 @@ profile.csv
 log
 runs/
 temporal_runs/
+# Experiment pages are tracked; benchmark and pipeline outputs under results/ stay ignored
+!/results/
+/results/*
+!/results/README.md
+!/results/E[0-9][0-9]-*/
+!/results/E[0-9][0-9]-*/log/
+pipeline_results/

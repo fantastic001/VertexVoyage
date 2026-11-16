@@ -1,0 +1,17 @@
+name = "vertex_voyage_proofs"
+version = "0.1.0"
+defaultTargets = ["VertexVoyageProofs"]
+
+[leanOptions]
+pp.unicode.fun = true
+relaxedAutoImplicit = false
+weak.linter.mathlibStandardSet = false
+maxSynthPendingDepth = 3
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.33.1"
+
+[[lean_lib]]
+name = "VertexVoyageProofs"

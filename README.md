@@ -1,681 +1,128 @@
-
-# Introduction 
-
-VertexVoyage is distribued implementation of node2vec algorithm for graph embedding. 
-
-## Installation 
-
-To install VertexVoyage using pip, you can follow these steps:
-
-1. Open your terminal or command prompt.
-
-2. Make sure you have pip installed. You can check by running the command `pip --version`. If pip is not installed, you can install it by following the instructions at https://pip.pypa.io/en/stable/installing/.
-
-3. Once you have pip installed, you can use the following command to install VertexVoyage:
-
-   ```
-   pip install vertex_voyage
-   ```
-
-   This command will download and install the latest version of VertexVoyage from the Python Package Index (PyPI).
-
-   Note: Make sure you have an active internet connection for pip to download the package.
-
-To install VertexVoyage using the setup.py file, you can follow these steps:
-
-1. Download the VertexVoyage source code from the repository or obtain the setup.py file.
-
-2. Open your terminal or command prompt and navigate to the directory where the setup.py file is located.
-
-3. Run the following command to install VertexVoyage:
-
-   ```
-   python setup.py install
-   ```
-
-   This command will execute the setup.py file and install VertexVoyage on your system.
-
-   Note: Make sure you have Python installed and added to your system's PATH environment variable.
-
-Both methods will install VertexVoyage and its dependencies on your system, allowing you to use it in your cluster.
-
-## Setting up ZK client 
-
-Export `ZK_HOSTS` envvar 
-
-    export ZK_HOSTS=localhost:2181,zoo1:2181,zoo2:2181
-
-Run ZK test 
-
-    vertex_voyage zk 
-
-# Running ZK instance 
-
-You can run inside Docker container 
-
-    SERVER_NUM=1 ./zk/run_server.sh 1 
-
-Where 1 iz ZK id
-
-You can also run ensemble. 
-
-
-# Starting VertexVoyage 
-
-please take a look at `docker-compose.yml` file inside `docker/` directory to see how to run VertexVoyage cluster. 
-
-You can create pipeline which you can use to communicate specific requests to cluster. Take a look at few samples inside `pipelines/` directory. 
-
-to run specific pipeline, run:
-
-    python -m client execute --pipeline pipelines/zachary.yml  --results-folder results/
-
-Please run `python -m client --help` for full list of possible commands. 
-
-## Using XML-RPC in VertexVoyage
-
-VertexVoyage utilizes XML-RPC for communication between the client and the VertexVoyage nodes. The main method available for communication is the `execute` method. This method allows you to invoke specific functions in the VertexVoyage node by providing the `method_name` parameter and any additional keyword arguments based on the selected functionality.
-
-Here is an example of how to use the `execute` method in Python:
-```py
-import xmlrpc.client
-
-# Replace 'leader_ip' with the actual IP address of the leader node
-leader_ip = '192.168.0.1'
-
-# Create an XML-RPC proxy to communicate with the leader node
-proxy = xmlrpc.client.ServerProxy(f"http://{leader_ip}:8000/")
-
-# Call the create_graph method on the leader node
-graph_name = "my_graph"
-result = proxy.execute("create_graph", name=graph_name)
-
-# Print the result
-print(result)
-```
-
-Methods are documented in the following table:
-
-
-| **Method**            | **Parameters**                                                                                                                                           | **Description**                                                                                              |
-|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| `create_graph`        | `name: str`                                                                                                                                               | Creates a new empty graph with the given name.                                                              |
-| `add_vertex`          | `graph_name: str`, `vertex_name: str`                                                                                                                     | Adds a vertex with the specified name to the graph.                                                         |
-| `add_edge`            | `graph_name: str`, `vertex1: str`, `vertex2: str`                                                                                                         | Adds an edge between two vertices in the specified graph.                                                   |
-| `partition_graph`     | `graph_name: str`                                                                                                                                         | Partitions the graph into subgraphs and calculates its corruptibility. Returns the partitions and metrics.  |
-| `get_partition`       | `graph_name: str`, `partition_num: int`                                                                                                                   | Retrieves information about a specific partition of the graph.                                              |
-| `get_embedding`       | `graph_name: str`, `dim: int=128`, `epochs: int=10`, `learning_rate: float=0.01`, `n_walks: int=10`, `negative_sample_num: int=1`, `p: float=1`, `q: float=1`, `window_size: int=10`, `walk_size: int=10` | Generates node embeddings for the graph using the Node2Vec algorithm with specified parameters.            |
-| `get_vertices`        | `graph_name: str`                                                                                                                                         | Retrieves a list of vertices in the graph.                                                                  |
-| `get_edges`           | `graph_name: str`                                                                                                                                         | Retrieves a list of edges in the graph.                                                                     |
-| `import_karate_club`  | `name: str`                                                                                                                                               | Imports the Karate Club graph dataset and creates a graph with the specified name.                          |
-| `get_leader`          | None                                                                                                                                                      | Retrieves information about the leader node in the system.                                                  |
-| `zk`                  | None                                                                                                                                                      | Provides information about the ZooKeeper nodes, leader, and the current node.                               |
-| `process`             | `graph_name: str`, `dim: int=128`, `epochs: int=10`, `learning_rate: float=0.01`, `n_walks: int=10`, `negative_sample_num: int=1`, `p: float=1`, `q: float=1`, `window_size: int=10`, `walk_size: int=10` | Processes the graph by computing and normalizing embeddings using parallel Node2Vec computations.           |
-| `import_gml`          | `url: str`, `graph_name: str`                                                                                                                             | Imports a graph in GML format from a specified URL.                                                         |
-| `download_gml`        | `dataset_name: str`, `source: str="snap"`                                                                                                                 | Downloads a GML file for a dataset from the specified source ("snap", "konect", or "network_repository").   |
-| `generate_graph`      | `graph_name: str`, `n: int`, `p: float`, `q: float`, `c: int`                                                                                             | Generates a planted partition graph with specified parameters and saves it.                                 |
-| `list`                | None                                                                                                                                                      | Lists all the available graphs stored.                                                                      |
-| `upload_gml`          | `graph_name: str`, `data: bytes`, `append: bool=False`                                                                                                    | Uploads or appends data to a GML file for the specified graph.                                              | 
-
-
-# Configuration 
-
-In order to get configuration parameters you can modify, execute:
-
-    python scripts/detect_function_calls.py  vertex_voyage/ g
-et_config_ --exclude get_config_location
-
-Every configuration parameter can be changed in configuration file and overwritten by using 
-environment variable. 
-
-For instance, `port` can be specified in configuration file and can be modified using `VERTEX_VOYAGE_PORT` environment variable. 
-
-Configuration file is specified using `VERTEX_VOYAGE_CONFIG` and default location is at `~/.vertex_voyage/config.json`
-
-
-# Running Vertex Voyage without ZooKeeper
-
-To run Vertex Voyage without ZooKeeper, you need to ensure that the configuration does not require ZooKeeper for its operations. Follow these steps:
-
-1. **Modify Configuration**: Update the configuration file to disable ZooKeeper dependencies. You can specify the configuration file using the `VERTEX_VOYAGE_CONFIG` environment variable. The default location is `~/.vertex_voyage/config.json`.
-
-2. **Set Environment Variables**: Ensure that any necessary configuration parameters are set via environment variables. For example, you can set the port using the `VERTEX_VOYAGE_PORT` environment variable. In order not to use ZK, set `NO_ZK=0` in your environment.
-
-3. **Run Vertex Voyage**: Execute the Vertex Voyage application as usual. If you are running it inside a SLURM cluster, Vertex Voyage will automatically detect the SLURM environment and configure itself accordingly.
-
-
-Example command to run Vertex Voyage:
-```sh
-VERTEX_VOYAGE_CONFIG=~/.vertex_voyage/config.json VERTEX_VOYAGE_PORT=8080 vertex_voyage
-```
-
-# Running benchmarks 
-
-To run particular benchmark from experiments folder, run:
-
-    python -m vertex_voyage.benchmark BENCHMARK_NAME 
-
-To list all benchmarks:
-
-    python -m vertex_voyage.benchmark --list 
-
-By default, we run benchmarks on small datasets for testing purposes. To run full benchmarks:
-
-    export VERTEX_VOYAGE_FULL_BENCHMARK=1 
-    python -m vertex_voyage.benchmark BENCHMARK_NAME 
-
-Or, to run on cluster:
-
-    export VERTEX_VOYAGE_FULL_BENCHMARK=1 
-    python -m vertex_voyage.benchmark --all --no-display 
-
-
-## Running benchmarks with SLURM 
-
-below is example of slurm script which can be used:
-
-First we need to generate arguments for jobs which is file `args.txt` which contains benchmark names. Every name is on a separate line.
+# VertexVoyage
+
+**Distributed and streaming graph vertex embedding with community-aware partitioning.**
+Master's thesis project, Department of Mathematics and Informatics, Faculty
+of Sciences, University of Novi Sad. Mentor: prof. dr Miloš Savić.
+
+A graph too large for one machine, possibly still growing, is split into $P$
+partitions. Each partition is embedded independently with
+node2vec / dynnode2vec, and the partition embeddings are merged into one
+embedding per vertex. The project asks **when, and why, partitioning
+preserves embedding quality**. Quality is measured by graph-reconstruction F1
+and by downstream link prediction, as a function of the number of partitions,
+the partitioner, the stream settings and the way partition embeddings are
+merged.
+
+| | |
+|---|---|
+| **Status** | Ablation study running ([E11](results/E11-ablation/README.md)); partition alignment ongoing ([E10](results/E10-partition-alignment/README.md)) |
+| **Next milestone** | Seeded re-runs of the core results and comparison with LDG / FENNEL ([ROADMAP](ROADMAP.md)) |
+| **Last updated** | 2026-11-16 · [progress journal](JOURNAL.md) |
+
+## Research questions and current answers
+
+| RQ | Question | Current answer | Evidence |
+|---|---|---|---|
+| RQ1 | Does community-aware partitioning preserve reconstruction quality? | It does not collapse it, unlike random partitioning. Cross-partition edges are never reconstructed, though, so F1 changes with $P$ reflect within-partition recall. | [E03](results/E03-partition-scaling/README.md), [E08](results/E08-f1-decomposition/README.md) |
+| RQ2 | What are the streaming partitioner's trade-offs? | $\mu = 1$ and buffer 1000 balance partitions ($B \le 1.3$ at $P = 2$ on 4 of 5 datasets) at acceptable F1 cost. | [E02](results/E02-hyperparameters/README.md), [E04](results/E04-balance-penalty/README.md), [E05](results/E05-repartitioning/README.md) |
+| RQ3 | Are partitioned embeddings useful for link prediction? | Yes with a random-forest decoder. Neural decoders lose 39–60% MRR from $P = 1$ to 8. | [E09](results/E09-link-prediction/README.md) |
+| RQ4 | Can partition spaces be aligned? | A triplet-trained residual aligner recovers cross-partition ranking to 6–14× chance. Theory proved in Lean. | [E10](results/E10-partition-alignment/README.md) |
+| RQ5 | Which pipeline components matter? | Exploratory: the structural partitioner is essential. The seeded 19-variant grid is running. | [E11](results/E11-ablation/README.md) |
+| RQ6–7 | Comparison with LDG / FENNEL; other embedders such as GraphSAGE | planned | [ROADMAP](ROADMAP.md) |
+
+All experiments are listed in the [experiment registry](results/README.md).
+
+## Headline result: reconstruction F1 vs number of partitions
+
+Streaming pipeline (dynnode2vec, `neighbors.all` partitioner, $\mu = 1$,
+buffer 1000, $RF = 1$). Values are the final F1, mean ± std over 3–11 runs
+([E03](results/E03-partition-scaling/README.md)). The edge-cut ratio is in
+parentheses. The full-graph node2vec baseline is from
+[E01](results/E01-static-node2vec/README.md).
+
+| Dataset | node2vec, full graph | $P = 1$ | $P = 2$ | $P = 4$ | $P = 8$ |
+|---|---|---|---|---|---|
+| CITESEER | 34.8% | 47.6 ± 1.6% | 45.8 ± 0.6% (23%) | 48.1 ± 0.5% (39%) | 54.8 ± 1.7% (48%) |
+| DBLP | 60.3% | 50.9 ± 0.3% | 54.1 ± 0.2% (32%) | 54.5 ± 0.2% (50%) | 49.9 ± 0.2% (59%) |
+| AstroPh | 70.4% | 57.7 ± 0.1% | 54.7 ± 0.4% (35%) | 51.0 ± 0.5% (56%) | 45.9 ± 0.5% (65%) |
+| AS-Oregon | 31.3% | 26.2 ± 0.6% | 24.9 ± 2.7% (30%) | 24.3 ± 1.0% (54%) | 21.5 ± 1.2% (72%) |
+| Enron | 20.4% | 18.0 ± 0.4% | 24.8 ± 0.4% (33%) | 27.4 ± 2.8% (49%) | 32.4 ± 1.2% (62%) |
+
+![CITESEER F1 over the stream](results/E03-partition-scaling/figures/citeseer-f1.png)
+
+**How to read this table.**
+- F1 rising with $P$ (CITESEER, Enron) is **not** a quality gain. In every
+  run no cross-partition edge is reconstructed, so recall is capped at
+  $1 - \delta$. A rise comes from denser within-partition reconstruction
+  ([E08](results/E08-f1-decomposition/README.md), proved in Lean).
+- These runs predate the fixed-seed protocol and are scheduled for re-running
+  with 10 seeds ([ROADMAP](ROADMAP.md)).
+- The full-graph baseline and the streaming $P = 1$ column come from
+  different pipelines and settings ([E01 open issues](results/E01-static-node2vec/README.md)).
+
+## Timeline
+
+| Period | Milestone | Artefacts |
+|---|---|---|
+| 2023-11 → 2024-01 | Literature review and thesis proposal | [proposal](doc/proposal.tex), [application form](official/) |
+| 2024-07 → 2025-05 | Distributed system (ZooKeeper, XML-RPC), modified LFM partitioner, partitioned node2vec | [E00](results/E00-legacy-distributed/README.md), [cluster guide](doc/guide/cluster.md) |
+| 2025-05 → 2025-11 | LPA vs LFM, DistGER, Seminars 1 and 2 | [Seminar 1](doc/Seminar1/paper.md), [Seminar 2](doc/Seminar2/paper.md) |
+| 2026-04 → 2026-09 | Streaming pipeline: dynnode2vec, neighbour partitioner, tuning, $\mu$, buffer size, repartitioning | [E02](results/E02-hyperparameters/README.md)–[E07](results/E07-buffer-size/README.md) |
+| 2026-05 → 2026-10 | Link prediction (480 runs), F1 decomposition theory | [E09](results/E09-link-prediction/README.md), [E08](results/E08-f1-decomposition/README.md) |
+| 2026-10 → 2026-11 | Partition alignment and its theory (Theorems 1–18 in Lean) | [E10](results/E10-partition-alignment/README.md), [theory](doc/theory/README.md) |
+| 2026-11 → | Seeded ablation study on SLURM | [E11](results/E11-ablation/README.md) |
+| next | LDG / FENNEL, GraphSAGE, publication | [ROADMAP](ROADMAP.md) |
+
+## Repository map
+
+| Path | Content |
+|---|---|
+| [`results/`](results/README.md) | One page per experiment: question, setup, results, conclusion, open issues |
+| [`doc/`](doc/README.md) | Methods, metrics, datasets, theory, glossary, guides, papers |
+| [`proofs/`](proofs/README.md) | Lean 4 / Mathlib proofs of every stated theorem |
+| [`vertex_voyage/`](vertex_voyage/) | The library: partitioning, embedding, aggregation, evaluation, CLI (`vv`) |
+| [`vertex_voyage_native/`](vertex_voyage_native/) | Rust extension (fast reconstruction) |
+| [`experiments/`](experiments/) | Dataset registry and the [ablation runner](experiments/ablation/README.md) |
+| [`notebooks/`](notebooks/) | Analysis notebooks that produced the tables and figures |
+| [`scripts/`](scripts/) | Experiment, analysis and SLURM scripts |
+
+## Quick start
 
 ```bash
-python -m vertex_voyage.benchmark --list | grep -E "^ - " | sed 's/^ - //' > args.txt
-```
-
-Then we can use this script:
-
-```bash 
-#!/bin/bash
-#SBATCH --job-name=py-array
-#SBATCH --output=logs/%A_%a.out
-#SBATCH --error=logs/%A_%a.err
-#SBATCH --array=0-32%10
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=64G
-#SBATCH --export=ALL
-# #SBATCH --gres=gpu:1                # uncomment if you need a GPU
-
-echo "Task $SLURM_ARRAY_TASK_ID args: $ARG_LINE"
-set -euo pipefail
-mkdir -p logs
-
-
-module load miniconda3
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/cm/shared/apps/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
-else
-    if [ -f "/cm/shared/apps/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/cm/shared/apps/miniconda3/etc/profile.d/conda.sh"
-    else
-        export PATH="/cm/shared/apps/miniconda3/bin:$PATH"
-    fi
-fi
-unset __conda_setup
-# <<< conda initialize <<<
-
-
-echo activating
-conda activate myenv 2>&1
-
-hash -r
-
-export VERTEX_VOYAGE_FULL_BENCHMARK=0
-ARG_LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" args.txt)
-
-
-srun python -m vertex_voyage.benchmark --no-display "$ARG_LINE"
-
-```
-
-# Partitioning methods
-
-## Most common neighbor partitioner
-
-Partition of vertex is the partition that contains the most neighbors of the vertex in the sampled events. The partitioner samples a subset of events according to a distribution P(event | vertex), and assigns the vertex to the partition that contains the most neighbors of the vertex in the sampled events. The partitioner also has a replication factor, which allows it to assign a vertex to multiple partitions if there are multiple partitions that contain a similar number of neighbors of the vertex in the sampled events. The partitioner also has a capacity penalty, which penalizes partitions that have more vertices than the average partition size, to encourage more balanced partitions.
-
-Formally, the score of a partition for a vertex is defined as:
-
-$$ S(P, v) = N(P, v) - \mu \cdot \max(0, |P| - \alpha \cdot (1 + \epsilon) \cdot \frac{1}{|P|} \sum_{P' \in P} |P'|) $$
-
-where $N(P, v)$ is the number of neighbors of vertex $v$ in partition $P$ in the sampled events, $\mu$ is the capacity penalty coefficient, $\alpha$ is the weight of the average partition size in the capacity penalty, $\epsilon$ is the imbalance tolerance, and $|P|$ is the size of partition $P$. The partitioner assigns the vertex to the top $k$ partitions with the highest scores, where $k$ is the replication factor. If there are multiple partitions with similar scores, the partitioner randomly assigns the vertex to some of those partitions until it reaches the replication factor.
-
-Also, if decay is not None, the partitioner will use an exponentially decaying weight for the neighbors in the sampled events, where the weight of a neighbor that was seen $t$ time steps ago is multiplied by $\exp(-\text{decay} \cdot t)$. This allows the partitioner to give more importance to recent neighbors when assigning vertices to partitions.
-
-Formally, the score of a partition for a vertex with decay is defined as:
-
-$$ S(P, v) = \sum_{u \in N(P, v)} \exp(-\text{decay} \cdot t(u)) - \mu \cdot \max(0, |P| - \alpha \cdot (1 + \epsilon) \cdot \frac{1}{|P|} \sum_{P' \in P} |P'|) $$
-
-# Running experiments 
-
-To run experiment for partitioning and embedding on a specific dataset, run:
-
-    vv test --name Cit-HepPh --partitions 1  --break-early  --use-dataset-params --long-run  --epochs 10
-
-For temporal experiments, run:
-
-    vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-params  --buffer-size 50 --partitions 5 --replication-factor 2 --partitioner neighbors.all  --mu 0.5
-
-## Test command flags
-
- Runs a test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
-
-Parameters:
-
-| Parameter | Description |
-|-----------|-------------|
-| `--name` |  The name of the dataset to use. |
-| `--partitions` | The number of partitions to create. |
-| `--alpha` | The alpha parameter for the partitioning algorithm (if applicable). |
-| `--threshold` | The threshold parameter for the partitioning algorithm (if applicable). |
-| `--break-early` | If True, breaks after the first combination of p and q parameters is tested. |
-| `--skip-global` | If True, skips the global F1 score computation. |
-| `--dim` | The dimensionality of the embeddings. |
-| `--default-p` | If > 0, uses this value for p in the embedding algorithm instead of testing multiple values. |
-| `--default-q` | If > 0, uses this value for q in the embedding algorithm instead of testing multiple values. |
-| `--epochs` | The number of epochs to train the embedding model for. |
-| `--long-run` | If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute. |
-| `--use-dataset-params` | If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available. |
-| `--use-lpa` | If True, uses label propagation for partitioning instead of the default partitioning algorithm. |
-| `--algorithm` | The embedding algorithm to use (e.g., "node2vec", "distger", "dynnode2vec"). |
-
-## Temporal test command flags
-
-Runs a temporal test of the embedding quality for a given dataset and partitioning parameters. It loads the dataset as a stream of events, partitions it using the specified method, computes embeddings for each partition using the specified algorithm, and then evaluates the quality of the embeddings by reconstructing the graph and computing the F1 score against the original graph after each buffer of events is processed. It also computes a global embedding by averaging the partition embeddings and evaluates its F1 score as well.
-
-Parameters:
-
-| Parameter | Description |
-|-----------|-------------|
-| `--name` | The name of the dataset to use. |
-| `--partitions` | The number of partitions to create. |
-| `--partitioner-name` | The name of the partitioning algorithm to use (e.g., "random", "random.degree", "neighbors.all", "neighbors.degree"). |
-| `--dim` | The dimensionality of the embeddings. |
-| `--default-p` | If > 0, uses this value for p in the embedding algorithm instead of testing multiple values. |
-| `--default-q` | If > 0, uses this value for q in the embedding algorithm instead of testing multiple values. |
-| `--epochs` | The number of epochs to train the embedding model for after each buffer of events. |
-| `--long-run` | If True, uses more walks and larger walk sizes for the embedding algorithm, which may lead to better embeddings but takes longer to compute. |
-| `--use-dataset-params` | If True, overrides the parameters with dataset-specific parameters from the dataset_params dictionary if they are available. |
-| `--use-lpa` | If True, uses label propagation for partitioning instead of the default partitioning algorithm (not implemented in this method). |
-| `--algorithm` | The embedding algorithm to use (e.g., "dynnode2vec"). |
-| `--track-seen` | If True, processes events in an order that prioritizes events connected to already seen nodes, which simulates a more realistic temporal scenario where new events are more likely to involve nodes that have already been observed. |
-| `--iterations` | The number of times to repeat the entire process for averaging results. |
-| `--limit` | If > 0, limits the number of events to process from the dataset for quicker testing. |
-| `--buffer-size` | The number of events to process in each buffer before updating the embeddings and evaluating the F1 score. |
-
-# Development 
-
-## Conda setup
-
-Create environment
-
-```
-conda create myenv -c conda-forge rust python=3.9 
-```
-
-Activate conda and install dependencies:
-
-```
-conda activate myenv
+conda create -n myenv -c conda-forge rust python=3.9 && conda activate myenv
 pip install -r requirements.txt
+(cd vertex_voyage_native && maturin develop)
+vv temporal_test --name CITESEER --long-run --use-dataset-params \
+  --buffer-size 1000 --partitions 4 --partitioner-name neighbors.all \
+  --mu 1 --seed 42 --iterations 1
 ```
 
-Compile Rust code with `maturin`
+More guides:
+- [Installation](doc/guide/install.md)
+- [Experiment CLI](doc/guide/cli.md)
+- [SLURM](doc/guide/slurm.md)
+- [Running a cluster](doc/guide/cluster.md)
+- [XML-RPC API](doc/guide/xmlrpc.md)
+- [Benchmarks](doc/guide/benchmarks.md)
+- [Seeding and reproducibility](doc/guide/seeding.md)
 
+## Reports and papers
+
+- Thesis proposal (Serbian): [`doc/proposal.tex`](doc/proposal.tex)
+- Seminar 1, *Evaluation and analysis of graph vertex embeddings in
+  distributed environment with community-aware vertex partitioning*:
+  [paper](doc/Seminar1/paper.md), [slides](doc/Seminar1/presentation/presentation.tex)
+- Seminar 2, *… based on information-oriented random walks …*:
+  [paper](doc/Seminar2/paper.md), [slides](doc/Seminar2/presentation/presentation.tex)
+- Thesis draft: [`doc/Rad.odt`](doc/Rad.odt)
+
+## Citing
+
+```bibtex
+@mastersthesis{nozinic_vertexvoyage,
+  author = {Stefan No{\v z}ini{\'c}},
+  title  = {VertexVoyage: Distributed and Streaming Graph Vertex Embedding with Community-Aware Partitioning},
+  school = {University of Novi Sad, Faculty of Sciences},
+  note   = {In progress. \url{https://github.com/fantastic001/vertexvoyage}}
+}
 ```
-cd vertex_voyage_native
-maturin develop
-```
-
-# Experimental results
-
-## Datasets
-
-| Dataset | Nodes | Edges | Citation |
-| --- | --- | --- | --- |
-| CITESEER | 3327 | 9104 | Z. Yang, W. W. Cohen, and R. Salakhutdinov. Revisiting Semi-Supervised Learning with Graph Embeddings. ICML 2016. Dataset statistics from the PyTorch Geometric Planetoid documentation. |
-|DBLP | 17716| 52867| J. Leskovec, A. Krevl, SNAP Datasets: Stanford large network dataset collection, http://snap.stanford.edu/data (Jun. 2014).|
-| AstroPh | 18772 | 198110 | J. Leskovec, J. Kleinberg, and C. Faloutsos. Graph Evolution: Densification and Shrinking Diameters. ACM Transactions on Knowledge Discovery from Data 1(1), 2007. |
-| AS - Oregon 2 | 11461 | 32730 | J. Leskovec, J. Kleinberg and C. Faloutsos. Graphs over Time: Densification Laws, Shrinking Diameters and Possible Explanations. ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD), 2005. |
-| Enron | 36692 | 183831 | B. Klimmt, Y. Yang. Introducing the Enron corpus. CEAS conference, 2004.|
-
-
-- CITESEER: A dataset of scientific publications and their citations, which can be represented as a graph where nodes are papers and edges are citations.
-- AS - Oregon: A dataset of autonomous systems (AS) and their connections, which can be represented as a graph where nodes are AS and edges are connections between them.
-- AstroPh: A dataset of scientific publications in the field of astrophysics, which can be represented as a graph where nodes are papers and edges are citations.
-- Enron: A dataset of email communications within the Enron corporation, which can be represented as a graph where nodes are email addresses and edges are email communications between them.
-- DBLP: A dataset of scientific publications in computer science, which can be represented as a graph where nodes are papers and edges are citations.
-
-
-## Node2Vec baseline 
-
-| Dataset  | Average F1 score |
-|----------|------------------|
-| CITESEER | 34.82%           |
-| DBLP     | 60.3%            |
-| AstroPh  | 70.41%           |
-| AS-Oregon| 31.26%           |
-| Enron | 20.42%           |
-
-## Dynnode2vec with buffered event processing 
-
-Example of run:
-
-```sh
-vv temporal_test --name CITESEER  --long-run --iterations 10  --use-dataset-params  --buffer-size 1000 --partitions 5 --replication-factor 1 
-```
-
-CITESEER:
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|--------------------------|----------|----------|
-| 1               | 47.57% ± 1.56%           | 0%       | 1 | 
-| 2               | 45.81% ± 0.59%           | 23%      | 1.31 |
-| 4               | 48.06% ± 0.53%           | 39%      | 1.63 |
-| 8               | 54.81% ± 1.66%           | 48%      | 1.75 |
-
-F1 Reconstruction score is reported as mean ± standard deviation over 11 runs.
-
-DBLP: 
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|--------------------------|----------|----------|
-| 1               | 50.91% ± 0.31%           | 0%       | 1 | 
-| 2               | 54.11% ± 0.18%           | 32%      | 1.10 |
-| 4               | 54.51% ± 0.15%           | 50%      | 1.20 |
-| 8               | 49.87% ± 0.16%           | 59%      | 1.31 |
-
-F1 Reconstruction score is reported as mean ± standard deviation over 4 runs.
-
-AstroPh:
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|--------------------------|----------|----------|
-| 1               | 57.70% ± 0.11%           | 0%       | 1 |
-| 2               | 54.67% ± 0.36%           | 35%      | 1.08 |
-| 4               | 50.95% ± 0.45%           | 56%      | 1.11 |
-| 8               | 45.94% ± 0.51%           | 65%      | 1.26 |
-
-F1 Reconstruction score is reported as mean ± standard deviation over 4 runs.
-
-AS-Oregon:
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|-------------------------|----------|----------|
-| 1               | 26.17% ± 0.57% | 0%   | 1 |
-| 2               | 24.88% ± 2.72% | 30.44%   | 1.21|
-| 4               | 24.30% ± 0.98% | 53.79%  | 1.26 |
-| 8               | 21.45% ± 1.19% | 71.56%  | 1.27 |
-
-F1 Reconstruction score is reported as mean ± standard deviation over 4 runs (P=1) and 3 runs (P=2, 4, 8).
-
-
-Enron:
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|-------------------------|----------|----------|
-| 1               | 18.03% ± 0.44% | 0%    | 1    |
-| 2               | 24.84% ± 0.38% | 33.07% | 1.09 |
-| 4               | 27.44% ± 2.83% | 49.18% | 1.08 |
-| 8               | 32.36% ± 1.24% | 61.99% | 1.25 |
-
-
-
-Partitioning time is negligible compared to embedding time. By partitioning the graph into multiple partitions, we can reduce the embedding time significantly, where the slowest partition is the biggest bottleneck.
-
-## Random partitioner baseline
-
-To measure how much of the neighbor-based partitioner's (see [Partitioning methods](#partitioning-methods)) embedding quality comes from preserving neighborhood locality, we ran the same buffered dynnode2vec pipeline using a **random partitioner**, which assigns each vertex to a partition uniformly at random, ignoring its neighbors entirely.
-
-Example of run:
-
-```sh
-vv temporal_test --name CITESEER  --long-run --iterations 3  --use-dataset-params  --buffer-size 1000 --partitions 4 --replication-factor 1 --partitioner random
-```
-
-CITESEER:
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|--------------------------|----------|----------|
-| 2               | 0.03% ± 0.02%            | 50.01%   | 1.02 |
-| 4               | 0.03% ± 0.03%            | 70.89%   | 1.32 |
-| 8               | 0.04% ± 0.03%            | 81.58%   | 1.61 |
-
-F1 Reconstruction score is reported as mean ± standard deviation over 3 runs.
-
-AstroPh:
-
-| # of partitions | F1 Reconstruction score | Edge cut | Balance |
-|-----------------|--------------------------|----------|----------|
-| 2               | 0.04% ± 0.02%            | 49.98%   | 1.00 |
-| 4               | 0.03% ± 0.02%            | 70.86%   | 1.31 |
-| 8               | 0.02% ± 0.01%            | 81.43%   | 1.60 |
-
-F1 Reconstruction score is reported as mean ± standard deviation over 3 runs.
-
-Compared to the neighbor-based partitioner, which reaches F1 scores of 45–55% on CITESEER and 46–55% on AstroPh at the same partition counts, random partitioning collapses reconstruction quality to essentially zero. This confirms that the neighbor partitioner's F1 scores are driven by preserving neighborhood locality across partitions rather than by the embedding algorithm alone: once locality is destroyed, per-partition embeddings become mutually incompatible and the reconstructed graph is no better than chance. Edge cut is also far higher under random partitioning (50–82%) than under the neighbor partitioner (23–65%), closely tracking the theoretical upper bound of $(P-1)/P$ for uniform random assignment.
-
-## Dataset parameters
-
-The following embedding hyperparameters were used for each dataset (via `--use-dataset-params`):
-
-| Dataset   | p    | q    | dim |
-|-----------|------|------|-----|
-| CITESEER  | 0.5  | 0.25 | 50  |
-| DBLP      | 0.5  | 1    | 25  |
-| AstroPh   | 2    | 0.25 | 50  |
-| AS-Oregon | 0.5  | 2    | 128 |
-| Enron     | 0.5  | 1    | 128 |
-
-## Balance metric
-
-The **balance** column measures how evenly vertices are distributed across partitions. It is computed as:
-
-$$B = 1 + \frac{1}{K} \sum_{i=1}^{K} \frac{|s_i - \bar{s}|}{\bar{s}}$$
-
-where $K$ is the number of partitions, $s_i$ is the number of vertices assigned to partition $i$, and $\bar{s} = \frac{1}{K} \sum_{i=1}^{K} s_i$ is the average partition size. A perfectly balanced partitioning yields $B = 1$; higher values indicate greater imbalance.
-
-## Temporal evolution plots
-
-The following plots show how F1 score, balance, edge cuts, and repartitioning rate evolve over iterations (buffer steps) for each dataset, broken down by number of partitions.
-
-### F1 Score over iterations
-
-| CITESEER | DBLP |
-|----------|------|
-| ![CITESEER F1](plots/citeseer-f1.png) | ![DBLP F1](plots/dblp-f1.png) |
-
-| AstroPh | AS-Oregon |
-|---------|-----------|
-| ![AstroPh F1](plots/astroph-f1.png) | ![AS-Oregon F1](plots/as-oregon-f1.png) |
-
-| Enron |
-|-------|
-| ![Enron F1](plots/enron-f1.png) |
-
-F1 reconstruction score generally improves as more events are ingested. Using more partitions tends to maintain competitive or improved F1 in datasets with clear community structure (CITESEER, DBLP, Enron), while high-density datasets (AstroPh) see a modest drop at higher partition counts due to increased edge cut.
-
-### Balance over iterations
-
-| CITESEER | DBLP |
-|----------|------|
-| ![CITESEER Balance](plots/citeseer-balance.png) | ![DBLP Balance](plots/dblp-balance.png) |
-
-| AstroPh | AS-Oregon |
-|---------|-----------|
-| ![AstroPh Balance](plots/astroph-balance.png) | ![AS-Oregon Balance](plots/as-oregon-balance.png) |
-
-| Enron |
-|-------|
-| ![Enron Balance](plots/enron-balance.png) |
-
-Balance remains close to 1 across all datasets and partition counts, indicating that the neighbor-based partitioner distributes vertices nearly evenly without requiring explicit load-balancing. The imbalance stays within a small constant factor of the ideal even as the graph evolves over time.
-
-### Edge cuts over iterations
-
-| CITESEER | DBLP |
-|----------|------|
-| ![CITESEER Edge Cuts](plots/citeseer-edge-cuts.png) | ![DBLP Edge Cuts](plots/dblp-edge-cuts.png) |
-
-| AstroPh | AS-Oregon |
-|---------|-----------|
-| ![AstroPh Edge Cuts](plots/astroph-edge-cuts.png) | ![AS-Oregon Edge Cuts](plots/as-oregon-edge-cuts.png) |
-
-| Enron |
-|-------|
-| ![Enron Edge Cuts](plots/enron-edge-cuts.png) |
-
-Edge cut ratio rises quickly in the first few iterations as new vertices are assigned, then stabilizes at a bounded plateau. This plateau is determined primarily by the number of partitions and the graph's community structure, confirming that the partitioner keeps edge cuts at predictable and manageable levels throughout the stream.
-
-### Repartitioning rate over iterations
-
-| CITESEER | DBLP |
-|----------|------|
-| ![CITESEER Repartitions](plots/citeseer-repartitions.png) | ![DBLP Repartitions](plots/dblp-repartitions.png) |
-
-| AstroPh | AS-Oregon |
-|---------|-----------|
-| ![AstroPh Repartitions](plots/astroph-repartitions.png) | ![AS-Oregon Repartitions](plots/as-oregon-repartitions.png) |
-
-| Enron |
-|-------|
-| ![Enron Repartitions](plots/enron-repartitions.png) |
-
-The fraction of vertices repartitioned per iteration decays rapidly and stays below 20% across all datasets and partition configurations. After the initial warm-up phase, the partitioner stabilises and only reassigns vertices whose neighbourhood has shifted significantly, keeping the overhead of maintaining partition assignments low throughout the stream.
-
-## Sensitivity analysis of the balance penalty parameter (μ)
-
-The most common neighbor partitioner (see [Partitioning methods](#partitioning-methods)) uses a capacity penalty coefficient $\mu$ to discourage assigning vertices to partitions that are already larger than average. This section analyzes the effect of $\mu$ on partition balance, varying $\mu \in \{0, 0.5, 1, 1.5, 2\}$ across all five datasets with 2 and 4 partitions. $\mu = 0$ disables the penalty entirely, so balance is determined purely by neighbor counts; higher $\mu$ increasingly rebalances vertex placement at the expense of prioritizing neighbor locality.
-
-### Balance at the last iteration
-
-The tables below show the average balance at the final iteration for each combination of $\mu$ and partition count. As in the [Balance metric](#balance-metric) section, $B = 1$ is a perfectly balanced partitioning; higher values indicate greater imbalance.
-
-AS-Oregon:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.18 | 1.49 |
-| 1.0 | 1.18 | 1.20 |
-| 1.5 | 1.10 | 1.21 |
-| 2.0 | 1.05 | 1.19 |
-
-AstroPh:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.15 | 1.18 |
-| 1.0 | 1.13 | 1.12 |
-| 1.5 | 1.08 | 1.12 |
-| 2.0 | 1.05 | 1.22 |
-
-CITESEER:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.61 | 1.61 |
-| 1.0 | 1.31 | 1.63 |
-| 1.5 | 1.17 | 1.50 |
-| 2.0 | 1.17 | 1.17 |
-
-DBLP:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.08 | 1.16 |
-| 1.0 | 1.03 | 1.09 |
-| 1.5 | 1.14 | 1.20 |
-| 2.0 | 1.01 | 1.14 |
-
-Enron:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.10 | 1.14 |
-| 1.0 | 1.10 | 1.10 |
-| 1.5 | 1.02 | 1.02 |
-| 2.0 | 1.06 | 1.06 |
-
-### Average balance across iterations
-
-The tables below show the average balance across all iterations (not just the last one) for each combination of $\mu$ and partition count, capturing how balance behaves during the stream rather than only at the end.
-
-AS-Oregon:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.14 | 1.51 |
-| 1.0 | 1.12 | 1.23 |
-| 1.5 | 1.10 | 1.18 |
-| 2.0 | 1.10 | 1.15 |
-
-AstroPh:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.24 | 1.51 |
-| 1.0 | 1.14 | 1.27 |
-| 1.5 | 1.11 | 1.21 |
-| 2.0 | 1.10 | 1.20 |
-
-CITESEER:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.92 | 2.12 |
-| 1.0 | 1.52 | 1.84 |
-| 1.5 | 1.34 | 1.66 |
-| 2.0 | 1.34 | 1.55 |
-
-DBLP:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.30 | 1.60 |
-| 1.0 | 1.17 | 1.40 |
-| 1.5 | 1.15 | 1.33 |
-| 2.0 | 1.12 | 1.25 |
-
-Enron:
-
-| μ | P=2 | P=4 |
-|---|-----|-----|
-| 0.0 | 2.00 | 2.50 |
-| 0.5 | 1.14 | 1.27 |
-| 1.0 | 1.11 | 1.19 |
-| 1.5 | 1.09 | 1.17 |
-| 2.0 | 1.08 | 1.15 |
-
-### Balance evolution across μ values
-
-The following plots show the (smoothed) average balance over iterations for each $\mu$ value, for P=2 and P=4 partitions side by side.
-
-
-![CITESEER Balance vs mu](plots/citeseer-balance-mu.png) 
-
-![DBLP Balance vs mu](plots/dblp-balance-mu.png) |
-
-
-![AstroPh Balance vs mu](plots/astroph-balance-mu.png) 
-
-![AS-Oregon Balance vs mu](plots/as-oregon-balance-mu.png) |
-
-![Enron Balance vs mu](plots/enron-balance-mu.png) |
-
-Across all datasets, $\mu = 0$ (no capacity penalty) produces the worst balance, matching the partition count almost exactly ($B \approx 1.5 + P/4$ at $P$ partitions), since vertices are placed purely by neighbor affinity with no regard for partition size. Increasing $\mu$ from 0 to 1 yields the largest balance improvement; beyond $\mu = 1$–$1.5$, returns diminish and balance mostly plateaus, with CITESEER remaining the hardest dataset to balance at every $\mu$ value tested.
-
-
-## Buffer size impact on F1 score and timing 
-
-![CITESEER Buffer size vs F1](plots/citeseer-buffer-timing.png)
-
-![AstroPh Buffer size vs F1](plots/astroph-buffer-timing.png)

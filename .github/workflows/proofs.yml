@@ -1,0 +1,19 @@
+name: proofs
+
+on:
+  push:
+    paths: ["proofs/**", ".github/workflows/proofs.yml"]
+  pull_request:
+    paths: ["proofs/**", ".github/workflows/proofs.yml"]
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: proofs
+          use-mathlib-cache: true
+      - name: Reject sorry
+        run: "! grep -rn --include=*.lean '\\bsorry\\b' proofs/VertexVoyageProofs"

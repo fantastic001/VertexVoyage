@@ -1,7 +1,7 @@
 # Ablation study runner
 
 Runs the variants of the
-ablation study
+[ablation study](../../results/E11-ablation/README.md)
 with `vv temporal_test`, one variant at a time, on a SLURM cluster or locally.
 
 ## Terms
