@@ -8,8 +8,8 @@ import numpy as np
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Type
-import vertex_voyage.config as cfg 
+from typing import Callable, Hashable, Mapping, Sequence, Type
+import vertex_voyage.config as cfg
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import log_loss
@@ -148,72 +148,235 @@ LINK_PREDICTION_MODEL_TRAINERS: "dict[str, Callable[[], LinkPredictionModelTrain
 }
 
 
+LOSS_OF_EMPTY_SPLIT = float("nan")
+
+
+def tensor_dataset_of(u, v, y) -> TensorDataset:
+    return TensorDataset(
+        torch.tensor(u, dtype=torch.float32),
+        torch.tensor(v, dtype=torch.float32),
+        torch.tensor(y, dtype=torch.float32),
+    )
+
+
+def batch_logits_of(model, u_batch, v_batch):
+    return model(u_batch, v_batch).reshape(-1)
+
+
+def mean_loss_of(model, loader: DataLoader) -> float:
+    if len(loader) > 0:
+        total_loss = 0.0
+        with torch.no_grad():
+            for u_batch, v_batch, y_batch in loader:
+                logits = batch_logits_of(model, u_batch, v_batch)
+                total_loss += model.criterion(logits, y_batch).item()
+        return total_loss / len(loader)
+    else:
+        logger.debug("Empty split, its loss is undefined")
+        return LOSS_OF_EMPTY_SPLIT
+
+
+def descend_one_epoch(model, optimizer, loader: DataLoader) -> None:
+    for u_batch, v_batch, y_batch in loader:
+        optimizer.zero_grad()
+        logits = batch_logits_of(model, u_batch, v_batch)
+        model.criterion(logits, y_batch).backward()
+        optimizer.step()
+
+
 def train_model(model, u_train, v_train, y_train, u_val, v_val, y_val, epochs=10, batch_size=32, learning_rate=0.1):
-    val_losses = [] 
+    if len(y_train) == 0:
+        logger.error("Cannot train a link prediction model without pairs")
+        raise ValueError("train_model needs at least one training pair")
+    else:
+        logger.debug(
+            "Training link prediction model on %d pairs, validating on %d",
+            len(y_train),
+            len(y_val),
+        )
+    val_losses = []
     train_losses = []
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
-    train_dataset = TensorDataset(torch.tensor(u_train, dtype=torch.float32), 
-                                  torch.tensor(v_train, dtype=torch.float32), 
-                                  torch.tensor(y_train, dtype=torch.float32))
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(TensorDataset(
-            torch.tensor(u_val, dtype=torch.float32), 
-            torch.tensor(v_val, dtype=torch.float32), 
-            torch.tensor(y_val, dtype=torch.float32)), 
+    train_loader = DataLoader(
+        tensor_dataset_of(u_train, v_train, y_train),
         batch_size=batch_size,
-        shuffle=False
+        shuffle=True,
     )
-    for epoch in range(epochs):
+    val_loader = DataLoader(
+        tensor_dataset_of(u_val, v_val, y_val),
+        batch_size=batch_size,
+        shuffle=False,
+    )
+    for _ in range(epochs):
         model.eval()
-        with torch.no_grad():
-            total_loss = 0
-            for u_batch, v_batch, y_batch in train_loader:
-                logits = model(u_batch, v_batch).squeeze()
-                loss = model.criterion(logits, y_batch)
-                total_loss += loss.item()
-            avg_loss = total_loss / len(train_loader)
-            train_losses.append(avg_loss)
-        # Validation
-        with torch.no_grad():
-            val_loss = 0
-            for u_batch, v_batch, y_batch in val_loader:
-                logits = model(u_batch, v_batch).squeeze()
-                loss = model.criterion(logits, y_batch)
-                current_val_loss = loss.item()
-                val_loss += current_val_loss
-            avg_val_loss = val_loss / len(val_loader)
-            val_losses.append(avg_val_loss)
-        # Update
+        train_losses.append(mean_loss_of(model, train_loader))
+        val_losses.append(mean_loss_of(model, val_loader))
         model.train()
-        for u_batch, v_batch, y_batch in train_loader:
-            optimizer.zero_grad()
-            logits = model(u_batch, v_batch).squeeze()
-            loss = model.criterion(logits, y_batch)
-            current_loss = loss.item()
-            loss.backward()
-            optimizer.step()
-            total_loss += current_loss
-    # Calculate one final validation loss after training
+        descend_one_epoch(model, optimizer, train_loader)
     model.eval()
-    with torch.no_grad():
-        total_loss = 0
-        for u_batch, v_batch, y_batch in train_loader:
-            logits = model(u_batch, v_batch).squeeze()
-            loss = model.criterion(logits, y_batch)
-            total_loss += loss.item()
-        avg_loss = total_loss / len(train_loader)
-        train_losses.append(avg_loss)
-    # Validation
-    with torch.no_grad():
-        val_loss = 0
-        for u_batch, v_batch, y_batch in val_loader:
-            logits = model(u_batch, v_batch).squeeze()
-            loss = model.criterion(logits, y_batch)
-            current_val_loss = loss.item()
-            val_loss += current_val_loss
-        avg_val_loss = val_loss / len(val_loader)
-        val_losses.append(avg_val_loss)
+    train_losses.append(mean_loss_of(model, train_loader))
+    val_losses.append(mean_loss_of(model, val_loader))
     return model, train_losses, val_losses
+
+
+INCREMENTAL_DECODER_NAMES = "bilinear, hadamard"
+TORCH_RANDOM_STATE_OF_CPU_ONLY: list = []
+
+
+def require_incremental_trainer(
+    trainer: LinkPredictionModelTrainer,
+) -> TorchLogitsLinkPredictionModelTrainer:
+    if isinstance(trainer, TorchLogitsLinkPredictionModelTrainer):
+        return trainer
+    else:
+        message = (
+            f"{type(trainer).__name__} cannot continue training an existing "
+            f"decoder, use one of: {INCREMENTAL_DECODER_NAMES}"
+        )
+        logger.error(message)
+        raise ValueError(message)
+
+
+class IncrementalLogitsDecoder(LinkPredictionModel):
+    def __init__(
+        self,
+        trainer: LinkPredictionModelTrainer,
+        vector_dim: int,
+        seed: int,
+    ):
+        self.trainer = require_incremental_trainer(trainer)
+        if vector_dim <= 0:
+            logger.error("Decoder dimension must be positive: %d", vector_dim)
+            raise ValueError(f"vector_dim must be positive, got {vector_dim}")
+        else:
+            logger.info(
+                "Creating incremental %s decoder of dimension %d with seed %d",
+                self.trainer.net_class.__name__,
+                vector_dim,
+                seed,
+            )
+        self.vector_dim = vector_dim
+        self.refit_count = 0
+        with torch.random.fork_rng(devices=TORCH_RANDOM_STATE_OF_CPU_ONLY):
+            torch.manual_seed(seed)
+            self.net = self.trainer.net_class(
+                vector_dim=vector_dim,
+                use_bias=self.trainer.use_bias,
+            )
+        self.model = TorchLogitsLinkPredictionModel(self.net)
+
+    def refit(self, dataset: LinkPredictionDataset, seed: int):
+        training_shape = np.shape(dataset.train.u)
+        if len(training_shape) != 2 or training_shape[1] != self.vector_dim:
+            logger.error(
+                "Training vectors of shape %s do not match decoder "
+                "dimension %d",
+                training_shape,
+                self.vector_dim,
+            )
+            raise ValueError("Training vectors do not match the decoder")
+        else:
+            logger.debug(
+                "Refit %d of the decoder on %d pairs with seed %d",
+                self.refit_count + 1,
+                len(dataset.train.y),
+                seed,
+            )
+        with torch.random.fork_rng(devices=TORCH_RANDOM_STATE_OF_CPU_ONLY):
+            torch.manual_seed(seed)
+            _, train_losses, val_losses = train_model(
+                self.net,
+                dataset.train.u, dataset.train.v, dataset.train.y,
+                dataset.val.u, dataset.val.v, dataset.val.y,
+                epochs=self.trainer.epochs,
+                batch_size=self.trainer.batch_size,
+                learning_rate=self.trainer.learning_rate,
+            )
+        self.refit_count += 1
+        logger.debug("Decoder training losses: %s", train_losses)
+        return train_losses, val_losses
+
+    def predict_proba(self, u_embedding, v_embedding) -> float:
+        return self.model.predict_proba(u_embedding, v_embedding)
+
+def snapshot_error(message: str) -> ValueError:
+    logger.error(message)
+    return ValueError(message)
+
+
+class EmbeddingSnapshot:
+    def __init__(
+        self,
+        vertices: Sequence[Hashable],
+        vectors: Sequence,
+        dim: int,
+    ):
+        if dim <= 0:
+            raise snapshot_error(
+                f"Embedding dimension must be positive, got {dim}"
+            )
+        elif len(vertices) != len(vectors):
+            raise snapshot_error(
+                f"{len(vertices)} vertices but {len(vectors)} vectors"
+            )
+        else:
+            logger.debug("Freezing embedding of %d vertices", len(vertices))
+        matrix = np.array(vectors) if len(vectors) > 0 else np.zeros((0, dim))
+        row_of_vertex = {vertex: row for row, vertex in enumerate(vertices)}
+        if matrix.shape != (len(vertices), dim):
+            raise snapshot_error(
+                f"Vectors have shape {matrix.shape}, expected "
+                f"{(len(vertices), dim)}"
+            )
+        elif len(row_of_vertex) != len(vertices):
+            raise snapshot_error("A vertex appears more than once")
+        else:
+            matrix.setflags(write=False)
+        self.dim = dim
+        self._matrix = matrix
+        self._row_of_vertex = row_of_vertex
+
+    @staticmethod
+    def empty(dim: int) -> "EmbeddingSnapshot":
+        return EmbeddingSnapshot([], [], dim)
+
+    @staticmethod
+    def of(vectors_by_vertex: Mapping) -> "EmbeddingSnapshot":
+        if len(vectors_by_vertex) > 0:
+            vertices = list(vectors_by_vertex)
+            vectors = [vectors_by_vertex[vertex] for vertex in vertices]
+            return EmbeddingSnapshot(vertices, vectors, len(vectors[0]))
+        else:
+            raise snapshot_error(
+                "Cannot infer the dimension of an empty embedding"
+            )
+
+    def embed_node(self, node):
+        if node in self._row_of_vertex:
+            return self._matrix[self._row_of_vertex[node]]
+        else:
+            logger.error("Vertex %r is not in the embedding snapshot", node)
+            raise KeyError(node)
+
+    def embed_nodes(self, nodes) -> np.ndarray:
+        try:
+            rows = [self._row_of_vertex[node] for node in nodes]
+        except KeyError as missing:
+            logger.error(
+                "Vertex %r is not in the embedding snapshot", missing.args[0]
+            )
+            raise
+        return self._matrix[rows]
+
+    def vertices(self) -> list:
+        return list(self._row_of_vertex)
+
+    def __contains__(self, node) -> bool:
+        return node in self._row_of_vertex
+
+    def __len__(self) -> int:
+        return len(self._row_of_vertex)
+
 
 class DatasetGenerator:
     def __init__(self, graph, embedding_model):

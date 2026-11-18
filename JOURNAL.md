@@ -10,6 +10,29 @@ direction.
 
 ## 2026-11
 
+- **2026-11-18** — Prequential link prediction in the streaming pipeline
+  (M7.1b, [evaluation.md](doc/evaluation.md#prequential-link-prediction-pipeline-t)).
+  - `vv temporal_test --link-prediction-model hadamard|bilinear` tests a
+    warm-started decoder on the new edges of each buffer, using the
+    embedding frozen after the previous buffer, and then trains it on them.
+  - Negatives are uniform non-edges of the current snapshot between known
+    vertices. Positives are split into within and cross partitions. Edges
+    with a new vertex, repeated edges and self-loops are counted but not
+    scored.
+  - Freezing the aggregated embedding, rather than copying the models,
+    matters. The partitioner and the aligner have already seen the buffer,
+    so an embedding read from copied models through them would leak the
+    test positives.
+  - Lemmas L2 (no leakage) and L3 (valid negatives) are proved in
+    [`PrequentialLinkPrediction.lean`](proofs/VertexVoyageProofs/PrequentialLinkPrediction.lean).
+  - Fixed two crashes in `train_model`: a last batch of one pair, and an
+    empty validation split. Otherwise `vv test` results are bit-identical.
+  - Turning link prediction on leaves the embedding unchanged. Without
+    isolating the decoder's torch random state, the triplet aligner's draws
+    shifted, and reconstruction F1 on the karate test stream went from 0.600
+    to 0.562.
+  - Smoke run on les_mis (2 partitions, buffer 20, dim 16, seed 1): pooled
+    AUC 0.784. This is a smoke test, not a result.
 - **2026-11-17** — Gap analysis against a standard research workflow
   (hypotheses, baselines, instrument, design, sample size, analysis,
   ablation, reproducibility).

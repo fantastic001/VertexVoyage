@@ -148,9 +148,12 @@ from M0.6 (at least 10), $\bar F \pm s$ with a 95% CI.
 ## M7 — Downstream tasks and scalability (RQ3)
 
 Current state:
-- Link prediction exists only in the static pipeline S (`vv test`,
+- Static link prediction in pipeline S (`vv test`,
   [E09](results/E09-link-prediction/README.md)).
-- `vv temporal_test` has no downstream evaluation.
+- Prequential link prediction in pipeline T
+  (`vv temporal_test --link-prediction-model hadamard|bilinear`,
+  [evaluation.md](doc/evaluation.md#prequential-link-prediction-pipeline-t)).
+  No confirmatory run yet.
 - There is no node-classification code.
 
 M7.0–M7.2, M7.4 and M7.5 build the evaluation instrument and come before
@@ -177,13 +180,13 @@ theorems are M9.9–M9.10, and the references are in
 | | ID | Task | Notes |
 |---|---|---|---|
 | ⬜ | M7.1a | A `DownstreamTask` plug-in interface with lifecycle hooks (`on_stream_start`, `before_buffer`, `after_buffer`, `report`), a registry, and a `--downstream-tasks` flag on `vv test` and `vv temporal_test`. Constants come from `VERTEX_VOYAGE_LP_*` and `VERTEX_VOYAGE_NC_*`. | Replaces the ad-hoc `EM` wrapper in `test_commands.py`. |
-| ⬜ | M7.1b | Prequential (test-then-train) evaluation: score the edges of buffer $b+1$ with the embeddings after buffer $b$, every $k$ buffers. | Gama et al. 2013 |
+| ✅ | M7.1b | Prequential (test-then-train) evaluation: score the edges of buffer $b+1$ with the embeddings after buffer $b$, every $k$ buffers. | Gama et al. 2013. Done for every buffer ($k = 1$), with uniform negatives filtered against the snapshot and drawn from a seeded `np.random.Generator`, and with AUC and AP; L2 and L3 proved in `PrequentialLinkPrediction.lean`. The static pipeline still lacks M7.0c and M7.0g. |
 | ⬜ | M7.1c | Negatives per source node: half historical (seen earlier, absent now) and half random, filtered. | Poursafaei et al. 2022; TGB |
-| ⬜ | M7.1d | Scopes `WITHIN`, `CROSS`, `NEW_VERTEX` and `REPEATED_EDGE`, with the coverage of vertices that have no embedding. | node2vec cannot embed a vertex it has not seen. |
+| 🔵 | M7.1d | Scopes `WITHIN`, `CROSS`, `NEW_VERTEX` and `REPEATED_EDGE`, with the coverage of vertices that have no embedding. | node2vec cannot embed a vertex it has not seen. `WITHIN` and `CROSS` are scored; `NEW_VERTEX`, `REPEATED_EDGE` and self-loops are counted per buffer but not scored. |
 | ⬜ | M7.1e | Baselines: EdgeBank (memorisation), the static full-graph ceiling, and the streaming pipeline at $P = 1$. | EdgeBank exposes easy negatives. |
 | ⬜ | M7.1f | A chronological 70/15/15 split as a second protocol, for comparison with TGB. | |
 | ⬜ | M7.1g | A `timestamp` ordering in `EDGE_ORDERINGS`, and the real temporal streams of M3.1. | Ordering `""` is file order. |
-| ⬜ | M7.1h | A decoder retraining policy (an enum: every $k$ buffers, or once at the end), with its cost measured. | |
+| 🔵 | M7.1h | A decoder retraining policy (an enum: every $k$ buffers, or once at the end), with its cost measured. | Chosen: one warm-started torch decoder refit on every buffer, never reinitialised; the random forest is rejected. Cost is timed as `link_prediction_buffer` but not yet reported. |
 
 ### M7.2 — Node classification
 

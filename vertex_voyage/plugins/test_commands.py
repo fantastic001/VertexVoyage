@@ -29,7 +29,11 @@ from vertex_voyage.aggregation import (
     models_by_partition_position,
 )
 from vertex_voyage.graph_sampling import LazySampler, RoundRobinUniform
-from vertex_voyage.config import get_config_float, notify_plugins
+from vertex_voyage.config import (
+    get_config_float,
+    get_config_int,
+    notify_plugins,
+)
 from vertex_voyage.partition_training import (
     PartitionTraining,
     configured_partition_training,
@@ -46,14 +50,26 @@ from vertex_voyage.reconstruction import (
     reconstruct,
 )
 from vertex_voyage.tasks.link_prediction import (
+    INCREMENTAL_DECODER_NAMES,
+    EmbeddingSnapshot,
     HadamardLogitsNet,
+    IncrementalLogitsDecoder,
     LinkPredictionModelTrainer,
     QuadraticLogitsNet,
     RandomForestLinkPredictionModelTrainer,
     TorchLogitsLinkPredictionModelTrainer,
     evaluate_predictions,
     heart_benchmark,
+    require_incremental_trainer,
     train_on_static_graph,
+)
+from vertex_voyage.tasks.prequential_link_prediction import (
+    POOLED_RESULT_NAME,
+    BufferLinkPrediction,
+    DisabledLinkPrediction,
+    PrequentialLinkPrediction,
+    ScoreScope,
+    UniformComplementSampler,
 )
 from vertex_voyage.temporal import FromIterable, buffered, to_nx_graph
 from vertex_voyage.temporal_ordering import BFSOrdering, DFSOrdering, RandomOrdering
@@ -135,6 +151,23 @@ def persisted_walk_overrides(
         for name, value in overrides.items()
         if value != WALK_PARAMETER_OF_LONG_RUN
     }
+
+
+LINK_PREDICTION_DISABLED = ""
+DEFAULT_TEMPORAL_LP_NEGATIVE_RATIO = 1
+DEFAULT_TEMPORAL_LP_NEGATIVE_ATTEMPTS = 100
+LINK_PREDICTION_SUMMARY_METRICS = ("auc", "average_precision", "f1")
+ITERATION_RESULT_NAMES = (
+    "models",
+    "partitioner",
+    "iteration_precisions",
+    "iteration_recalls",
+    "iteration_f1s",
+)
+
+
+def iteration_result_key(name: str, iteration: int) -> str:
+    return f"{name}_{iteration}"
 
 
 def retrain_threshold_of(graph) -> int:
@@ -476,23 +509,13 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
     def _run_link_prediction_with_embedding(self, run, dataset, embedding_dict, positive_edges, negative_edges, model_trainer: LinkPredictionModelTrainer, parts: list):
         log("Training link prediction model on full graph...")
 
-        class EM:
-            def __init__(self, embedding_dict):
-                self.embedding_dict = embedding_dict
-
-            def embed_nodes(self, nodes):
-                return [self.embed_node(n) for n in nodes]
-
-            def embed_node(self, node):
-                return self.embedding_dict[node]
-
         vertex_to_parts = {}
         for i, part in enumerate(parts):
             for v in part:
                 if v not in vertex_to_parts:
                     vertex_to_parts[v] = set()
                 vertex_to_parts[v].add(i)
-        em = EM(embedding_dict)
+        em = EmbeddingSnapshot.of(embedding_dict)
         full_model, train_losses, val_losses = run("lp_full", train_on_static_graph, dataset, em, model_trainer=model_trainer)
         log("Full model trained (Train loss: %f, Val loss: %f)" % (train_losses[-1], val_losses[-1]))
         cross_part_positive_edges = list(filter( 
@@ -756,6 +779,134 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
         else:
             return {"aggregator": aggregator}
 
+    def _validate_temporal_link_prediction_model(
+        self,
+        link_prediction_model: str,
+    ) -> None:
+        if link_prediction_model == LINK_PREDICTION_DISABLED:
+            logger.debug("Temporal link prediction is disabled")
+        elif link_prediction_model in self.LINK_PREDICTION_MODEL_TRAINERS:
+            trainer = require_incremental_trainer(
+                self.LINK_PREDICTION_MODEL_TRAINERS[link_prediction_model]()
+            )
+            log(
+                "Prequential link prediction with the "
+                f"{trainer.net_class.__name__} decoder"
+            )
+        else:
+            logger.error(
+                "Unknown link prediction model %r", link_prediction_model
+            )
+            raise ValueError(
+                "link_prediction_model must be one of: '', "
+                f"{INCREMENTAL_DECODER_NAMES}"
+            )
+
+    def _persisted_link_prediction_params(
+        self,
+        link_prediction_model: str,
+    ) -> dict:
+        if link_prediction_model == LINK_PREDICTION_DISABLED:
+            return {}
+        else:
+            return {"link_prediction_model": link_prediction_model}
+
+    def _create_link_prediction(
+        self,
+        link_prediction_model: str,
+        dim: int,
+        seed: int,
+    ) -> BufferLinkPrediction:
+        if link_prediction_model == LINK_PREDICTION_DISABLED:
+            return DisabledLinkPrediction()
+        else:
+            create_trainer = self.LINK_PREDICTION_MODEL_TRAINERS[
+                link_prediction_model
+            ]
+            trainer = create_trainer(
+                epochs=get_config_int(
+                    "temporal_lp_epochs",
+                    self.LINK_PREDICTION_TEST_EPOCHS,
+                    "Epochs of every decoder refit in prequential link "
+                    "prediction",
+                )
+            )
+            sampler = UniformComplementSampler(
+                np.random.default_rng(seed),
+                get_config_int(
+                    "temporal_lp_negative_attempts",
+                    DEFAULT_TEMPORAL_LP_NEGATIVE_ATTEMPTS,
+                    "Random draws per requested negative before the "
+                    "complement of the snapshot is enumerated",
+                ),
+            )
+            return PrequentialLinkPrediction(
+                IncrementalLogitsDecoder(trainer, dim, seed),
+                sampler,
+                get_config_int(
+                    "temporal_lp_negative_ratio",
+                    DEFAULT_TEMPORAL_LP_NEGATIVE_RATIO,
+                    "Negatives sampled per new edge in prequential link "
+                    "prediction",
+                ),
+                seed,
+                log_line=log,
+            )
+
+    def _iteration_result_keys(
+        self,
+        iteration: int,
+        link_prediction: BufferLinkPrediction,
+    ) -> list:
+        names = ITERATION_RESULT_NAMES + tuple(link_prediction.result_names())
+        return [iteration_result_key(name, iteration) for name in names]
+
+    def _persist_link_prediction_results(
+        self,
+        run,
+        iteration: int,
+        link_prediction: BufferLinkPrediction,
+    ) -> dict:
+        results = link_prediction.results()
+        for name, value in results.items():
+            run[iteration_result_key(name, iteration)] = value
+        return results.get(POOLED_RESULT_NAME, {})
+
+    def _stored_pooled_link_prediction(
+        self,
+        run,
+        iteration: int,
+        link_prediction: BufferLinkPrediction,
+    ) -> dict:
+        stored = {
+            name: run[iteration_result_key(name, iteration)]
+            for name in link_prediction.result_names()
+        }
+        return stored.get(POOLED_RESULT_NAME, {})
+
+    def _log_link_prediction_summary(self, pooled_by_iteration: list) -> None:
+        scopes = [
+            scope.value
+            for scope in ScoreScope
+            if any(scope.value in pooled for pooled in pooled_by_iteration)
+        ]
+        if len(scopes) == 0:
+            logger.debug("No link prediction scores to summarise")
+        else:
+            logger.debug("Summarising link prediction scopes %s", scopes)
+        for scope in scopes:
+            for metric in LINK_PREDICTION_SUMMARY_METRICS:
+                values = [
+                    pooled[scope][metric]
+                    for pooled in pooled_by_iteration
+                    if scope in pooled
+                ]
+                log(
+                    f"Pooled link prediction, {scope} edges, {metric}: "
+                    f"mean {np.mean(values):.4f}, std {np.std(values):.4f} "
+                    f"over {len(values)} iterations"
+                )
+
     def _partition_graph_sampler(self, models) -> LazySampler:
         return LazySampler(
             lambda: RoundRobinUniform(*[part.graph() for part in models])
@@ -791,6 +942,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             iteration: int,
             aggregator: Aggregator,
             training: PartitionTraining,
+            link_prediction: BufferLinkPrediction,
             run = None,
         ):
         total_edges = 0
@@ -813,16 +965,25 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 training.update_models(models, partitioner, buffer)
             with TimeMetric("aggregator_update"):
                 aggregator.update(self._partition_graph_sampler(models), models, partitioner, buffer)
+            ordered_nodes = list(nodes)
             with TimeMetric("embedding"):
                 if run is not None:
-                    embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, nodes, aggregator)
+                    embeddings = run(f"embedding_{iteration}_buffer_{bi}", partitioner.get_distributed_embedding, models, ordered_nodes, aggregator)
                 else:
-                    embeddings = partitioner.get_distributed_embedding(models, nodes, aggregator)
+                    embeddings = partitioner.get_distributed_embedding(models, ordered_nodes, aggregator)
+            with TimeMetric("link_prediction_buffer"):
+                link_prediction.evaluate_buffer(
+                    bi,
+                    buffer,
+                    ordered_nodes,
+                    embeddings,
+                    partitioner,
+                )
 
             if processed_after_last_f1 >= F1_COMPU_THRESHOLD or bi == total_buffers - 1 or bi == 0:
                 processed_after_last_f1 = 0
                 with TimeMetric("reconstruct_and_f1"):
-                    g = reconstruct(total_edges, embeddings, list(nodes))
+                    g = reconstruct(total_edges, embeddings, ordered_nodes)
                     G = nx.Graph()
                     for u, v in original_graph.edges:
                         if u in nodes and v in nodes:
@@ -1054,6 +1215,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                semantic_reassign_noise: bool = True,
                semantic_embedding: str = "auto",
                aggregator: str = DEFAULT_AGGREGATOR_NAME,
+               link_prediction_model: str = LINK_PREDICTION_DISABLED,
                seed: int = DEFAULT_SEED):
         import networkx as nx
 
@@ -1061,6 +1223,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
             raise ValueError(f"ordering must be one of: '', {', '.join(self.EDGE_ORDERINGS)}")
         if not is_aggregator_registered(aggregator):
             raise ValueError(f"aggregator must be one of: {', '.join(aggregator_names())}")
+        self._validate_temporal_link_prediction_model(link_prediction_model)
         aggregator = aggregator_name_for_partitions(aggregator, partitions)
         walk_params = self._dataset_walk_params(
             name,
@@ -1077,7 +1240,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
 
         scores = []
         log(f"Starting temporal test for dataset {name} with {partitions} partitions and partitioner {partitioner_name} which is embedded in the algorithm {algorithm}.")
-        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed, **self._persisted_aggregator_params(aggregator), **persisted_walk_overrides(n_walks, walk_size, window_size))
+        run = PersistedRun(checkpoint, name=name, partitions=partitions, partitioner_name=partitioner_name, dim=dim, default_p=default_p, default_q=default_q, epochs=epochs, long_run=long_run, use_dataset_params=use_dataset_params, algorithm=algorithm, track_seen=track_seen, ordering=ordering, iterations=iterations, limit=limit, buffer_size=buffer_size, replication_factor=replication_factor, mu=mu, epsilon=epsilon, alpha=alpha, decay=decay, semantic_metric=semantic_metric, semantic_assignment=semantic_assignment, semantic_k=semantic_k, semantic_eps=semantic_eps, semantic_min_samples=semantic_min_samples, semantic_reassign_noise=semantic_reassign_noise, semantic_embedding=semantic_embedding, seed=seed, **self._persisted_aggregator_params(aggregator), **self._persisted_link_prediction_params(link_prediction_model), **persisted_walk_overrides(n_walks, walk_size, window_size))
         log(f"Processing dataset {name}")
         with TimeMetric("load_dataset"):
             t = VertexEnumerator()
@@ -1114,20 +1277,31 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 resolved_partitioner_name = partitioner_name
         else:
             raise ValueError("semantic_embedding must be one of: auto, node2vec, dynnode2vec")
+        pooled_link_prediction_by_iteration = []
         for it in range(iterations):
             log(f"Iteration {it+1} / {iterations}: Processing dataset {name}")
-            if ("models_%d" % it in run and "partitioner_%d" % it in run
-                and "iteration_precisions_%d" % it in run
-                and "iteration_recalls_%d" % it in run
-                and "iteration_f1s_%d" % it in run):
+            iteration_seed = derive_iteration_seed(seed, it)
+            link_prediction = self._create_link_prediction(
+                link_prediction_model,
+                dim,
+                iteration_seed,
+            )
+            if all(
+                key in run
+                for key in self._iteration_result_keys(it, link_prediction)
+            ):
                 log("Loading models and partitioner for iteration...")
                 models = run["models_%d" % it]
                 partitioner: PartitionerProfile = run["partitioner_%d" % it]
                 log("Models and partitioner loaded")
                 partitioner.print_profile()
                 scores.append(run["iteration_f1s_%d" % it][-1])
+                pooled_link_prediction_by_iteration.append(
+                    self._stored_pooled_link_prediction(
+                        run, it, link_prediction
+                    )
+                )
             else:
-                iteration_seed = derive_iteration_seed(seed, it)
                 seed_shared_random_state(iteration_seed)
                 models = self._create_temporal_models(
                     training=training,
@@ -1178,6 +1352,7 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                     iteration=it,
                     aggregator=iteration_aggregator,
                     training=training,
+                    link_prediction=link_prediction,
                     run = run if checkpoint_iterations else None
                 )
                 log("Event stream processing completed")
@@ -1190,8 +1365,14 @@ class TestCustomCLICommandExecutor(CustomCLICommandExecutor):
                 run["iteration_f1s_%d" % it] = iteration_f1s
                 partitioner.print_profile()
                 run["profile_%d" % it] = partitioner.dump_profile()
+                pooled_link_prediction_by_iteration.append(
+                    self._persist_link_prediction_results(
+                        run, it, link_prediction
+                    )
+                )
         log("Average F1 score: ", np.mean(scores))
         log("Standard deviation of F1 score: ", np.std(scores))
+        self._log_link_prediction_summary(pooled_link_prediction_by_iteration)
         if not skip_full_graph_baseline:
             log("Evaluating full graph baseline...")
             self._evaluate_temporal_full_graph_baseline(
