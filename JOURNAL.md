@@ -10,6 +10,19 @@ direction.
 
 ## 2026-11
 
+- **2026-11-17** — Gap analysis against a standard research workflow
+  (hypotheses, baselines, instrument, design, sample size, analysis,
+  ablation, reproducibility).
+  - The [roadmap](ROADMAP.md) is reorganised into M0–M12. A
+    pre-registered analysis plan (M0) now comes before any confirmatory
+    run.
+  - Main gaps found:
+    - no hypotheses with statistics and thresholds;
+    - the closest prior work (Local2Global, DeHIN) is not cited;
+    - no datasets with real timestamps;
+    - no graph above 37k vertices;
+    - no runtime or memory measurements.
+  - A 3-paper publication plan is proposed.
 - **2026-11-16** — The repository becomes the single source of truth.
   - All working notes moved into [`results/`](results/README.md) (E00–E11),
     [`doc/`](doc/README.md) and [`proofs/`](proofs/README.md).

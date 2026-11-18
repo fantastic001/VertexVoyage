@@ -10,6 +10,7 @@
 | [theory/](theory/README.md) | Index of all theorems and their Lean proofs |
 | [theory/partition-alignment.md](theory/partition-alignment.md) | Formal model of the residual aligner, Theorems 1–10 |
 | [glossary.md](glossary.md) | Definitions with references for every technical term |
+| [references.md](references.md) | Bibliography by topic, with where each work is used; BibTeX in [`refs.bib`](refs.bib) |
 | [dynnode2vec-reference-protocol.md](dynnode2vec-reference-protocol.md) | Evaluation protocol of the original dynnode2vec paper |
 
 ## Guides

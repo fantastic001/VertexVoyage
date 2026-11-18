@@ -24,8 +24,14 @@
 @article{fang2023distributed,
   title={Distributed Graph Embedding with Information-Oriented Random Walks},
   author={Fang, Peng and Khan, Arijit and Luo, Siqiang and Wang, Fang and Feng, Dan and Li, Zhenli and Yin, Wei and Cao, Yuchao},
-  journal={arXiv preprint arXiv:2303.15702},
-  year={2023}
+  journal={Proceedings of the VLDB Endowment},
+  volume={16},
+  number={7},
+  pages={1643--1656},
+  year={2023},
+  doi={10.14778/3587136.3587140},
+  eprint={2303.15702},
+  archivePrefix={arXiv}
 }
 
 @article{anil2018large,
@@ -260,4 +266,377 @@
   pages={2134--2144},
   year={2018},
   publisher={IEEE}
+}
+
+% ---------------------------------------------------------------------------
+% Added 2026-11-18: related work, baselines, evaluation protocols, datasets
+% and statistics for the PhD publication plan. Readable list with the places
+% each reference is used: doc/references.md
+% ---------------------------------------------------------------------------
+
+% Independent partition or patch embedding with alignment
+
+@article{jeub2023local2global,
+  title={Local2Global: a distributed approach for scaling representation learning on graphs},
+  author={Jeub, Lucas G. S. and Colavizza, Giovanni and Dong, Xiaowen and Bazzi, Marya and Cucuringu, Mihai},
+  journal={Machine Learning},
+  volume={112},
+  number={5},
+  pages={1663--1692},
+  year={2023},
+  doi={10.1007/s10994-022-06285-7}
+}
+
+@inproceedings{imran2021ddhh,
+  title={{DDHH}: A Decentralized Deep Learning Framework for Large-scale Heterogeneous Networks},
+  author={Imran, Mubashir and Yin, Hongzhi and Chen, Tong and Huang, Zi and Zhang, Xiangliang and Zheng, Kai},
+  booktitle={Proceedings of the 37th IEEE International Conference on Data Engineering (ICDE)},
+  pages={2033--2038},
+  year={2021}
+}
+
+@article{imran2023dehin,
+  title={{DeHIN}: A Decentralized Framework for Embedding Large-scale Heterogeneous Information Networks},
+  author={Imran, Mubashir and Yin, Hongzhi and Chen, Tong and Huang, Zi and Zheng, Kai},
+  journal={IEEE Transactions on Knowledge and Data Engineering},
+  year={2023},
+  doi={10.1109/TKDE.2022.3141951},
+  eprint={2201.02757},
+  archivePrefix={arXiv}
+}
+
+% Distributed embedding and training systems
+
+@inproceedings{lerer2019pytorch,
+  title={{PyTorch-BigGraph}: A Large-scale Graph Embedding System},
+  author={Lerer, Adam and Wu, Ledell and Shen, Jiajun and Lacroix, Timothee and Wehrstedt, Luca and Bose, Abhijit and Peysakhovich, Alex},
+  booktitle={Proceedings of Machine Learning and Systems (SysML)},
+  year={2019},
+  eprint={1903.12287},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{yang2019knightking,
+  title={{KnightKing}: A Fast Distributed Graph Random Walk Engine},
+  author={Yang, Ke and Zhang, MingXing and Chen, Kang and Ma, Xiaosong and Bai, Yang and Jiang, Yong},
+  booktitle={Proceedings of the 27th ACM Symposium on Operating Systems Principles (SOSP)},
+  year={2019}
+}
+
+@inproceedings{zheng2020distdgl,
+  title={{DistDGL}: Distributed Graph Neural Network Training for Billion-Scale Graphs},
+  author={Zheng, Da and Ma, Chao and Wang, Minjie and Zhou, Jinjing and Su, Qidong and Song, Xiang and Gan, Quan and Zhang, Zheng and Karypis, George},
+  booktitle={IEEE/ACM 10th Workshop on Irregular Applications: Architectures and Algorithms (IA3)},
+  year={2020},
+  eprint={2010.05337},
+  archivePrefix={arXiv}
+}
+
+% Effect of partitioning on distributed training
+
+@article{kochsiek2021parallel,
+  title={Parallel Training of Knowledge Graph Embedding Models: A Comparison of Techniques},
+  author={Kochsiek, Adrian and Gemulla, Rainer},
+  journal={Proceedings of the VLDB Endowment},
+  volume={15},
+  number={3},
+  pages={633--645},
+  year={2021},
+  doi={10.14778/3494124.3494144}
+}
+
+@inproceedings{merkel2025experimental,
+  title={An Experimental Comparison of Partitioning Strategies for Distributed Graph Neural Network Training},
+  author={Merkel, Nikolai and Stoll, Daniel and Mayer, Ruben and Jacobsen, Hans-Arno},
+  booktitle={Proceedings of the 28th International Conference on Extending Database Technology (EDBT)},
+  pages={171--184},
+  year={2025},
+  doi={10.48786/edbt.2025.14},
+  eprint={2308.15602},
+  archivePrefix={arXiv}
+}
+
+% Graph partitioning
+
+@inproceedings{pacaci2019experimental,
+  title={Experimental Analysis of Streaming Algorithms for Graph Partitioning},
+  author={Pacaci, Anil and {\"O}zsu, M. Tamer},
+  booktitle={Proceedings of the 2019 International Conference on Management of Data (SIGMOD)},
+  year={2019},
+  doi={10.1145/3299869.3300076}
+}
+
+@inproceedings{stanton2012streaming,
+  title={Streaming Graph Partitioning for Large Distributed Graphs},
+  author={Stanton, Isabelle and Kliot, Gabriel},
+  booktitle={Proceedings of the 18th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  pages={1222--1230},
+  year={2012}
+}
+
+@inproceedings{tsourakakis2014fennel,
+  title={{FENNEL}: Streaming Graph Partitioning for Massive Scale Graphs},
+  author={Tsourakakis, Charalampos and Gkantsidis, Christos and Radunovic, Bozidar and Vojnovic, Milan},
+  booktitle={Proceedings of the 7th ACM International Conference on Web Search and Data Mining (WSDM)},
+  pages={333--342},
+  year={2014}
+}
+
+@inproceedings{petroni2015hdrf,
+  title={{HDRF}: Stream-Based Partitioning for Power-Law Graphs},
+  author={Petroni, Fabio and Querzoni, Leonardo and Daudjee, Khuzaima and Kamali, Shahin and Iacoboni, Giorgio},
+  booktitle={Proceedings of the 24th ACM International Conference on Information and Knowledge Management (CIKM)},
+  pages={243--252},
+  year={2015}
+}
+
+@inproceedings{nishimura2013restreaming,
+  title={Restreaming Graph Partitioning: Simple Versatile Algorithms for Advanced Balancing},
+  author={Nishimura, Joel and Ugander, Johan},
+  booktitle={Proceedings of the 19th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  year={2013}
+}
+
+@article{karypis1998fast,
+  title={A Fast and High Quality Multilevel Scheme for Partitioning Irregular Graphs},
+  author={Karypis, George and Kumar, Vipin},
+  journal={SIAM Journal on Scientific Computing},
+  volume={20},
+  number={1},
+  pages={359--392},
+  year={1998}
+}
+
+@article{andreev2006balanced,
+  title={Balanced Graph Partitioning},
+  author={Andreev, Konstantin and R{\"a}cke, Harald},
+  journal={Theory of Computing Systems},
+  volume={39},
+  number={6},
+  pages={929--939},
+  year={2006}
+}
+
+% Dynamic embedding, link prediction and node classification protocols
+
+@inproceedings{mahdavi2018dynnode2vec,
+  title={dynnode2vec: Scalable Dynamic Network Embedding},
+  author={Mahdavi, Sedigheh and Khoshraftar, Shima and An, Aijun},
+  booktitle={2018 IEEE International Conference on Big Data},
+  pages={3762--3765},
+  year={2018},
+  eprint={1812.02356},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{poursafaei2022towards,
+  title={Towards Better Evaluation for Dynamic Link Prediction},
+  author={Poursafaei, Farimah and Huang, Shenyang and Pelrine, Kellin and Rabbany, Reihaneh},
+  booktitle={Advances in Neural Information Processing Systems 35, Datasets and Benchmarks Track},
+  year={2022},
+  eprint={2207.10128},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{li2023evaluating,
+  title={Evaluating Graph Neural Networks for Link Prediction: Current Pitfalls and New Benchmarking},
+  author={Li, Juanhui and Shomer, Harry and Mao, Haitao and Zeng, Shenglai and Ma, Yao and Shah, Neil and Tang, Jiliang and Yin, Dawei},
+  booktitle={Advances in Neural Information Processing Systems 36, Datasets and Benchmarks Track},
+  year={2023},
+  eprint={2306.10453},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{huang2023temporal,
+  title={Temporal Graph Benchmark for Machine Learning on Temporal Graphs},
+  author={Huang, Shenyang and Poursafaei, Farimah and Danovitch, Jacob and Fey, Matthias and Hu, Weihua and Rossi, Emanuele and Leskovec, Jure and Bronstein, Michael and Rabusseau, Guillaume and Rabbany, Reihaneh},
+  booktitle={Advances in Neural Information Processing Systems 36, Datasets and Benchmarks Track},
+  year={2023},
+  eprint={2307.01026},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{gastinger2024tgb,
+  title={{TGB} 2.0: A Benchmark for Learning on Temporal Knowledge Graphs and Heterogeneous Graphs},
+  author={Gastinger, Julia and Huang, Shenyang and Galkin, Mikhail and Loghmani, Erfan and Parviz, Ali and Poursafaei, Farimah and Danovitch, Jacob and Rossi, Emanuele and Koutis, Ioannis and Stuckenschmidt, Heiner and Rabbany, Reihaneh and Rabusseau, Guillaume},
+  booktitle={Advances in Neural Information Processing Systems 37, Datasets and Benchmarks Track},
+  year={2024},
+  eprint={2406.09639},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{hu2020open,
+  title={Open Graph Benchmark: Datasets for Machine Learning on Graphs},
+  author={Hu, Weihua and Fey, Matthias and Zitnik, Marinka and Dong, Yuxiao and Ren, Hongyu and Liu, Bowen and Catasta, Michele and Leskovec, Jure},
+  booktitle={Advances in Neural Information Processing Systems 33},
+  year={2020},
+  eprint={2005.00687},
+  archivePrefix={arXiv}
+}
+
+@article{gama2013evaluating,
+  title={On evaluating stream learning algorithms},
+  author={Gama, Jo{\~a}o and Sebasti{\~a}o, Raquel and Rodrigues, Pedro Pereira},
+  journal={Machine Learning},
+  volume={90},
+  number={3},
+  pages={317--346},
+  year={2013},
+  doi={10.1007/s10994-012-5320-9}
+}
+
+@misc{shchur2018pitfalls,
+  title={Pitfalls of Graph Neural Network Evaluation},
+  author={Shchur, Oleksandr and Mumme, Maximilian and Bojchevski, Aleksandar and G{\"u}nnemann, Stephan},
+  year={2018},
+  eprint={1811.05868},
+  archivePrefix={arXiv},
+  note={Relational Representation Learning Workshop, NeurIPS 2018}
+}
+
+@inproceedings{kipf2017semi,
+  title={Semi-Supervised Classification with Graph Convolutional Networks},
+  author={Kipf, Thomas N. and Welling, Max},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2017},
+  eprint={1609.02907},
+  archivePrefix={arXiv}
+}
+
+@inproceedings{yang2016revisiting,
+  title={Revisiting Semi-Supervised Learning with Graph Embeddings},
+  author={Yang, Zhilin and Cohen, William W. and Salakhutdinov, Ruslan},
+  booktitle={Proceedings of the 33rd International Conference on Machine Learning (ICML)},
+  pages={40--48},
+  year={2016},
+  eprint={1603.08861},
+  archivePrefix={arXiv}
+}
+
+% Further embedding methods
+
+@inproceedings{zhang2019prone,
+  title={{ProNE}: Fast and Scalable Network Representation Learning},
+  author={Zhang, Jie and Dong, Yuxiao and Wang, Yan and Tang, Jie and Ding, Ming},
+  booktitle={Proceedings of the 28th International Joint Conference on Artificial Intelligence (IJCAI)},
+  year={2019}
+}
+
+@inproceedings{qiu2018network,
+  title={Network Embedding as Matrix Factorization: Unifying {DeepWalk}, {LINE}, {PTE}, and node2vec},
+  author={Qiu, Jiezhong and Dong, Yuxiao and Ma, Hao and Li, Jian and Wang, Kuansan and Tang, Jie},
+  booktitle={Proceedings of the 11th ACM International Conference on Web Search and Data Mining (WSDM)},
+  year={2018},
+  eprint={1710.02971},
+  archivePrefix={arXiv}
+}
+
+% Synthetic graph models
+
+@article{lancichinetti2008benchmark,
+  title={Benchmark graphs for testing community detection algorithms},
+  author={Lancichinetti, Andrea and Fortunato, Santo and Radicchi, Filippo},
+  journal={Physical Review E},
+  volume={78},
+  number={4},
+  pages={046110},
+  year={2008}
+}
+
+@article{holland1983stochastic,
+  title={Stochastic blockmodels: First steps},
+  author={Holland, Paul W. and Laskey, Kathryn Blackmond and Leinhardt, Samuel},
+  journal={Social Networks},
+  volume={5},
+  number={2},
+  pages={109--137},
+  year={1983}
+}
+
+% Dataset sources
+
+@inproceedings{bojchevski2018deep,
+  title={Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking},
+  author={Bojchevski, Aleksandar and G{\"u}nnemann, Stephan},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2018}
+}
+
+@article{leskovec2007graph,
+  title={Graph Evolution: Densification and Shrinking Diameters},
+  author={Leskovec, Jure and Kleinberg, Jon and Faloutsos, Christos},
+  journal={ACM Transactions on Knowledge Discovery from Data},
+  volume={1},
+  number={1},
+  year={2007}
+}
+
+@inproceedings{leskovec2005graphs,
+  title={Graphs over Time: Densification Laws, Shrinking Diameters and Possible Explanations},
+  author={Leskovec, Jure and Kleinberg, Jon and Faloutsos, Christos},
+  booktitle={Proceedings of the 11th ACM SIGKDD International Conference on Knowledge Discovery in Data Mining},
+  pages={177--187},
+  year={2005}
+}
+
+@inproceedings{klimt2004introducing,
+  title={Introducing the {Enron} Corpus},
+  author={Klimt, Bryan and Yang, Yiming},
+  booktitle={First Conference on Email and Anti-Spam (CEAS)},
+  year={2004}
+}
+
+@inproceedings{paranjape2017motifs,
+  title={Motifs in Temporal Networks},
+  author={Paranjape, Ashwin and Benson, Austin R. and Leskovec, Jure},
+  booktitle={Proceedings of the 10th ACM International Conference on Web Search and Data Mining (WSDM)},
+  year={2017}
+}
+
+@inproceedings{kumar2018community,
+  title={Community Interaction and Conflict on the Web},
+  author={Kumar, Srijan and Hamilton, William L. and Leskovec, Jure and Jurafsky, Dan},
+  booktitle={Proceedings of the 2018 World Wide Web Conference (WWW)},
+  year={2018}
+}
+
+% Statistics
+
+@article{holm1979simple,
+  title={A Simple Sequentially Rejective Multiple Test Procedure},
+  author={Holm, Sture},
+  journal={Scandinavian Journal of Statistics},
+  volume={6},
+  number={2},
+  pages={65--70},
+  year={1979}
+}
+
+@article{schuirmann1987comparison,
+  title={A comparison of the two one-sided tests procedure and the power approach for assessing the equivalence of average bioavailability},
+  author={Schuirmann, Donald J.},
+  journal={Journal of Pharmacokinetics and Biopharmaceutics},
+  volume={15},
+  number={6},
+  pages={657--680},
+  year={1987}
+}
+
+@article{dolan2002benchmarking,
+  title={Benchmarking optimization software with performance profiles},
+  author={Dolan, Elizabeth D. and Mor{\'e}, Jorge J.},
+  journal={Mathematical Programming},
+  volume={91},
+  number={2},
+  pages={201--213},
+  year={2002}
+}
+
+@article{demsar2006statistical,
+  title={Statistical Comparisons of Classifiers over Multiple Data Sets},
+  author={Dem{\v{s}}ar, Janez},
+  journal={Journal of Machine Learning Research},
+  volume={7},
+  pages={1--30},
+  year={2006}
 }

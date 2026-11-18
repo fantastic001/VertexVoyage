@@ -16,8 +16,8 @@ merged.
 | | |
 |---|---|
 | **Status** | Ablation study running ([E11](results/E11-ablation/README.md)); partition alignment ongoing ([E10](results/E10-partition-alignment/README.md)) |
-| **Next milestone** | Seeded re-runs of the core results and comparison with LDG / FENNEL ([ROADMAP](ROADMAP.md)) |
-| **Last updated** | 2026-11-16 · [progress journal](JOURNAL.md) |
+| **Next milestone** | Pre-registered analysis plan, then seeded re-runs and comparison with LDG / FENNEL / HDRF ([ROADMAP](ROADMAP.md)) |
+| **Last updated** | 2026-11-17 · [progress journal](JOURNAL.md) |
 
 ## Research questions and current answers
 
