@@ -10,6 +10,8 @@ on the linked page, and machine-checked in Lean 4 / Mathlib under
 | Result | Statement | English | Lean |
 |---|---|---|---|
 | Balance range | $0 \le \beta \le 2 - 2/K$, attained by a single partition | [evaluation.md](../evaluation.md#2-partition-quality) | `PartitionBalance.balance_le`, `balance_of_single_partition` |
+| No leakage in prequential link prediction (L2) | $P_t \cap (E_{t-1} \cup \bigcup_{i<t} P_i) = \emptyset$ | [evaluation.md](../evaluation.md#prequential-link-prediction-pipeline-t) | `PrequentialLinkPrediction.no_leakage`, `positives_pairwise_disjoint` |
+| Valid negatives (L3) | $N_t \subseteq S_t$ implies $N_t \cap E_t = \emptyset$, $N_t \cap P_t = \emptyset$, no self-pairs | [evaluation.md](../evaluation.md#prequential-link-prediction-pipeline-t) | `PrequentialLinkPrediction.negatives_valid`, `stream_negatives_disjoint_positives` |
 
 ## Reconstruction F1 under partitioning ([E08](../../results/E08-f1-decomposition/README.md))
 
@@ -52,3 +54,7 @@ Some theorems use further lemmas, which are named on the linked page.
 
 - $\mathbb{E}[\delta] = (P-1)/P$ for random partitioning: linearity of
   expectation over edges, see [evaluation.md](../evaluation.md#2-partition-quality).
+- Chance AUC $\tfrac12$ of a label-independent score (Lemma L4), see
+  [evaluation.md](../evaluation.md#prequential-link-prediction-pipeline-t).
+- Order equivalence of test-then-train (Lemma L1): a statement about
+  program order, checked by a unit test.

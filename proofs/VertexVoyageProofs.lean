@@ -6,3 +6,4 @@ import VertexVoyageProofs.PartitioningF1NodeAveraged
 import VertexVoyageProofs.PartitioningF1ChanceFloor
 import VertexVoyageProofs.PartitionAlignment
 import VertexVoyageProofs.PartitionBalance
+import VertexVoyageProofs.PrequentialLinkPrediction

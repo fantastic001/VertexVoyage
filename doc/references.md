@@ -153,7 +153,13 @@ aligner of [E10](../results/E10-partition-alignment/README.md).
   algorithms.* Machine Learning 90(3):317–346, 2013.
   [doi:10.1007/s10994-012-5320-9](https://doi.org/10.1007/s10994-012-5320-9) ·
   `gama2013evaluating` · Prequential (test-then-train) evaluation.
-  Used in: M7.1b.
+  Used in: M7.1b, [evaluation.md](evaluation.md#prequential-link-prediction-pipeline-t).
+- J. A. Hanley, B. J. McNeil. *The meaning and use of the area under a
+  receiver operating characteristic (ROC) curve.* Radiology
+  143(1):29–36, 1982.
+  [doi:10.1148/radiology.143.1.7063747](https://doi.org/10.1148/radiology.143.1.7063747) ·
+  `hanley1982meaning` · AUC as $\Pr[s^+ > s^-]$; chance level $1/2$.
+  Used in: M7.1b, [glossary](glossary.md#auc-and-average-precision).
 - O. Shchur, M. Mumme, A. Bojchevski, S. Günnemann. *Pitfalls of Graph
   Neural Network Evaluation.* R2L workshop, NeurIPS 2018.
   [arXiv:1811.05868](https://arxiv.org/abs/1811.05868) ·

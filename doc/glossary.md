@@ -296,6 +296,33 @@ broken explicitly (optimistic or pessimistic).
 Reference: J. Li et al., "Evaluating Graph Neural Networks for Link
 Prediction: Current Pitfalls and New Benchmarking" (HeaRT), NeurIPS 2023.
 
+<a id="auc-and-average-precision"></a>
+### AUC and average precision
+Let $s^+$ and $s^-$ be the scores of a random positive and a random
+negative. Then
+$\mathrm{AUC} = \Pr[s^+ > s^-] + \tfrac12 \Pr[s^+ = s^-]$, which is
+$\tfrac12$ for a score that is independent of the label.
+
+Sort the pairs by decreasing score, and let $P_n$ and $R_n$ be the precision
+and recall at the $n$-th threshold. Then
+$\mathrm{AP} = \sum_n (R_n - R_{n-1})\, P_n$, as computed by scikit-learn.
+When no scores are tied, this is the mean precision at the rank of each
+positive. Both metrics need at least one positive and one negative.
+
+References: J. A. Hanley, B. J. McNeil, "The meaning and use of the area
+under a receiver operating characteristic (ROC) curve", *Radiology* 143(1),
+1982; Manning et al. 2008, §8.4.
+
+<a id="prequential-evaluation"></a>
+### Prequential evaluation
+A way of evaluating a stream learner in which every example is first used
+to test the current model and then to train it ("test-then-train"). The
+model scored at time $t$ was trained only on data from before $t$. The
+streaming link prediction follows this protocol, see
+[evaluation.md](evaluation.md#prequential-link-prediction-pipeline-t).
+Reference: J. Gama, R. Sebastião, P. P. Rodrigues, "On evaluating stream
+learning algorithms", *Machine Learning* 90(3), 2013.
+
 <a id="stratified-metric-decomposition"></a>
 ### Stratified metric decomposition
 Writing a metric as a weighted sum over strata, here within-partition and

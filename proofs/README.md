@@ -13,6 +13,7 @@ statement to its Lean name.
 | `PartitioningF1ChanceFloor.lean` | chance floor of a global pair budget, E08 |
 | `ErdosRenyi.lean`, `ErdosRenyiPartitions.lean`, `ErdosRenyiChanceFloor.lean` | $G(n,p)$ facts used by the E08 Erdős–Rényi sweep |
 | `PartitionAlignment.lean` | Theorems 1–18 of the residual aligner, [theory](../doc/theory/partition-alignment.md) and [E10](../results/E10-partition-alignment/README.md) |
+| `PrequentialLinkPrediction.lean` | no leakage (L2) and valid negatives (L3) of prequential link prediction, [evaluation.md](../doc/evaluation.md#prequential-link-prediction-pipeline-t) |
 
 ## Building
 
