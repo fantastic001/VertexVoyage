@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Optional, Set
 from vertex_voyage.aggregation import Aggregator, MeanAggregator
+from vertex_voyage.partition_neighbours import neighbour_weights_of
 from vertex_voyage.temporal import Event, EventSequence, FromIterable
 from random import randint, random, choice, shuffle
 import numpy as np 
@@ -390,9 +391,21 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
 
     $$ S(P, v) = N(P, v) - \mu \cdot \max(0, |P| - \alpha \cdot (1 + \epsilon) \cdot \frac{1}{|P|} \sum_{P' \in P} |P'|) $$
 
-    where $N(P, v)$ is the number of neighbors of vertex $v$ in partition $P$ in the sampled events, $\mu$ is the capacity penalty coefficient, $\alpha$ is the weight of the average partition size in the capacity penalty, $\epsilon$ is the imbalance tolerance, and $|P|$ is the size of partition $P$. The partitioner assigns the vertex to the top $k$ partitions with the highest scores, where $k$ is the replication factor. If there are multiple partitions with similar scores, the partitioner randomly assigns the vertex to some of those partitions until it reaches the replication factor.
+    where $N(P, v)$ is the number of distinct neighbors $u \neq v$ of
+    vertex $v$ that are in partition $P$, among the sampled events of the
+    current buffer, $\mu$ is the capacity penalty coefficient, $\alpha$ is
+    the weight of the average partition size in the capacity penalty,
+    $\epsilon$ is the imbalance tolerance, and $|P|$ is the size of
+    partition $P$. The partitioner assigns the vertex to the top $k$
+    partitions with the highest scores, where $k$ is the replication
+    factor. Ties are broken uniformly at random.
 
-    Also, if decay is not None, the partitioner will use an exponentially decaying weight for the neighbors in the sampled events, where the weight of a neighbor that was seen $t$ time steps ago is multiplied by $\exp(-\text{decay} \cdot t)$. This allows the partitioner to give more importance to recent neighbors when assigning vertices to partitions.
+    Also, if decay is not None, the neighbors of $v$ come from the sampled
+    events of every buffer so far, and each neighbor $u$ counts
+    $\exp(-\text{decay} \cdot t(u))$ instead of 1. Here
+    $t(u) = T - T(v, u)$, where $T$ is the timestamp of the last event of
+    the current buffer and $T(v, u)$ is the timestamp of the last sampled
+    event between $v$ and $u$.
 
     Formally, the score of a partition for a vertex with decay is defined as:
 
@@ -420,11 +433,8 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         self.mu = mu
         self.epsilon = epsilon
         self.alpha = alpha
-        self.previous_capacity_estimate = 0
         self.decay = decay
-        if decay is not None:
-            self.full_graph = nx.Graph()
-            self.time = 0
+        self.neighbours = neighbour_weights_of(decay)
     def sample_events(self, buffer: EventSequence) -> list[Event]:
         events = list(buffer)
         probabilities = [
@@ -438,38 +448,48 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
                 sampled_events.append(event)
         return sampled_events
 
-    def score_partition(self, vertex, partition, buffer):
-        if self.decay is None:
-            neighbor_count = sum(1 for event in buffer if (partition.has(event.src) and event.src != vertex) or (partition.has(event.dest) and event.dest != vertex))
-        else:
-            neighbor_count = 0 
-            for event in buffer:
-                self.full_graph.add_edge(event.src, event.dest, timestamp=self.time)
-            for u, v in self.full_graph.edges():
-                if self.full_graph.has_edge(u, v):
-                    timestamp = self.full_graph[u][v]['timestamp']
-                    if partition.has(u) and u != vertex:
-                        neighbor_count += np.exp(-self.decay * (self.time - timestamp))
-                    if partition.has(v) and v != vertex:
-                        neighbor_count += np.exp(-self.decay * (self.time - timestamp))
-            self.time += 1
-        average_capacity = self.alpha * (np.mean([partition.size() for partition in self.partitions]) if self.partitions else 0) * (1 + self.epsilon) + (1 - self.alpha) * self.previous_capacity_estimate
-        self.previous_capacity_estimate = average_capacity
-        capacity_penalty = self.mu * max(0, partition.size() - average_capacity)
-        score = neighbor_count - capacity_penalty
-        return score
+    def score_partition(self, vertex, partition: Partition) -> float:
+        neighbour_weight = sum(
+            weight
+            for neighbour, weight in self.neighbours.weights_of(vertex).items()
+            if partition.has(neighbour)
+        )
+        return neighbour_weight - self.capacity_penalty_of(partition)
+
+    def capacity_penalty_of(self, partition: Partition) -> float:
+        sizes = [candidate.size() for candidate in self.partitions]
+        average_size = float(np.mean(sizes)) if sizes else 0.0
+        capacity = self.alpha * (1 + self.epsilon) * average_size
+        return self.mu * max(0.0, partition.size() - capacity)
+
+    def best_partitions_of(self, vertex) -> list[Partition]:
+        candidates = list(self.partitions)
+        shuffle(candidates)
+        ranked = sorted(
+            candidates,
+            key=lambda partition: self.score_partition(vertex, partition),
+            reverse=True,
+        )
+        return ranked[:self.replication_factor]
 
     def push(self, buffer: EventSequence):
         """
         Assign each vertex to the partition that contains the most neighbors of the vertex in the sampled events. Then connect the vertices in the same partition according to the events in the buffer.
         """
-        buffer = list(buffer)
-        buffer = self.sample_events(buffer=buffer)
+        events = list(buffer)
+        if events:
+            self.partition_events(events)
+        else:
+            logger.debug("Empty buffer, no vertex to partition")
+
+    def partition_events(self, events: list[Event]) -> None:
+        buffer = self.sample_events(buffer=events)
+        self.neighbours.observe(buffer, events[-1].timestamp)
         for event in buffer:
             for vertex in [event.src, event.dest]:
-                best_partitions = sorted(self.partitions, key=lambda partition: self.score_partition(vertex, partition, buffer), reverse=True)[:self.replication_factor]
+                best_partitions = self.best_partitions_of(vertex)
                 for partition in best_partitions:
-                    logger.debug(f"Assigning vertex {vertex} to partition {partition} based on score: {self.score_partition(vertex, partition, buffer)}")
+                    logger.debug(f"Assigning vertex {vertex} to partition {partition} based on score: {self.score_partition(vertex, partition)}")
                     partition.add(vertex)
                 shuffled_partitions = self.partitions.copy()
                 shuffled_partitions = list(shuffled_partitions)

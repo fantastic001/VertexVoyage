@@ -65,33 +65,81 @@ The hyperparameters were selected in [E02](../results/E02-hyperparameters/README
 ## Streaming neighbour partitioner (`neighbors.all`)
 
 The partition of a vertex is the partition holding most of its neighbours in
-the sampled events. The partitioner samples events according to a
-distribution $\Pr(\text{event} \mid \text{vertex})$ and scores each
-partition $Q$ for vertex $v$ by
+the sampled events.
+
+Let $Q_1, \dots, Q_P$ be the partitions and $B$ the current buffer. The
+partitioner keeps each event $e = (s, d) \in B$ with probability
+$\Pr(e \mid s) + \Pr(e \mid d)$. `neighbors.all` keeps every event. Let
+$E_B \subseteq B$ be the kept (sampled) events. The neighbours of $v$ in the
+current buffer are
 
 $$
-S(Q, v) = N(Q, v) - \mu \cdot \max\Big(0,\; |Q| - \alpha (1 + \epsilon) \frac{1}{P} \sum_{Q'} |Q'|\Big),
+\mathcal{N}_B(v) = \{\, u \neq v : (v, u) \in E_B \text{ or } (u, v) \in E_B \,\}.
+$$
+
+For a partition $Q$, let $N(Q, v) = |\mathcal{N}_B(v) \cap Q|$ be the
+number of distinct neighbours of $v$ in $Q$. The capacity is
+$C = \alpha (1 + \epsilon) \frac{1}{P} \sum_{Q'} |Q'|$, and the score of $Q$
+for $v$ is
+
+$$
+S(Q, v) = N(Q, v) - \mu \cdot \max\big(0,\; |Q| - C\big),
 $$
 
 where:
-- $N(Q, v)$ is the number of neighbours of $v$ in $Q$ among the sampled
-  events;
 - $\mu$ is the capacity-penalty coefficient;
 - $\alpha$ weights the average partition size;
 - $\epsilon$ is the imbalance tolerance.
 
-The vertex is assigned to the top $RF$ partitions, and ties are broken at
-random. With `--decay` $\lambda > 0$, each neighbour seen $t$ steps ago
-counts $e^{-\lambda t}$ instead of $1$:
+The sampled events are processed in stream order. Each endpoint $v$ is
+placed in the $RF$ partitions with the highest scores and removed from all
+other partitions (a repartitioning). Ties are broken uniformly at random,
+using the seeded random state.
+
+**Decay.** With `--decay` $\lambda > 0$, the neighbours come from the
+sampled events of every buffer so far, $\mathcal{N}_{\le B}(v)$, and each
+neighbour $u$ counts $e^{-\lambda\, t(u)}$ instead of $1$:
 
 $$
-S(Q, v) = \sum_{u \in N(Q, v)} e^{-\lambda\, t(u)} - \mu \cdot \max\Big(0,\; |Q| - \alpha (1 + \epsilon) \frac{1}{P} \sum_{Q'} |Q'|\Big).
+S(Q, v) = \sum_{u \in \mathcal{N}_{\le B}(v) \cap Q} e^{-\lambda\, t(u)} - \mu \cdot \max\big(0,\; |Q| - C\big),
+\qquad t(u) = T_B - T(v, u),
 $$
 
-With $\mu = 0$ there is no capacity penalty, and in every run the
-partitioner places all vertices in one partition
-([E04](../results/E04-balance-penalty/README.md)). The `random` partitioner
-assigns vertices uniformly at random and is the structure-blind control.
+where:
+- $T_B$ is the timestamp of the last event of $B$;
+- $T(v, u)$ is the timestamp of the last sampled event between $v$ and $u$.
+
+Corner cases:
+- If the stream is not ordered by time (`--ordering bfs|random`), $t(u)$
+  can be negative and the weight then exceeds $1$. Weights are capped at
+  the largest finite float.
+- On CITESEER every event has timestamp $1$, so decay has no effect there.
+
+**Example.** Let $Q_0 = \{a, b\}$ and $Q_1 = \{c, d\}$, with $\mu = 0$, and
+let $B$ hold the events $ab$, $cd$, $xa$ and $yc$. Then
+$\mathcal{N}_B(x) = \{a\}$ and $\mathcal{N}_B(y) = \{c\}$, so
+
+$$
+S(Q_0, x) = 1,\quad S(Q_1, x) = 0,\quad S(Q_0, y) = 0,\quad S(Q_1, y) = 1.
+$$
+
+The vertex $x$ goes to $Q_0$ and $y$ goes to $Q_1$. With $\mu = 1$ and
+$\epsilon = 0.1$, the capacity is $C = 1.1 \cdot 2 = 2.2$, so neither
+partition is penalised and the placement is the same.
+
+**Earlier score.** Until 2026-11-19 the code computed $N(Q, v)$ as the
+number of sampled events with an endpoint in $Q$ other than $v$, whether or
+not the event touched $v$. All vertices of a buffer then got the same scores
+and moved to the same partition. The results recorded before that date
+(E02–E11) used that score:
+- With $\mu = 0$, every run placed all vertices in one partition
+  ([E04](../results/E04-balance-penalty/README.md)).
+- On CITESEER with $P = 8$, buffer 1000, $\mu = 1$ and $\alpha = 1$, the
+  documented score lowers the edge cut after the last buffer from 48% to
+  27%.
+
+The `random` partitioner assigns vertices uniformly at random and is the
+structure-blind control.
 
 **Related work.** LDG (Stanton and Kliot, KDD 2012) uses the score
 $|N(Q, v)| \cdot (1 - |Q|/C)$ and FENNEL (Tsourakakis et al., WSDM 2014)
