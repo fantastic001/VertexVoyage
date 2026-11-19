@@ -4,12 +4,18 @@ from collections.abc import Callable
 
 import numpy as np
 
-from vertex_voyage.config import get_config_int
+from vertex_voyage.config import get_config_bool, get_config_int
 
 logger = logging.getLogger("Seeding")
 
 DEFAULT_SEED = get_config_int("default_seed", -1, "Seed used by seeded commands when none is given")
 MAX_SEED_EXCLUSIVE = 2 ** 32
+DETERMINISTIC_TORCH_ALGORITHMS = get_config_bool(
+    "deterministic_torch_algorithms",
+    True,
+    "Restrict seeded runs to deterministic torch algorithms, so that a seed "
+    "reproduces the same results bit for bit",
+)
 
 
 def _seed_builtin_random(seed: int) -> None:
@@ -31,6 +37,10 @@ def _seed_torch(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
     if torch.backends.mps.is_available():
         torch.mps.manual_seed(seed)
+    torch.use_deterministic_algorithms(DETERMINISTIC_TORCH_ALGORITHMS)
+    logger.info(
+        "Deterministic torch algorithms: %s", DETERMINISTIC_TORCH_ALGORITHMS
+    )
 
 
 def _seed_tensorflow(seed: int) -> None:

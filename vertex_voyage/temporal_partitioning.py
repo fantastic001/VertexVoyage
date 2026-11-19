@@ -425,18 +425,18 @@ class MostCommonNeighborPartitioner(TemporalGraphPartitioner):
         if decay is not None:
             self.full_graph = nx.Graph()
             self.time = 0
-    def sample_events(self, buffer: EventSequence) -> set[Event]:
+    def sample_events(self, buffer: EventSequence) -> list[Event]:
         events = list(buffer)
         probabilities = [
-            self.distribution(event.src, event) + 
-            self.distribution(event.dest, event) 
+            self.distribution(event.src, event) +
+            self.distribution(event.dest, event)
             for event in events
         ]
         sampled_events = []
         for event, p in zip(events, probabilities):
             if random() <= p:
                 sampled_events.append(event)
-        return set(sampled_events)
+        return sampled_events
 
     def score_partition(self, vertex, partition, buffer):
         if self.decay is None:

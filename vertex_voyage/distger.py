@@ -1,11 +1,34 @@
+import functools
+import logging
 import math
 import random
+import secrets
 from collections import defaultdict
-from typing import List, Dict, Tuple
+from typing import Callable, List, Dict, Optional, Tuple
 from vertex_voyage import node2vec
 from vertex_voyage.node2vec import Node2Vec
 import networkx as nx
-import vertex_voyage_native as native 
+import vertex_voyage_native as native
+
+logger = logging.getLogger(__name__)
+
+WALK_SEED_BITS = 64
+
+
+def entropy_walk_seed() -> int:
+    return secrets.randbits(WALK_SEED_BITS)
+
+
+def walk_seeds_of(seed: Optional[int]) -> Callable[[], int]:
+    if seed is not None:
+        return functools.partial(
+            random.Random(seed).getrandbits,
+            WALK_SEED_BITS,
+        )
+    else:
+        return entropy_walk_seed
+
+
 class Walker:
     def __init__(self, id):
         self.id = id
@@ -151,10 +174,12 @@ class DistGER(Node2Vec):
         self.threshold = threshold
         self.min_walk_size = min_walk_size
         self.adjacency = None
+        self.next_walk_seed = walk_seeds_of(seed)
+        logger.info("DistGER walks are seeded from seed %s", seed)
         super().__init__(dim, max_walk_size, n_walks, window_size, epochs, p, q, negative_sample_num, learning_rate, seed, use_threads)
 
     def _random_walk(self, node):
-        walker = native.Walker(node)
+        walker = native.Walker(node, self.next_walk_seed())
         if self.adjacency is None:
             self.adjacency = {v: [
                 (n, len(set(self.G.neighbors(v)) & set(self.G.neighbors(n)))) 

@@ -70,7 +70,7 @@ Proposed series of three papers for the PhD dissertation, to be confirmed
 | | ID | Task | Notes |
 |---|---|---|---|
 | ⬜ | M1.1 | Decide and fix the `--track-seen` semantics: it is ignored once `--ordering` is set, so either drop it from the baseline or make it combine with an ordering. | [cli guide](doc/guide/cli.md#additional-temporal_test-flags) |
-| ⬜ | M1.2 | Find the source of non-determinism in aligner training. | [E10](results/E10-partition-alignment/README.md) |
+| ✅ | M1.2 | Find the source of non-determinism in aligner training. | Two causes, both fixed on 2026-11-19 ([seeding guide](doc/guide/seeding.md#deterministic-execution)): the partitioner visited events in memory-address order, and threaded torch kernels sum in a varying order. Results recorded before then, including [E10](results/E10-partition-alignment/README.md), are not bit-reproducible. |
 | ⬜ | M1.3 | Report the sample standard deviation (`ddof=1`) and 95% CIs. | `experiments/ablation/collect.py` and `scripts/analyze.py` use the population `np.std`. |
 | ⬜ | M1.4 | Store provenance (commit, date, seeds, environment, full configuration) and the per-seed raw values in every `scores.csv`; generate the results tables from them, starting with E11. | |
 | ⬜ | M1.5 | Measure test coverage and add tests for edge cut, balance, MRR tie-breaking, the scoped metrics and the new partitioners; target ≥ 80% branch coverage on metrics and partitioners. | |

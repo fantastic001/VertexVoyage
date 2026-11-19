@@ -8,6 +8,8 @@ use rand::{Rng};
 use rand_chacha::{ChaCha20Rng, ChaChaRng, rand_core::{RngCore, SeedableRng}};
 use std::collections::HashMap;
 use rand::prelude::IndexedRandom;
+use rand::rngs::StdRng;
+use rand::SeedableRng as _;
 
 struct Edge {
     dist: f64,
@@ -286,12 +288,13 @@ pub struct Walker {
     pub R: f64,
     pub last_vertex: Option<usize>,
     pub trace_flag: bool,
+    rng: StdRng,
 }
 
 #[pymethods]
 impl Walker {
     #[new]
-    pub fn new(id: usize) -> Self {
+    pub fn new(id: usize, seed: u64) -> Self {
         Walker {
             id,
             step: 0,
@@ -306,6 +309,7 @@ impl Walker {
             R: 1.0,
             last_vertex: None,
             trace_flag: false,
+            rng: StdRng::seed_from_u64(seed),
         }
     }
 }
@@ -333,16 +337,25 @@ impl Graph {
     /// Equivalent of random_neighbor(self, vertex)
     /// Returns Some((dst, common_neighbors)) or None
     pub fn random_neighbor(&self, vertex: usize) -> Option<(usize, usize)> {
-        let mut rng = rand::thread_rng();
-        self.adjacency
-            .get(&vertex)
-            .and_then(|neighbors| neighbors.choose(&mut rng).copied())
+        self.neighbor_drawn_by(vertex, &mut rand::thread_rng())
     }
 
     /// Placeholder for is_remote (always false, as in Python)
     pub fn is_remote(&self, _vertex: usize) -> bool {
         // TODO: define proper logic
         false
+    }
+}
+
+impl Graph {
+    fn neighbor_drawn_by<R: Rng + ?Sized>(
+        &self,
+        vertex: usize,
+        rng: &mut R,
+    ) -> Option<(usize, usize)> {
+        self.adjacency
+            .get(&vertex)
+            .and_then(|neighbors| neighbors.choose(rng).copied())
     }
 }
 
@@ -415,7 +428,6 @@ pub fn walk(
     min_length: usize,
     max_length: usize,
 ) -> Vec<usize> {
-    let mut rng = rand::thread_rng();
     let mut walker_to_path_count: HashMap<usize, usize> = HashMap::new();
 
     let mut path = Vec::new();
@@ -450,7 +462,7 @@ pub fn walk(
             break;
         }
 
-        let candidate = graph.random_neighbor(current_v);
+        let candidate = graph.neighbor_drawn_by(current_v, &mut walker.rng);
         let (dst, common_neighbors) = match candidate {
             Some(c) => c,
             None => break,
@@ -477,7 +489,7 @@ pub fn walk(
         };
 
         let p_norm = (p_accept as f64).tanh();
-        let p: f64 = rng.gen();
+        let p: f64 = walker.rng.random();
 
         if p_norm < p && walker.step > min_length {
             walker.trace_flag = true;

@@ -24,13 +24,53 @@ the number of completed runs, `n=k/10`. Older results (E02–E06) were
 recorded without fixed seeds. [ROADMAP.md](../../ROADMAP.md) lists them
 for re-running.
 
-## Known non-determinism
+## Deterministic execution
 
-The alignment aggregator is not bit-reproducible at a fixed seed: two Enron
-runs with the same seed ended at different losses (see
-[E10](../../results/E10-partition-alignment/README.md#open-issues)).
-Candidate causes are unseeded negative sampling and nondeterministic
-threaded kernels.
+Until 2026-11-19 a fixed seed did not make `vv temporal_test`
+bit-reproducible. Two runs with the same seed could end with different
+partitions, embeddings and scores. For example, two Enron runs ended at
+different aligner losses
+([E10](../../results/E10-partition-alignment/README.md#open-issues)). There
+were two causes, and both are fixed.
+
+1. **Event order in the partitioner.**
+   - `MostCommonNeighborPartitioner.sample_events` returned a `set` of
+     `Event` objects.
+   - `Event` defines no `__hash__`, so the set iterated in memory-address
+     order, which changes from one process to the next.
+   - The greedy assignment depends on that order. On the first 1000
+     CITESEER events at $P = 8$, eight processes gave partition sizes such
+     as $\{1042\}$, $\{970, 3, 69\}$, $\{16, 1026\}$ and $\{2, 1040\}$.
+   - The set never removed duplicates, because identity hashing only drops
+     the same object twice. The partitioner now visits the sampled events
+     in stream order.
+2. **Threaded torch kernels.**
+   - Threaded reductions add numbers in an order that varies from run to
+     run.
+   - With identical partitions and partition models, the triplet aligner
+     started every run at the same loss. By epoch 100 the losses differed
+     by about $10^{-6}$, and the difference grew over the buffers.
+   - `seed_shared_random_state` now calls
+     `torch.use_deterministic_algorithms(True)`.
+
+The config key `deterministic_torch_algorithms` (environment variable
+`VERTEX_VOYAGE_DETERMINISTIC_TORCH_ALGORITHMS`, default `true`) controls
+the second fix. While it is on, torch raises a `RuntimeError` for any
+operation that has no deterministic implementation. Set it to `false` to
+run such code, at the cost of reproducibility.
+
+With both fixes, two full CITESEER runs ($P = 8$, buffer 1000, triplet
+aggregator, hadamard link prediction) in separate processes give identical
+partitions, F1 and link-prediction scores after every buffer.
+
+Python's string hashing (`PYTHONHASHSEED`) does not affect the streaming
+pipeline. `temporal_test` numbers the vertices in order of first appearance
+(`VertexEnumerator`), so sets of vertices iterate in the same order in every
+process.
+
+Results recorded before 2026-11-19 with `neighbors.all` or an alignment
+aggregator are not bit-reproducible. Their spread over seeds also includes
+this run-to-run variation.
 
 ## Pattern: independent streams per pipeline step
 

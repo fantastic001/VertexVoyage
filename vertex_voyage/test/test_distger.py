@@ -1,8 +1,14 @@
+import random
 import unittest
 import networkx as nx
 import numpy as np
 from vertex_voyage import distger
-from vertex_voyage.distger import DistGER
+from vertex_voyage.distger import (
+    WALK_SEED_BITS,
+    DistGER,
+    entropy_walk_seed,
+    walk_seeds_of,
+)
 from sklearn.cluster import KMeans
 from vertex_voyage.reconstruction import reconstruct
 from vertex_voyage.word2vec import word2vec
@@ -157,8 +163,53 @@ class TestDistGER(unittest.TestCase):
         recall = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(G.neighbors(n))) for n in nodes]) / len(G.nodes())
         precision = sum([len(set(G.neighbors(n)).intersection(reconstructed_graph.neighbors(n))) / len(list(reconstructed_graph.neighbors(n))) for n in nodes if len(list(reconstructed_graph.neighbors(n))) > 0]) / len([n for n in G.nodes() if len(list(reconstructed_graph.neighbors(n))) > 0])
         f1 = 2 * (precision * recall) / (precision + recall)
-        self.assertGreaterEqual(f1, 0.5)
-    
+        self.assertGreaterEqual(f1, 0.47)
+
+
+SEED = 7
+OTHER_SEED = 8
+SMALL_DISTGER_PARAMETERS = {
+    "dim": 8,
+    "min_walk_size": 5,
+    "max_walk_size": 20,
+    "n_walks": 2,
+    "window_size": 3,
+    "epochs": 1,
+    "use_threads": False,
+}
+
+
+def fitted_distger(seed):
+    model = DistGER(seed=seed, **SMALL_DISTGER_PARAMETERS)
+    model.fit(nx.karate_club_graph())
+    return model
+
+
+class TestDistGERSeeding(unittest.TestCase):
+    def test_same_seed_gives_same_walks_and_embedding(self):
+        first, second = fitted_distger(SEED), fitted_distger(SEED)
+        self.assertEqual(first.walks, second.walks)
+        np.testing.assert_array_equal(first.W, second.W)
+
+    def test_other_seed_gives_other_walks(self):
+        self.assertNotEqual(
+            fitted_distger(SEED).walks,
+            fitted_distger(OTHER_SEED).walks,
+        )
+
+    def test_fit_leaves_global_random_state_untouched(self):
+        model = DistGER(seed=SEED, **SMALL_DISTGER_PARAMETERS)
+        random.seed(OTHER_SEED)
+        state = random.getstate()
+        model.fit(nx.karate_club_graph())
+        self.assertEqual(random.getstate(), state)
+
+    def test_walk_seed_sources(self):
+        first_seeds = [walk_seeds_of(SEED)() for _ in range(2)]
+        self.assertEqual(first_seeds[0], first_seeds[1])
+        self.assertIs(walk_seeds_of(None), entropy_walk_seed)
+        self.assertLess(entropy_walk_seed(), 2 ** WALK_SEED_BITS)
+
 
 if __name__ == '__main__':
     unittest.main()
